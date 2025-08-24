@@ -1,0 +1,6 @@
+--bad yuecheck:ignore
+-- good
+--[[ okay
+i guess
+]]
+print 1

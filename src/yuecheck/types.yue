@@ -1,0 +1,3503 @@
+-- yuecheck:ignore
+-- generated code; do not edit
+import 'yuecheck.ast_impl' as ast
+_selector_t = ast._selector_t
+_selector_list_t = ast._selector_list_t
+_list_t = ast._list_t
+Node = ast.Node
+Leaf = ast.Leaf
+ast_nodes = {}
+_in = (val, set) ->
+  for i,v in ipairs set
+    return true if v == val
+  false
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L92
+class Num extends Leaf
+  @yue_name: 'Num'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.Num = Num
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L95
+class Name extends Leaf
+  @yue_name: 'Name'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.Name = Name
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L98
+class UnicodeName extends Leaf
+  @yue_name: 'UnicodeName'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.UnicodeName = UnicodeName
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L101
+class Variable extends Node
+  @yue_name: 'Variable'
+  
+  -- @name: _sel_t(true,Name,UnicodeName)
+  new: (name = nil) =>
+    @name = name
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and _in v\g_yue_name!, {'Name','UnicodeName'}
+        @name = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    visitor @
+ast_nodes.Variable = Variable
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L106
+class LabelName extends Node
+  @yue_name: 'LabelName'
+  
+  -- @name(true): ast_nodes.UnicodeName
+  new: (name = nil) =>
+    @name = name
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and v\g_yue_name! == 'UnicodeName'
+        @name = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    visitor @
+ast_nodes.LabelName = LabelName
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L111
+class LuaKeyword extends Node
+  @yue_name: 'LuaKeyword'
+  
+  -- @name(true): ast_nodes.Name
+  new: (name = nil) =>
+    @name = name
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and v\g_yue_name! == 'Name'
+        @name = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    visitor @
+ast_nodes.LuaKeyword = LuaKeyword
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L116
+class Self extends Leaf
+  @yue_name: 'Self'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.Self = Self
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L119
+class SelfName extends Node
+  @yue_name: 'SelfName'
+  
+  -- @name: _sel_t(true,Name,UnicodeName)
+  new: (name = nil) =>
+    @name = name
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and _in v\g_yue_name!, {'Name','UnicodeName'}
+        @name = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    visitor @
+ast_nodes.SelfName = SelfName
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L124
+class SelfClass extends Leaf
+  @yue_name: 'SelfClass'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.SelfClass = SelfClass
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L127
+class SelfClassName extends Node
+  @yue_name: 'SelfClassName'
+  
+  -- @name: _sel_t(true,Name,UnicodeName)
+  new: (name = nil) =>
+    @name = name
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and _in v\g_yue_name!, {'Name','UnicodeName'}
+        @name = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    visitor @
+ast_nodes.SelfClassName = SelfClassName
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L132
+class SelfItem extends Node
+  @yue_name: 'SelfItem'
+  
+  -- @name: _sel_t(true,SelfClassName,SelfClass,SelfName,Self)
+  new: (name = nil) =>
+    @name = name
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and _in v\g_yue_name!, {'SelfClassName','SelfClass','SelfName','Self'}
+        @name = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    visitor @
+ast_nodes.SelfItem = SelfItem
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L137
+class KeyName extends Node
+  @yue_name: 'KeyName'
+  
+  -- @name: _sel_t(true,SelfItem,Name,UnicodeName)
+  new: (name = nil) =>
+    @name = name
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and _in v\g_yue_name!, {'SelfItem','Name','UnicodeName'}
+        @name = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    visitor @
+ast_nodes.KeyName = KeyName
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L142
+class VarArg extends Leaf
+  @yue_name: 'VarArg'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.VarArg = VarArg
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L145
+class LocalFlag extends Leaf
+  @yue_name: 'LocalFlag'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.LocalFlag = LocalFlag
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L151
+class NameList extends Node
+  @yue_name: 'NameList'
+  
+  -- @names: _list_t(true,Variable)
+  new: (names = {}) =>
+    @names = names
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'Variable'}
+        table.insert @names, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@names
+    visitor @
+ast_nodes.NameList = NameList
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L157
+class LocalValues extends Node
+  @yue_name: 'LocalValues'
+  
+  -- @nameList(true): ast_nodes.NameList
+  -- @valueList: _sel_t(false,TableBlock,ExpListLow)
+  new: (nameList = nil, valueList = nil) =>
+    @nameList = nameList
+    @valueList = valueList
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @nameList) and v\g_yue_name! == 'NameList'
+        @nameList = v
+        continue
+      if (not @valueList) and _in v\g_yue_name!, {'TableBlock','ExpListLow'}
+        @valueList = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @nameList\walk visitor
+    @valueList\walk visitor if @valueList
+    visitor @
+ast_nodes.LocalValues = LocalValues
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L163
+class Local extends Node
+  @yue_name: 'Local'
+  
+  -- @item: _sel_t(true,LocalFlag,LocalValues)
+  new: (item = nil) =>
+    @item = item
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @item) and _in v\g_yue_name!, {'LocalFlag','LocalValues'}
+        @item = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @item\walk visitor
+    visitor @
+ast_nodes.Local = Local
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L172
+class ConstAttrib extends Leaf
+  @yue_name: 'ConstAttrib'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.ConstAttrib = ConstAttrib
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L175
+class CloseAttrib extends Leaf
+  @yue_name: 'CloseAttrib'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.CloseAttrib = CloseAttrib
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L178
+class LocalAttrib extends Node
+  @yue_name: 'LocalAttrib'
+  
+  -- @attrib: _sel_t(true,ConstAttrib,CloseAttrib)
+  -- @leftList: _sel_list_t(true,Variable,SimpleTable,TableLit,Comprehension)
+  -- @assign(true): ast_nodes.Assign
+  new: (attrib = nil, leftList = {}, assign = nil) =>
+    @attrib = attrib
+    @leftList = leftList
+    @assign = assign
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @attrib) and _in v\g_yue_name!, {'ConstAttrib','CloseAttrib'}
+        @attrib = v
+        continue
+      if _in v\g_yue_name!, {'Variable','SimpleTable','TableLit','Comprehension'}
+        table.insert @leftList, v
+        continue
+      if (not @assign) and v\g_yue_name! == 'Assign'
+        @assign = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @attrib\walk visitor
+    node\walk visitor for node in *@leftList
+    @assign\walk visitor
+    visitor @
+ast_nodes.LocalAttrib = LocalAttrib
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L187
+class ColonImportName extends Node
+  @yue_name: 'ColonImportName'
+  
+  -- @name(true): ast_nodes.Variable
+  new: (name = nil) =>
+    @name = name
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and v\g_yue_name! == 'Variable'
+        @name = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    visitor @
+ast_nodes.ColonImportName = ColonImportName
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L192
+class ImportLiteralInner extends Leaf
+  @yue_name: 'ImportLiteralInner'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.ImportLiteralInner = ImportLiteralInner
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L195
+class ImportLiteral extends Node
+  @yue_name: 'ImportLiteral'
+  
+  -- @inners: _sel_list_t(true,ImportLiteralInner)
+  new: (inners = {}) =>
+    @inners = inners
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'ImportLiteralInner'}
+        table.insert @inners, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@inners
+    visitor @
+ast_nodes.ImportLiteral = ImportLiteral
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L201
+class ImportFrom extends Node
+  @yue_name: 'ImportFrom'
+  
+  -- @names: _sel_list_t(true,ColonImportName,Variable)
+  -- @item: _sel_t(true,ImportLiteral,Exp)
+  new: (names = {}, item = nil) =>
+    @names = names
+    @item = item
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'ColonImportName','Variable'}
+        table.insert @names, v
+        continue
+      if (not @item) and _in v\g_yue_name!, {'ImportLiteral','Exp'}
+        @item = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@names
+    @item\walk visitor
+    visitor @
+ast_nodes.ImportFrom = ImportFrom
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L208
+class FromImport extends Node
+  @yue_name: 'FromImport'
+  
+  -- @item: _sel_t(true,ImportLiteral,Exp)
+  -- @names: _sel_list_t(true,ColonImportName,Variable)
+  new: (item = nil, names = {}) =>
+    @item = item
+    @names = names
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @item) and _in v\g_yue_name!, {'ImportLiteral','Exp'}
+        @item = v
+        continue
+      if _in v\g_yue_name!, {'ColonImportName','Variable'}
+        table.insert @names, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @item\walk visitor
+    node\walk visitor for node in *@names
+    visitor @
+ast_nodes.FromImport = FromImport
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L215
+class MacroNamePair extends Node
+  @yue_name: 'MacroNamePair'
+  
+  -- @key(true): ast_nodes.MacroName
+  -- @value(true): ast_nodes.MacroName
+  new: (key = nil, value = nil) =>
+    @key = key
+    @value = value
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @key) and v\g_yue_name! == 'MacroName'
+        @key = v
+        continue
+      if (not @value) and v\g_yue_name! == 'MacroName'
+        @value = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @key\walk visitor
+    @value\walk visitor
+    visitor @
+ast_nodes.MacroNamePair = MacroNamePair
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L221
+class ImportAllMacro extends Leaf
+  @yue_name: 'ImportAllMacro'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.ImportAllMacro = ImportAllMacro
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L224
+class ImportTabLit extends Node
+  @yue_name: 'ImportTabLit'
+  
+  -- @items: _sel_list_t(false,VariablePair,NormalPair,MacroName,MacroNamePair,ImportAllMacro,Exp,MetaVariablePair,MetaNormalPair)
+  new: (items = {}) =>
+    @items = items
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'VariablePair','NormalPair','MacroName','MacroNamePair','ImportAllMacro','Exp','MetaVariablePair','MetaNormalPair'}
+        table.insert @items, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@items
+    visitor @
+ast_nodes.ImportTabLit = ImportTabLit
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L230
+class ImportAs extends Node
+  @yue_name: 'ImportAs'
+  
+  -- @literal(true): ast_nodes.ImportLiteral
+  -- @target: _sel_t(false,Variable,ImportTabLit,ImportAllMacro)
+  new: (literal = nil, target = nil) =>
+    @literal = literal
+    @target = target
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @literal) and v\g_yue_name! == 'ImportLiteral'
+        @literal = v
+        continue
+      if (not @target) and _in v\g_yue_name!, {'Variable','ImportTabLit','ImportAllMacro'}
+        @target = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @literal\walk visitor
+    @target\walk visitor if @target
+    visitor @
+ast_nodes.ImportAs = ImportAs
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L236
+class ImportGlobal extends Node
+  @yue_name: 'ImportGlobal'
+  
+  -- @segs: _list_t(true,UnicodeName)
+  -- @target(false): ast_nodes.Variable
+  new: (segs = {}, target = nil) =>
+    @segs = segs
+    @target = target
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'UnicodeName'}
+        table.insert @segs, v
+        continue
+      if (not @target) and v\g_yue_name! == 'Variable'
+        @target = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@segs
+    @target\walk visitor if @target
+    visitor @
+ast_nodes.ImportGlobal = ImportGlobal
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L243
+class Import extends Node
+  @yue_name: 'Import'
+  
+  -- @content: _sel_t(true,ImportAs,ImportFrom,FromImport,ImportGlobal)
+  new: (content = nil) =>
+    @content = content
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @content) and _in v\g_yue_name!, {'ImportAs','ImportFrom','FromImport','ImportGlobal'}
+        @content = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @content\walk visitor
+    visitor @
+ast_nodes.Import = Import
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L248
+class Label extends Node
+  @yue_name: 'Label'
+  
+  -- @label(true): ast_nodes.LabelName
+  new: (label = nil) =>
+    @label = label
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @label) and v\g_yue_name! == 'LabelName'
+        @label = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @label\walk visitor
+    visitor @
+ast_nodes.Label = Label
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L253
+class Goto extends Node
+  @yue_name: 'Goto'
+  
+  -- @label(true): ast_nodes.LabelName
+  new: (label = nil) =>
+    @label = label
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @label) and v\g_yue_name! == 'LabelName'
+        @label = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @label\walk visitor
+    visitor @
+ast_nodes.Goto = Goto
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L258
+class ShortTabAppending extends Node
+  @yue_name: 'ShortTabAppending'
+  
+  -- @assign(true): ast_nodes.Assign
+  new: (assign = nil) =>
+    @assign = assign
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @assign) and v\g_yue_name! == 'Assign'
+        @assign = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @assign\walk visitor
+    visitor @
+ast_nodes.ShortTabAppending = ShortTabAppending
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L263
+class FnArrowBack extends Leaf
+  @yue_name: 'FnArrowBack'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.FnArrowBack = FnArrowBack
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L266
+class Backcall extends Node
+  @yue_name: 'Backcall'
+  
+  -- @argsDef(false): ast_nodes.FnArgsDef
+  -- @arrow(true): ast_nodes.FnArrowBack
+  -- @value(true): ast_nodes.ChainValue
+  new: (argsDef = nil, arrow = nil, value = nil) =>
+    @argsDef = argsDef
+    @arrow = arrow
+    @value = value
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @argsDef) and v\g_yue_name! == 'FnArgsDef'
+        @argsDef = v
+        continue
+      if (not @arrow) and v\g_yue_name! == 'FnArrowBack'
+        @arrow = v
+        continue
+      if (not @value) and v\g_yue_name! == 'ChainValue'
+        @value = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @argsDef\walk visitor if @argsDef
+    @arrow\walk visitor
+    @value\walk visitor
+    visitor @
+ast_nodes.Backcall = Backcall
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L273
+class ExpListLow extends Node
+  @yue_name: 'ExpListLow'
+  
+  -- @exprs: _list_t(true,Exp)
+  new: (exprs = {}) =>
+    @exprs = exprs
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'Exp'}
+        table.insert @exprs, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@exprs
+    visitor @
+ast_nodes.ExpListLow = ExpListLow
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L279
+class ExpList extends Node
+  @yue_name: 'ExpList'
+  
+  -- @exprs: _list_t(true,Exp)
+  new: (exprs = {}) =>
+    @exprs = exprs
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'Exp'}
+        table.insert @exprs, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@exprs
+    visitor @
+ast_nodes.ExpList = ExpList
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L287
+class Return extends Node
+  @yue_name: 'Return'
+  
+  -- @valueList: _sel_t(false,TableBlock,ExpListLow)
+  new: (valueList = nil) =>
+    @valueList = valueList
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @valueList) and _in v\g_yue_name!, {'TableBlock','ExpListLow'}
+        @valueList = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @valueList\walk visitor if @valueList
+    visitor @
+ast_nodes.Return = Return
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L294
+class With extends Node
+  @yue_name: 'With'
+  
+  -- @eop(false): ast_nodes.ExistentialOp
+  -- @valueList(true): ast_nodes.ExpList
+  -- @assign(false): ast_nodes.Assign
+  -- @body: _sel_t(true,Block,Statement)
+  new: (eop = nil, valueList = nil, assign = nil, body = nil) =>
+    @eop = eop
+    @valueList = valueList
+    @assign = assign
+    @body = body
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @eop) and v\g_yue_name! == 'ExistentialOp'
+        @eop = v
+        continue
+      if (not @valueList) and v\g_yue_name! == 'ExpList'
+        @valueList = v
+        continue
+      if (not @assign) and v\g_yue_name! == 'Assign'
+        @assign = v
+        continue
+      if (not @body) and _in v\g_yue_name!, {'Block','Statement'}
+        @body = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @eop\walk visitor if @eop
+    @valueList\walk visitor
+    @assign\walk visitor if @assign
+    @body\walk visitor
+    visitor @
+ast_nodes.With = With
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L302
+class SwitchList extends Node
+  @yue_name: 'SwitchList'
+  
+  -- @exprs: _list_t(true,Exp)
+  new: (exprs = {}) =>
+    @exprs = exprs
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'Exp'}
+        table.insert @exprs, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@exprs
+    visitor @
+ast_nodes.SwitchList = SwitchList
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L308
+class SwitchCase extends Node
+  @yue_name: 'SwitchCase'
+  
+  -- @condition(true): ast_nodes.SwitchList
+  -- @body: _sel_t(true,Block,Statement)
+  new: (condition = nil, body = nil) =>
+    @condition = condition
+    @body = body
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @condition) and v\g_yue_name! == 'SwitchList'
+        @condition = v
+        continue
+      if (not @body) and _in v\g_yue_name!, {'Block','Statement'}
+        @body = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @condition\walk visitor
+    @body\walk visitor
+    visitor @
+ast_nodes.SwitchCase = SwitchCase
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L314
+class Assignment extends Node
+  @yue_name: 'Assignment'
+  
+  -- @expList(false): ast_nodes.ExpList
+  -- @assign(true): ast_nodes.Assign
+  new: (expList = nil, assign = nil) =>
+    @expList = expList
+    @assign = assign
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @expList) and v\g_yue_name! == 'ExpList'
+        @expList = v
+        continue
+      if (not @assign) and v\g_yue_name! == 'Assign'
+        @assign = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @expList\walk visitor if @expList
+    @assign\walk visitor
+    visitor @
+ast_nodes.Assignment = Assignment
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L320
+class Switch extends Node
+  @yue_name: 'Switch'
+  
+  -- @target(true): ast_nodes.Exp
+  -- @assignment(false): ast_nodes.Assignment
+  -- @branches: _list_t(true,SwitchCase)
+  -- @lastBranch: _sel_t(false,Block,Statement)
+  new: (target = nil, assignment = nil, branches = {}, lastBranch = nil) =>
+    @target = target
+    @assignment = assignment
+    @branches = branches
+    @lastBranch = lastBranch
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @target) and v\g_yue_name! == 'Exp'
+        @target = v
+        continue
+      if (not @assignment) and v\g_yue_name! == 'Assignment'
+        @assignment = v
+        continue
+      if _in v\g_yue_name!, {'SwitchCase'}
+        table.insert @branches, v
+        continue
+      if (not @lastBranch) and _in v\g_yue_name!, {'Block','Statement'}
+        @lastBranch = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @target\walk visitor
+    @assignment\walk visitor if @assignment
+    node\walk visitor for node in *@branches
+    @lastBranch\walk visitor if @lastBranch
+    visitor @
+ast_nodes.Switch = Switch
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L329
+class IfCond extends Node
+  @yue_name: 'IfCond'
+  
+  -- @condition(true): ast_nodes.Exp
+  -- @assignment(false): ast_nodes.Assignment
+  new: (condition = nil, assignment = nil) =>
+    @condition = condition
+    @assignment = assignment
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @condition) and v\g_yue_name! == 'Exp'
+        @condition = v
+        continue
+      if (not @assignment) and v\g_yue_name! == 'Assignment'
+        @assignment = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @condition\walk visitor
+    @assignment\walk visitor if @assignment
+    visitor @
+ast_nodes.IfCond = IfCond
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L335
+class IfType extends Leaf
+  @yue_name: 'IfType'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.IfType = IfType
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L338
+class If extends Node
+  @yue_name: 'If'
+  
+  -- @type(true): ast_nodes.IfType
+  -- @nodes: _sel_list_t(true,IfCond,Block,Statement)
+  new: (type = nil, nodes = {}) =>
+    @type = type
+    @nodes = nodes
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @type) and v\g_yue_name! == 'IfType'
+        @type = v
+        continue
+      if _in v\g_yue_name!, {'IfCond','Block','Statement'}
+        table.insert @nodes, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @type\walk visitor
+    node\walk visitor for node in *@nodes
+    visitor @
+ast_nodes.If = If
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L344
+class WhileType extends Leaf
+  @yue_name: 'WhileType'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.WhileType = WhileType
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L347
+class While extends Node
+  @yue_name: 'While'
+  
+  -- @type(true): ast_nodes.WhileType
+  -- @condition(true): ast_nodes.Exp
+  -- @assignment(false): ast_nodes.Assignment
+  -- @body: _sel_t(true,Block,Statement)
+  new: (type = nil, condition = nil, assignment = nil, body = nil) =>
+    @type = type
+    @condition = condition
+    @assignment = assignment
+    @body = body
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @type) and v\g_yue_name! == 'WhileType'
+        @type = v
+        continue
+      if (not @condition) and v\g_yue_name! == 'Exp'
+        @condition = v
+        continue
+      if (not @assignment) and v\g_yue_name! == 'Assignment'
+        @assignment = v
+        continue
+      if (not @body) and _in v\g_yue_name!, {'Block','Statement'}
+        @body = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @type\walk visitor
+    @condition\walk visitor
+    @assignment\walk visitor if @assignment
+    @body\walk visitor
+    visitor @
+ast_nodes.While = While
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L355
+class Repeat extends Node
+  @yue_name: 'Repeat'
+  
+  -- @body: _sel_t(true,Block,Statement)
+  -- @condition(true): ast_nodes.Exp
+  new: (body = nil, condition = nil) =>
+    @body = body
+    @condition = condition
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @body) and _in v\g_yue_name!, {'Block','Statement'}
+        @body = v
+        continue
+      if (not @condition) and v\g_yue_name! == 'Exp'
+        @condition = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @body\walk visitor
+    @condition\walk visitor
+    visitor @
+ast_nodes.Repeat = Repeat
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L361
+class ForStepValue extends Node
+  @yue_name: 'ForStepValue'
+  
+  -- @value(true): ast_nodes.Exp
+  new: (value = nil) =>
+    @value = value
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @value) and v\g_yue_name! == 'Exp'
+        @value = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @value\walk visitor
+    visitor @
+ast_nodes.ForStepValue = ForStepValue
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L366
+class For extends Node
+  @yue_name: 'For'
+  
+  -- @varName(true): ast_nodes.Variable
+  -- @startValue(true): ast_nodes.Exp
+  -- @stopValue(true): ast_nodes.Exp
+  -- @stepValue(false): ast_nodes.ForStepValue
+  -- @body: _sel_t(true,Block,Statement)
+  new: (varName = nil, startValue = nil, stopValue = nil, stepValue = nil, body = nil) =>
+    @varName = varName
+    @startValue = startValue
+    @stopValue = stopValue
+    @stepValue = stepValue
+    @body = body
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @varName) and v\g_yue_name! == 'Variable'
+        @varName = v
+        continue
+      if (not @startValue) and v\g_yue_name! == 'Exp'
+        @startValue = v
+        continue
+      if (not @stopValue) and v\g_yue_name! == 'Exp'
+        @stopValue = v
+        continue
+      if (not @stepValue) and v\g_yue_name! == 'ForStepValue'
+        @stepValue = v
+        continue
+      if (not @body) and _in v\g_yue_name!, {'Block','Statement'}
+        @body = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @varName\walk visitor
+    @startValue\walk visitor
+    @stopValue\walk visitor
+    @stepValue\walk visitor if @stepValue
+    @body\walk visitor
+    visitor @
+ast_nodes.For = For
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L375
+class ForEach extends Node
+  @yue_name: 'ForEach'
+  
+  -- @nameList(true): ast_nodes.AssignableNameList
+  -- @loopValue: _sel_t(true,StarExp,ExpList)
+  -- @body: _sel_t(true,Block,Statement)
+  new: (nameList = nil, loopValue = nil, body = nil) =>
+    @nameList = nameList
+    @loopValue = loopValue
+    @body = body
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @nameList) and v\g_yue_name! == 'AssignableNameList'
+        @nameList = v
+        continue
+      if (not @loopValue) and _in v\g_yue_name!, {'StarExp','ExpList'}
+        @loopValue = v
+        continue
+      if (not @body) and _in v\g_yue_name!, {'Block','Statement'}
+        @body = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @nameList\walk visitor
+    @loopValue\walk visitor
+    @body\walk visitor
+    visitor @
+ast_nodes.ForEach = ForEach
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L382
+class Do extends Node
+  @yue_name: 'Do'
+  
+  -- @body(true): ast_nodes.Body
+  new: (body = nil) =>
+    @body = body
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @body) and v\g_yue_name! == 'Body'
+        @body = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @body\walk visitor
+    visitor @
+ast_nodes.Do = Do
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L387
+class CatchBlock extends Node
+  @yue_name: 'CatchBlock'
+  
+  -- @err(true): ast_nodes.Variable
+  -- @block(true): ast_nodes.Block
+  new: (err = nil, block = nil) =>
+    @err = err
+    @block = block
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @err) and v\g_yue_name! == 'Variable'
+        @err = v
+        continue
+      if (not @block) and v\g_yue_name! == 'Block'
+        @block = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @err\walk visitor
+    @block\walk visitor
+    visitor @
+ast_nodes.CatchBlock = CatchBlock
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L393
+class Try extends Node
+  @yue_name: 'Try'
+  
+  -- @eop(false): ast_nodes.ExistentialOp
+  -- @func: _sel_t(true,Block,Exp)
+  -- @catchBlock(false): ast_nodes.CatchBlock
+  new: (eop = nil, func = nil, catchBlock = nil) =>
+    @eop = eop
+    @func = func
+    @catchBlock = catchBlock
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @eop) and v\g_yue_name! == 'ExistentialOp'
+        @eop = v
+        continue
+      if (not @func) and _in v\g_yue_name!, {'Block','Exp'}
+        @func = v
+        continue
+      if (not @catchBlock) and v\g_yue_name! == 'CatchBlock'
+        @catchBlock = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @eop\walk visitor if @eop
+    @func\walk visitor
+    @catchBlock\walk visitor if @catchBlock
+    visitor @
+ast_nodes.Try = Try
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L400
+class Comprehension extends Node
+  @yue_name: 'Comprehension'
+  
+  -- @items: _sel_list_t(false,NormalDef,SpreadListExp,CompInner,Statement)
+  new: (items = {}) =>
+    @items = items
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'NormalDef','SpreadListExp','CompInner','Statement'}
+        table.insert @items, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@items
+    visitor @
+ast_nodes.Comprehension = Comprehension
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L407
+class CompValue extends Node
+  @yue_name: 'CompValue'
+  
+  -- @value(true): ast_nodes.Exp
+  new: (value = nil) =>
+    @value = value
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @value) and v\g_yue_name! == 'Exp'
+        @value = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @value\walk visitor
+    visitor @
+ast_nodes.CompValue = CompValue
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L412
+class TblComprehension extends Node
+  @yue_name: 'TblComprehension'
+  
+  -- @key(true): ast_nodes.Exp
+  -- @value(false): ast_nodes.CompValue
+  -- @forLoop(true): ast_nodes.CompInner
+  new: (key = nil, value = nil, forLoop = nil) =>
+    @key = key
+    @value = value
+    @forLoop = forLoop
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @key) and v\g_yue_name! == 'Exp'
+        @key = v
+        continue
+      if (not @value) and v\g_yue_name! == 'CompValue'
+        @value = v
+        continue
+      if (not @forLoop) and v\g_yue_name! == 'CompInner'
+        @forLoop = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @key\walk visitor
+    @value\walk visitor if @value
+    @forLoop\walk visitor
+    visitor @
+ast_nodes.TblComprehension = TblComprehension
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L419
+class StarExp extends Node
+  @yue_name: 'StarExp'
+  
+  -- @value(true): ast_nodes.Exp
+  new: (value = nil) =>
+    @value = value
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @value) and v\g_yue_name! == 'Exp'
+        @value = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @value\walk visitor
+    visitor @
+ast_nodes.StarExp = StarExp
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L424
+class CompForEach extends Node
+  @yue_name: 'CompForEach'
+  
+  -- @nameList(true): ast_nodes.AssignableNameList
+  -- @loopValue: _sel_t(true,StarExp,Exp)
+  new: (nameList = nil, loopValue = nil) =>
+    @nameList = nameList
+    @loopValue = loopValue
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @nameList) and v\g_yue_name! == 'AssignableNameList'
+        @nameList = v
+        continue
+      if (not @loopValue) and _in v\g_yue_name!, {'StarExp','Exp'}
+        @loopValue = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @nameList\walk visitor
+    @loopValue\walk visitor
+    visitor @
+ast_nodes.CompForEach = CompForEach
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L430
+class CompFor extends Node
+  @yue_name: 'CompFor'
+  
+  -- @varName(true): ast_nodes.Variable
+  -- @startValue(true): ast_nodes.Exp
+  -- @stopValue(true): ast_nodes.Exp
+  -- @stepValue(false): ast_nodes.ForStepValue
+  new: (varName = nil, startValue = nil, stopValue = nil, stepValue = nil) =>
+    @varName = varName
+    @startValue = startValue
+    @stopValue = stopValue
+    @stepValue = stepValue
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @varName) and v\g_yue_name! == 'Variable'
+        @varName = v
+        continue
+      if (not @startValue) and v\g_yue_name! == 'Exp'
+        @startValue = v
+        continue
+      if (not @stopValue) and v\g_yue_name! == 'Exp'
+        @stopValue = v
+        continue
+      if (not @stepValue) and v\g_yue_name! == 'ForStepValue'
+        @stepValue = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @varName\walk visitor
+    @startValue\walk visitor
+    @stopValue\walk visitor
+    @stepValue\walk visitor if @stepValue
+    visitor @
+ast_nodes.CompFor = CompFor
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L438
+class CompInner extends Node
+  @yue_name: 'CompInner'
+  
+  -- @items: _sel_list_t(true,CompFor,CompForEach,Exp)
+  new: (items = {}) =>
+    @items = items
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'CompFor','CompForEach','Exp'}
+        table.insert @items, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@items
+    visitor @
+ast_nodes.CompInner = CompInner
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L444
+class Assign extends Node
+  @yue_name: 'Assign'
+  
+  -- @values: _sel_list_t(true,With,If,Switch,TableBlock,Exp)
+  new: (values = {}) =>
+    @values = values
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'With','If','Switch','TableBlock','Exp'}
+        table.insert @values, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@values
+    visitor @
+ast_nodes.Assign = Assign
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L450
+class UpdateOp extends Leaf
+  @yue_name: 'UpdateOp'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.UpdateOp = UpdateOp
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L453
+class Update extends Node
+  @yue_name: 'Update'
+  
+  -- @op(true): ast_nodes.UpdateOp
+  -- @value(true): ast_nodes.Exp
+  new: (op = nil, value = nil) =>
+    @op = op
+    @value = value
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @op) and v\g_yue_name! == 'UpdateOp'
+        @op = v
+        continue
+      if (not @value) and v\g_yue_name! == 'Exp'
+        @value = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @op\walk visitor
+    @value\walk visitor
+    visitor @
+ast_nodes.Update = Update
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L459
+class BinaryOperator extends Leaf
+  @yue_name: 'BinaryOperator'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.BinaryOperator = BinaryOperator
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L462
+class UnaryOperator extends Leaf
+  @yue_name: 'UnaryOperator'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.UnaryOperator = UnaryOperator
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L465
+class NotIn extends Leaf
+  @yue_name: 'NotIn'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.NotIn = NotIn
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L468
+class In extends Node
+  @yue_name: 'In'
+  
+  -- @not_(false): ast_nodes.NotIn
+  -- @value(true): ast_nodes.Value
+  new: (not_ = nil, value = nil) =>
+    @not_ = not_
+    @value = value
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @not_) and v\g_yue_name! == 'NotIn'
+        @not_ = v
+        continue
+      if (not @value) and v\g_yue_name! == 'Value'
+        @value = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @not_\walk visitor if @not_
+    @value\walk visitor
+    visitor @
+ast_nodes.In = In
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L474
+class Assignable extends Node
+  @yue_name: 'Assignable'
+  
+  -- @item: _sel_t(true,AssignableChain,Variable,SelfItem)
+  new: (item = nil) =>
+    @item = item
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @item) and _in v\g_yue_name!, {'AssignableChain','Variable','SelfItem'}
+        @item = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @item\walk visitor
+    visitor @
+ast_nodes.Assignable = Assignable
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L479
+class ExpOpValue extends Node
+  @yue_name: 'ExpOpValue'
+  
+  -- @op(true): ast_nodes.BinaryOperator
+  -- @pipeExprs: _list_t(true,UnaryExp)
+  new: (op = nil, pipeExprs = {}) =>
+    @op = op
+    @pipeExprs = pipeExprs
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @op) and v\g_yue_name! == 'BinaryOperator'
+        @op = v
+        continue
+      if _in v\g_yue_name!, {'UnaryExp'}
+        table.insert @pipeExprs, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @op\walk visitor
+    node\walk visitor for node in *@pipeExprs
+    visitor @
+ast_nodes.ExpOpValue = ExpOpValue
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L485
+class Exp extends Node
+  @yue_name: 'Exp'
+  
+  -- @pipeExprs: _list_t(true,UnaryExp)
+  -- @opValues: _list_t(false,ExpOpValue)
+  -- @nilCoalesed(false): ast_nodes.Exp
+  new: (pipeExprs = {}, opValues = {}, nilCoalesed = nil) =>
+    @pipeExprs = pipeExprs
+    @opValues = opValues
+    @nilCoalesed = nilCoalesed
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'UnaryExp'}
+        table.insert @pipeExprs, v
+        continue
+      if _in v\g_yue_name!, {'ExpOpValue'}
+        table.insert @opValues, v
+        continue
+      if (not @nilCoalesed) and v\g_yue_name! == 'Exp'
+        @nilCoalesed = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@pipeExprs
+    node\walk visitor for node in *@opValues
+    @nilCoalesed\walk visitor if @nilCoalesed
+    visitor @
+ast_nodes.Exp = Exp
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L493
+class Callable extends Node
+  @yue_name: 'Callable'
+  
+  -- @item: _sel_t(true,Variable,SelfItem,Parens,MacroName)
+  new: (item = nil) =>
+    @item = item
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @item) and _in v\g_yue_name!, {'Variable','SelfItem','Parens','MacroName'}
+        @item = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @item\walk visitor
+    visitor @
+ast_nodes.Callable = Callable
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L498
+class VariablePair extends Node
+  @yue_name: 'VariablePair'
+  
+  -- @name(true): ast_nodes.Variable
+  new: (name = nil) =>
+    @name = name
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and v\g_yue_name! == 'Variable'
+        @name = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    visitor @
+ast_nodes.VariablePair = VariablePair
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L503
+class VariablePairDef extends Node
+  @yue_name: 'VariablePairDef'
+  
+  -- @pair(true): ast_nodes.VariablePair
+  -- @defVal(false): ast_nodes.Exp
+  new: (pair = nil, defVal = nil) =>
+    @pair = pair
+    @defVal = defVal
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @pair) and v\g_yue_name! == 'VariablePair'
+        @pair = v
+        continue
+      if (not @defVal) and v\g_yue_name! == 'Exp'
+        @defVal = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @pair\walk visitor
+    @defVal\walk visitor if @defVal
+    visitor @
+ast_nodes.VariablePairDef = VariablePairDef
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L509
+class NormalPair extends Node
+  @yue_name: 'NormalPair'
+  
+  -- @key: _sel_t(true,KeyName,Exp,String)
+  -- @value: _sel_t(true,Exp,TableBlock)
+  new: (key = nil, value = nil) =>
+    @key = key
+    @value = value
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @key) and _in v\g_yue_name!, {'KeyName','Exp','String'}
+        @key = v
+        continue
+      if (not @value) and _in v\g_yue_name!, {'Exp','TableBlock'}
+        @value = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @key\walk visitor
+    @value\walk visitor
+    visitor @
+ast_nodes.NormalPair = NormalPair
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L515
+class NormalPairDef extends Node
+  @yue_name: 'NormalPairDef'
+  
+  -- @pair(true): ast_nodes.NormalPair
+  -- @defVal(false): ast_nodes.Exp
+  new: (pair = nil, defVal = nil) =>
+    @pair = pair
+    @defVal = defVal
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @pair) and v\g_yue_name! == 'NormalPair'
+        @pair = v
+        continue
+      if (not @defVal) and v\g_yue_name! == 'Exp'
+        @defVal = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @pair\walk visitor
+    @defVal\walk visitor if @defVal
+    visitor @
+ast_nodes.NormalPairDef = NormalPairDef
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L521
+class NormalDef extends Node
+  @yue_name: 'NormalDef'
+  
+  -- @item(true): ast_nodes.Exp
+  -- @defVal(false): ast_nodes.Exp
+  new: (item = nil, defVal = nil) =>
+    @item = item
+    @defVal = defVal
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @item) and v\g_yue_name! == 'Exp'
+        @item = v
+        continue
+      if (not @defVal) and v\g_yue_name! == 'Exp'
+        @defVal = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @item\walk visitor
+    @defVal\walk visitor if @defVal
+    visitor @
+ast_nodes.NormalDef = NormalDef
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L528
+class MetaVariablePair extends Node
+  @yue_name: 'MetaVariablePair'
+  
+  -- @name(true): ast_nodes.Variable
+  new: (name = nil) =>
+    @name = name
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and v\g_yue_name! == 'Variable'
+        @name = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    visitor @
+ast_nodes.MetaVariablePair = MetaVariablePair
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L533
+class MetaVariablePairDef extends Node
+  @yue_name: 'MetaVariablePairDef'
+  
+  -- @pair(true): ast_nodes.MetaVariablePair
+  -- @defVal(false): ast_nodes.Exp
+  new: (pair = nil, defVal = nil) =>
+    @pair = pair
+    @defVal = defVal
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @pair) and v\g_yue_name! == 'MetaVariablePair'
+        @pair = v
+        continue
+      if (not @defVal) and v\g_yue_name! == 'Exp'
+        @defVal = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @pair\walk visitor
+    @defVal\walk visitor if @defVal
+    visitor @
+ast_nodes.MetaVariablePairDef = MetaVariablePairDef
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L539
+class MetaNormalPair extends Node
+  @yue_name: 'MetaNormalPair'
+  
+  -- @key: _sel_t(false,Name,Exp,String)
+  -- @value: _sel_t(true,Exp,TableBlock)
+  new: (key = nil, value = nil) =>
+    @key = key
+    @value = value
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @key) and _in v\g_yue_name!, {'Name','Exp','String'}
+        @key = v
+        continue
+      if (not @value) and _in v\g_yue_name!, {'Exp','TableBlock'}
+        @value = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @key\walk visitor if @key
+    @value\walk visitor
+    visitor @
+ast_nodes.MetaNormalPair = MetaNormalPair
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L545
+class MetaNormalPairDef extends Node
+  @yue_name: 'MetaNormalPairDef'
+  
+  -- @pair(true): ast_nodes.MetaNormalPair
+  -- @defVal(false): ast_nodes.Exp
+  new: (pair = nil, defVal = nil) =>
+    @pair = pair
+    @defVal = defVal
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @pair) and v\g_yue_name! == 'MetaNormalPair'
+        @pair = v
+        continue
+      if (not @defVal) and v\g_yue_name! == 'Exp'
+        @defVal = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @pair\walk visitor
+    @defVal\walk visitor if @defVal
+    visitor @
+ast_nodes.MetaNormalPairDef = MetaNormalPairDef
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L551
+class SimpleTable extends Node
+  @yue_name: 'SimpleTable'
+  
+  -- @pairs: _sel_list_t(true,VariablePair,NormalPair,MetaVariablePair,MetaNormalPair)
+  new: (pairs = {}) =>
+    @pairs = pairs
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'VariablePair','NormalPair','MetaVariablePair','MetaNormalPair'}
+        table.insert @pairs, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@pairs
+    visitor @
+ast_nodes.SimpleTable = SimpleTable
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L557
+class SimpleValue extends Node
+  @yue_name: 'SimpleValue'
+  
+  -- @value: _sel_t(true,TableLit,ConstValue,If,Switch,With,ClassDecl,ForEach,For,While,Do,Try,UnaryValue,TblComprehension,Comprehension,FunLit,Num,VarArg)
+  new: (value = nil) =>
+    @value = value
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @value) and _in v\g_yue_name!, {'TableLit','ConstValue','If','Switch','With','ClassDecl','ForEach','For','While','Do','Try','UnaryValue','TblComprehension','Comprehension','FunLit','Num','VarArg'}
+        @value = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @value\walk visitor
+    visitor @
+ast_nodes.SimpleValue = SimpleValue
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L568
+class LuaStringOpen extends Leaf
+  @yue_name: 'LuaStringOpen'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.LuaStringOpen = LuaStringOpen
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L571
+class LuaStringContent extends Leaf
+  @yue_name: 'LuaStringContent'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.LuaStringContent = LuaStringContent
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L574
+class LuaStringClose extends Leaf
+  @yue_name: 'LuaStringClose'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.LuaStringClose = LuaStringClose
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L577
+class LuaString extends Node
+  @yue_name: 'LuaString'
+  
+  -- @open(true): ast_nodes.LuaStringOpen
+  -- @content(true): ast_nodes.LuaStringContent
+  -- @close(true): ast_nodes.LuaStringClose
+  new: (open = nil, content = nil, close = nil) =>
+    @open = open
+    @content = content
+    @close = close
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @open) and v\g_yue_name! == 'LuaStringOpen'
+        @open = v
+        continue
+      if (not @content) and v\g_yue_name! == 'LuaStringContent'
+        @content = v
+        continue
+      if (not @close) and v\g_yue_name! == 'LuaStringClose'
+        @close = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @open\walk visitor
+    @content\walk visitor
+    @close\walk visitor
+    visitor @
+ast_nodes.LuaString = LuaString
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L584
+class SingleString extends Leaf
+  @yue_name: 'SingleString'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.SingleString = SingleString
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L587
+class DoubleStringInner extends Leaf
+  @yue_name: 'DoubleStringInner'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.DoubleStringInner = DoubleStringInner
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L590
+class DoubleStringContent extends Node
+  @yue_name: 'DoubleStringContent'
+  
+  -- @content: _sel_t(true,DoubleStringInner,Exp)
+  new: (content = nil) =>
+    @content = content
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @content) and _in v\g_yue_name!, {'DoubleStringInner','Exp'}
+        @content = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @content\walk visitor
+    visitor @
+ast_nodes.DoubleStringContent = DoubleStringContent
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L595
+class DoubleString extends Node
+  @yue_name: 'DoubleString'
+  
+  -- @segments: _list_t(false,DoubleStringContent)
+  new: (segments = {}) =>
+    @segments = segments
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'DoubleStringContent'}
+        table.insert @segments, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@segments
+    visitor @
+ast_nodes.DoubleString = DoubleString
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L601
+class YAMLIndent extends Leaf
+  @yue_name: 'YAMLIndent'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.YAMLIndent = YAMLIndent
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L604
+class YAMLLineInner extends Leaf
+  @yue_name: 'YAMLLineInner'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.YAMLLineInner = YAMLLineInner
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L607
+class YAMLLineContent extends Node
+  @yue_name: 'YAMLLineContent'
+  
+  -- @content: _sel_t(true,YAMLLineInner,Exp)
+  new: (content = nil) =>
+    @content = content
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @content) and _in v\g_yue_name!, {'YAMLLineInner','Exp'}
+        @content = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @content\walk visitor
+    visitor @
+ast_nodes.YAMLLineContent = YAMLLineContent
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L612
+class YAMLLine extends Node
+  @yue_name: 'YAMLLine'
+  
+  -- @indent(true): ast_nodes.YAMLIndent
+  -- @segments: _list_t(true,YAMLLineContent)
+  new: (indent = nil, segments = {}) =>
+    @indent = indent
+    @segments = segments
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @indent) and v\g_yue_name! == 'YAMLIndent'
+        @indent = v
+        continue
+      if _in v\g_yue_name!, {'YAMLLineContent'}
+        table.insert @segments, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @indent\walk visitor
+    node\walk visitor for node in *@segments
+    visitor @
+ast_nodes.YAMLLine = YAMLLine
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L618
+class YAMLMultiline extends Node
+  @yue_name: 'YAMLMultiline'
+  
+  -- @lines: _list_t(true,YAMLLine)
+  new: (lines = {}) =>
+    @lines = lines
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'YAMLLine'}
+        table.insert @lines, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@lines
+    visitor @
+ast_nodes.YAMLMultiline = YAMLMultiline
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L624
+class String extends Node
+  @yue_name: 'String'
+  
+  -- @str: _sel_t(true,DoubleString,SingleString,LuaString,YAMLMultiline)
+  new: (str = nil) =>
+    @str = str
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @str) and _in v\g_yue_name!, {'DoubleString','SingleString','LuaString','YAMLMultiline'}
+        @str = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @str\walk visitor
+    visitor @
+ast_nodes.String = String
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L629
+class Metatable extends Leaf
+  @yue_name: 'Metatable'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.Metatable = Metatable
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L632
+class Metamethod extends Node
+  @yue_name: 'Metamethod'
+  
+  -- @item: _sel_t(true,Name,Exp,String)
+  new: (item = nil) =>
+    @item = item
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @item) and _in v\g_yue_name!, {'Name','Exp','String'}
+        @item = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @item\walk visitor
+    visitor @
+ast_nodes.Metamethod = Metamethod
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L637
+class DotChainItem extends Node
+  @yue_name: 'DotChainItem'
+  
+  -- @name: _sel_t(true,Name,Metatable,Metamethod,UnicodeName)
+  new: (name = nil) =>
+    @name = name
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and _in v\g_yue_name!, {'Name','Metatable','Metamethod','UnicodeName'}
+        @name = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    visitor @
+ast_nodes.DotChainItem = DotChainItem
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L642
+class ColonChainItem extends Node
+  @yue_name: 'ColonChainItem'
+  
+  -- @name: _sel_t(true,Name,LuaKeyword,Metamethod,UnicodeName)
+  new: (name = nil) =>
+    @name = name
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and _in v\g_yue_name!, {'Name','LuaKeyword','Metamethod','UnicodeName'}
+        @name = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    visitor @
+ast_nodes.ColonChainItem = ColonChainItem
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L648
+class Slice extends Node
+  @yue_name: 'Slice'
+  
+  -- @startValue: _sel_t(true,Exp,DefaultValue)
+  -- @stopValue: _sel_t(true,Exp,DefaultValue)
+  -- @stepValue: _sel_t(true,Exp,DefaultValue)
+  new: (startValue = nil, stopValue = nil, stepValue = nil) =>
+    @startValue = startValue
+    @stopValue = stopValue
+    @stepValue = stepValue
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @startValue) and _in v\g_yue_name!, {'Exp','DefaultValue'}
+        @startValue = v
+        continue
+      if (not @stopValue) and _in v\g_yue_name!, {'Exp','DefaultValue'}
+        @stopValue = v
+        continue
+      if (not @stepValue) and _in v\g_yue_name!, {'Exp','DefaultValue'}
+        @stepValue = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @startValue\walk visitor
+    @stopValue\walk visitor
+    @stepValue\walk visitor
+    visitor @
+ast_nodes.Slice = Slice
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L655
+class Parens extends Node
+  @yue_name: 'Parens'
+  
+  -- @expr(true): ast_nodes.Exp
+  new: (expr = nil) =>
+    @expr = expr
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @expr) and v\g_yue_name! == 'Exp'
+        @expr = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @expr\walk visitor
+    visitor @
+ast_nodes.Parens = Parens
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L661
+class Invoke extends Node
+  @yue_name: 'Invoke'
+  
+  -- @args: _sel_list_t(false,Exp,SingleString,DoubleString,LuaString,TableLit)
+  new: (args = {}) =>
+    @args = args
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'Exp','SingleString','DoubleString','LuaString','TableLit'}
+        table.insert @args, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@args
+    visitor @
+ast_nodes.Invoke = Invoke
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L667
+class ExistentialOp extends Leaf
+  @yue_name: 'ExistentialOp'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.ExistentialOp = ExistentialOp
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L670
+class TableAppendingOp extends Leaf
+  @yue_name: 'TableAppendingOp'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.TableAppendingOp = TableAppendingOp
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L673
+class PlainItem extends Leaf
+  @yue_name: 'PlainItem'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.PlainItem = PlainItem
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L676
+class ReversedIndex extends Node
+  @yue_name: 'ReversedIndex'
+  
+  -- @modifier(false): ast_nodes.Exp
+  new: (modifier = nil) =>
+    @modifier = modifier
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @modifier) and v\g_yue_name! == 'Exp'
+        @modifier = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @modifier\walk visitor if @modifier
+    visitor @
+ast_nodes.ReversedIndex = ReversedIndex
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L681
+class ChainValue extends Node
+  @yue_name: 'ChainValue'
+  
+  -- @items: _sel_list_t(true,Callable,Invoke,DotChainItem,ColonChainItem,Slice,Exp,String,InvokeArgs,ExistentialOp,TableAppendingOp,ReversedIndex,PlainItem)
+  new: (items = {}) =>
+    @items = items
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'Callable','Invoke','DotChainItem','ColonChainItem','Slice','Exp','String','InvokeArgs','ExistentialOp','TableAppendingOp','ReversedIndex','PlainItem'}
+        table.insert @items, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@items
+    visitor @
+ast_nodes.ChainValue = ChainValue
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L688
+class AssignableChain extends Node
+  @yue_name: 'AssignableChain'
+  
+  -- @items: _sel_list_t(true,Callable,Invoke,DotChainItem,ColonChainItem,Exp,String)
+  new: (items = {}) =>
+    @items = items
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'Callable','Invoke','DotChainItem','ColonChainItem','Exp','String'}
+        table.insert @items, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@items
+    visitor @
+ast_nodes.AssignableChain = AssignableChain
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L694
+class Value extends Node
+  @yue_name: 'Value'
+  
+  -- @item: _sel_t(true,SimpleValue,SimpleTable,ChainValue,String)
+  new: (item = nil) =>
+    @item = item
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @item) and _in v\g_yue_name!, {'SimpleValue','SimpleTable','ChainValue','String'}
+        @item = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @item\walk visitor
+    visitor @
+ast_nodes.Value = Value
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L699
+class DefaultValue extends Leaf
+  @yue_name: 'DefaultValue'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.DefaultValue = DefaultValue
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L702
+class SpreadExp extends Node
+  @yue_name: 'SpreadExp'
+  
+  -- @exp(true): ast_nodes.Exp
+  new: (exp = nil) =>
+    @exp = exp
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @exp) and v\g_yue_name! == 'Exp'
+        @exp = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @exp\walk visitor
+    visitor @
+ast_nodes.SpreadExp = SpreadExp
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L707
+class SpreadListExp extends Node
+  @yue_name: 'SpreadListExp'
+  
+  -- @exp(true): ast_nodes.Exp
+  new: (exp = nil) =>
+    @exp = exp
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @exp) and v\g_yue_name! == 'Exp'
+        @exp = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @exp\walk visitor
+    visitor @
+ast_nodes.SpreadListExp = SpreadListExp
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L712
+class TableLit extends Node
+  @yue_name: 'TableLit'
+  
+  -- @values: _sel_list_t(false,VariablePairDef,NormalPairDef,SpreadExp,NormalDef,MetaVariablePairDef,MetaNormalPairDef,VariablePair,NormalPair,Exp,MetaVariablePair,MetaNormalPair,TableBlockIndent,SpreadListExp)
+  new: (values = {}) =>
+    @values = values
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'VariablePairDef','NormalPairDef','SpreadExp','NormalDef','MetaVariablePairDef','MetaNormalPairDef','VariablePair','NormalPair','Exp','MetaVariablePair','MetaNormalPair','TableBlockIndent','SpreadListExp'}
+        table.insert @values, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@values
+    visitor @
+ast_nodes.TableLit = TableLit
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L723
+class TableBlockIndent extends Node
+  @yue_name: 'TableBlockIndent'
+  
+  -- @values: _sel_list_t(false,VariablePair,NormalPair,Exp,TableBlockIndent,MetaVariablePair,MetaNormalPair)
+  new: (values = {}) =>
+    @values = values
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'VariablePair','NormalPair','Exp','TableBlockIndent','MetaVariablePair','MetaNormalPair'}
+        table.insert @values, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@values
+    visitor @
+ast_nodes.TableBlockIndent = TableBlockIndent
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L731
+class TableBlock extends Node
+  @yue_name: 'TableBlock'
+  
+  -- @values: _sel_list_t(false,VariablePair,NormalPair,TableBlockIndent,Exp,TableBlock,SpreadExp,MetaVariablePair,MetaNormalPair)
+  new: (values = {}) =>
+    @values = values
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'VariablePair','NormalPair','TableBlockIndent','Exp','TableBlock','SpreadExp','MetaVariablePair','MetaNormalPair'}
+        table.insert @values, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@values
+    visitor @
+ast_nodes.TableBlock = TableBlock
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L737
+class ClassMemberList extends Node
+  @yue_name: 'ClassMemberList'
+  
+  -- @values: _sel_list_t(true,VariablePair,NormalPair,MetaVariablePair,MetaNormalPair)
+  new: (values = {}) =>
+    @values = values
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'VariablePair','NormalPair','MetaVariablePair','MetaNormalPair'}
+        table.insert @values, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@values
+    visitor @
+ast_nodes.ClassMemberList = ClassMemberList
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L743
+class ClassBlock extends Node
+  @yue_name: 'ClassBlock'
+  
+  -- @contents: _sel_list_t(true,ClassMemberList,Statement)
+  new: (contents = {}) =>
+    @contents = contents
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'ClassMemberList','Statement'}
+        table.insert @contents, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@contents
+    visitor @
+ast_nodes.ClassBlock = ClassBlock
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L749
+class ClassDecl extends Node
+  @yue_name: 'ClassDecl'
+  
+  -- @name(false): ast_nodes.Assignable
+  -- @extend(false): ast_nodes.Exp
+  -- @mixes(false): ast_nodes.ExpList
+  -- @body(false): ast_nodes.ClassBlock
+  new: (name = nil, extend = nil, mixes = nil, body = nil) =>
+    @name = name
+    @extend = extend
+    @mixes = mixes
+    @body = body
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and v\g_yue_name! == 'Assignable'
+        @name = v
+        continue
+      if (not @extend) and v\g_yue_name! == 'Exp'
+        @extend = v
+        continue
+      if (not @mixes) and v\g_yue_name! == 'ExpList'
+        @mixes = v
+        continue
+      if (not @body) and v\g_yue_name! == 'ClassBlock'
+        @body = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor if @name
+    @extend\walk visitor if @extend
+    @mixes\walk visitor if @mixes
+    @body\walk visitor if @body
+    visitor @
+ast_nodes.ClassDecl = ClassDecl
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L757
+class GlobalValues extends Node
+  @yue_name: 'GlobalValues'
+  
+  -- @nameList(true): ast_nodes.NameList
+  -- @valueList: _sel_t(false,TableBlock,ExpListLow)
+  new: (nameList = nil, valueList = nil) =>
+    @nameList = nameList
+    @valueList = valueList
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @nameList) and v\g_yue_name! == 'NameList'
+        @nameList = v
+        continue
+      if (not @valueList) and _in v\g_yue_name!, {'TableBlock','ExpListLow'}
+        @valueList = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @nameList\walk visitor
+    @valueList\walk visitor if @valueList
+    visitor @
+ast_nodes.GlobalValues = GlobalValues
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L763
+class GlobalOp extends Leaf
+  @yue_name: 'GlobalOp'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.GlobalOp = GlobalOp
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L766
+class Global extends Node
+  @yue_name: 'Global'
+  
+  -- @constAttrib(false): ast_nodes.ConstAttrib
+  -- @item: _sel_t(true,ClassDecl,GlobalOp,GlobalValues)
+  new: (constAttrib = nil, item = nil) =>
+    @constAttrib = constAttrib
+    @item = item
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @constAttrib) and v\g_yue_name! == 'ConstAttrib'
+        @constAttrib = v
+        continue
+      if (not @item) and _in v\g_yue_name!, {'ClassDecl','GlobalOp','GlobalValues'}
+        @item = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @constAttrib\walk visitor if @constAttrib
+    @item\walk visitor
+    visitor @
+ast_nodes.Global = Global
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L772
+class ExportDefault extends Leaf
+  @yue_name: 'ExportDefault'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.ExportDefault = ExportDefault
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L775
+class Export extends Node
+  @yue_name: 'Export'
+  
+  -- @def(false): ast_nodes.ExportDefault
+  -- @target: _sel_t(true,ExpList,Exp,Macro,DotChainItem)
+  -- @assign(false): ast_nodes.Assign
+  new: (def = nil, target = nil, assign = nil) =>
+    @def = def
+    @target = target
+    @assign = assign
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @def) and v\g_yue_name! == 'ExportDefault'
+        @def = v
+        continue
+      if (not @target) and _in v\g_yue_name!, {'ExpList','Exp','Macro','DotChainItem'}
+        @target = v
+        continue
+      if (not @assign) and v\g_yue_name! == 'Assign'
+        @assign = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @def\walk visitor if @def
+    @target\walk visitor
+    @assign\walk visitor if @assign
+    visitor @
+ast_nodes.Export = Export
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L782
+class FnArgDef extends Node
+  @yue_name: 'FnArgDef'
+  
+  -- @name: _sel_t(true,Variable,SelfItem)
+  -- @op(false): ast_nodes.ExistentialOp
+  -- @label(false): ast_nodes.Name
+  -- @defaultValue(false): ast_nodes.Exp
+  new: (name = nil, op = nil, label = nil, defaultValue = nil) =>
+    @name = name
+    @op = op
+    @label = label
+    @defaultValue = defaultValue
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and _in v\g_yue_name!, {'Variable','SelfItem'}
+        @name = v
+        continue
+      if (not @op) and v\g_yue_name! == 'ExistentialOp'
+        @op = v
+        continue
+      if (not @label) and v\g_yue_name! == 'Name'
+        @label = v
+        continue
+      if (not @defaultValue) and v\g_yue_name! == 'Exp'
+        @defaultValue = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    @op\walk visitor if @op
+    @label\walk visitor if @label
+    @defaultValue\walk visitor if @defaultValue
+    visitor @
+ast_nodes.FnArgDef = FnArgDef
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L790
+class FnArgDefList extends Node
+  @yue_name: 'FnArgDefList'
+  
+  -- @definitions: _list_t(false,FnArgDef)
+  -- @varArg(false): ast_nodes.VarArg
+  -- @label(false): ast_nodes.Name
+  new: (definitions = {}, varArg = nil, label = nil) =>
+    @definitions = definitions
+    @varArg = varArg
+    @label = label
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'FnArgDef'}
+        table.insert @definitions, v
+        continue
+      if (not @varArg) and v\g_yue_name! == 'VarArg'
+        @varArg = v
+        continue
+      if (not @label) and v\g_yue_name! == 'Name'
+        @label = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@definitions
+    @varArg\walk visitor if @varArg
+    @label\walk visitor if @label
+    visitor @
+ast_nodes.FnArgDefList = FnArgDefList
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L798
+class OuterVarShadow extends Node
+  @yue_name: 'OuterVarShadow'
+  
+  -- @varList(false): ast_nodes.NameList
+  new: (varList = nil) =>
+    @varList = varList
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @varList) and v\g_yue_name! == 'NameList'
+        @varList = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @varList\walk visitor if @varList
+    visitor @
+ast_nodes.OuterVarShadow = OuterVarShadow
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L803
+class FnArgsDef extends Node
+  @yue_name: 'FnArgsDef'
+  
+  -- @defList(false): ast_nodes.FnArgDefList
+  -- @shadowOption(false): ast_nodes.OuterVarShadow
+  new: (defList = nil, shadowOption = nil) =>
+    @defList = defList
+    @shadowOption = shadowOption
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @defList) and v\g_yue_name! == 'FnArgDefList'
+        @defList = v
+        continue
+      if (not @shadowOption) and v\g_yue_name! == 'OuterVarShadow'
+        @shadowOption = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @defList\walk visitor if @defList
+    @shadowOption\walk visitor if @shadowOption
+    visitor @
+ast_nodes.FnArgsDef = FnArgsDef
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L809
+class FnArrow extends Leaf
+  @yue_name: 'FnArrow'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.FnArrow = FnArrow
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L812
+class FunLit extends Node
+  @yue_name: 'FunLit'
+  
+  -- @argsDef(false): ast_nodes.FnArgsDef
+  -- @defaultReturn: _sel_t(false,ExpListLow,DefaultValue)
+  -- @arrow(true): ast_nodes.FnArrow
+  -- @body(false): ast_nodes.Body
+  new: (argsDef = nil, defaultReturn = nil, arrow = nil, body = nil) =>
+    @argsDef = argsDef
+    @defaultReturn = defaultReturn
+    @arrow = arrow
+    @body = body
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @argsDef) and v\g_yue_name! == 'FnArgsDef'
+        @argsDef = v
+        continue
+      if (not @defaultReturn) and _in v\g_yue_name!, {'ExpListLow','DefaultValue'}
+        @defaultReturn = v
+        continue
+      if (not @arrow) and v\g_yue_name! == 'FnArrow'
+        @arrow = v
+        continue
+      if (not @body) and v\g_yue_name! == 'Body'
+        @body = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @argsDef\walk visitor if @argsDef
+    @defaultReturn\walk visitor if @defaultReturn
+    @arrow\walk visitor
+    @body\walk visitor if @body
+    visitor @
+ast_nodes.FunLit = FunLit
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L822
+class MacroName extends Node
+  @yue_name: 'MacroName'
+  
+  -- @name(true): ast_nodes.UnicodeName
+  new: (name = nil) =>
+    @name = name
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and v\g_yue_name! == 'UnicodeName'
+        @name = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    visitor @
+ast_nodes.MacroName = MacroName
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L827
+class MacroLit extends Node
+  @yue_name: 'MacroLit'
+  
+  -- @argsDef(false): ast_nodes.FnArgDefList
+  -- @body(true): ast_nodes.Body
+  new: (argsDef = nil, body = nil) =>
+    @argsDef = argsDef
+    @body = body
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @argsDef) and v\g_yue_name! == 'FnArgDefList'
+        @argsDef = v
+        continue
+      if (not @body) and v\g_yue_name! == 'Body'
+        @body = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @argsDef\walk visitor if @argsDef
+    @body\walk visitor
+    visitor @
+ast_nodes.MacroLit = MacroLit
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L833
+class MacroFunc extends Node
+  @yue_name: 'MacroFunc'
+  
+  -- @name(true): ast_nodes.MacroName
+  -- @invoke: _sel_t(true,Invoke,InvokeArgs)
+  new: (name = nil, invoke = nil) =>
+    @name = name
+    @invoke = invoke
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and v\g_yue_name! == 'MacroName'
+        @name = v
+        continue
+      if (not @invoke) and _in v\g_yue_name!, {'Invoke','InvokeArgs'}
+        @invoke = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    @invoke\walk visitor
+    visitor @
+ast_nodes.MacroFunc = MacroFunc
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L839
+class MacroInPlace extends Node
+  @yue_name: 'MacroInPlace'
+  
+  -- @body(true): ast_nodes.Body
+  new: (body = nil) =>
+    @body = body
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @body) and v\g_yue_name! == 'Body'
+        @body = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @body\walk visitor
+    visitor @
+ast_nodes.MacroInPlace = MacroInPlace
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L844
+class Macro extends Node
+  @yue_name: 'Macro'
+  
+  -- @name(true): ast_nodes.UnicodeName
+  -- @decl: _sel_t(true,MacroLit,MacroFunc)
+  new: (name = nil, decl = nil) =>
+    @name = name
+    @decl = decl
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and v\g_yue_name! == 'UnicodeName'
+        @name = v
+        continue
+      if (not @decl) and _in v\g_yue_name!, {'MacroLit','MacroFunc'}
+        @decl = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    @decl\walk visitor
+    visitor @
+ast_nodes.Macro = Macro
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L850
+class NameOrDestructure extends Node
+  @yue_name: 'NameOrDestructure'
+  
+  -- @item: _sel_t(true,Variable,TableLit,Comprehension)
+  new: (item = nil) =>
+    @item = item
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @item) and _in v\g_yue_name!, {'Variable','TableLit','Comprehension'}
+        @item = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @item\walk visitor
+    visitor @
+ast_nodes.NameOrDestructure = NameOrDestructure
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L855
+class AssignableNameList extends Node
+  @yue_name: 'AssignableNameList'
+  
+  -- @items: _list_t(true,NameOrDestructure)
+  new: (items = {}) =>
+    @items = items
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'NameOrDestructure'}
+        table.insert @items, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@items
+    visitor @
+ast_nodes.AssignableNameList = AssignableNameList
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L861
+class InvokeArgs extends Node
+  @yue_name: 'InvokeArgs'
+  
+  -- @args: _sel_list_t(true,Exp,TableBlock)
+  new: (args = {}) =>
+    @args = args
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'Exp','TableBlock'}
+        table.insert @args, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@args
+    visitor @
+ast_nodes.InvokeArgs = InvokeArgs
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L867
+class ConstValue extends Leaf
+  @yue_name: 'ConstValue'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.ConstValue = ConstValue
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L870
+class UnaryValue extends Node
+  @yue_name: 'UnaryValue'
+  
+  -- @ops: _list_t(true,UnaryOperator)
+  -- @value(true): ast_nodes.Value
+  new: (ops = {}, value = nil) =>
+    @ops = ops
+    @value = value
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'UnaryOperator'}
+        table.insert @ops, v
+        continue
+      if (not @value) and v\g_yue_name! == 'Value'
+        @value = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@ops
+    @value\walk visitor
+    visitor @
+ast_nodes.UnaryValue = UnaryValue
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L876
+class UnaryExp extends Node
+  @yue_name: 'UnaryExp'
+  
+  -- @ops: _list_t(false,UnaryOperator)
+  -- @expos: _list_t(true,Value)
+  -- @inExp(false): ast_nodes.In
+  new: (ops = {}, expos = {}, inExp = nil) =>
+    @ops = ops
+    @expos = expos
+    @inExp = inExp
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'UnaryOperator'}
+        table.insert @ops, v
+        continue
+      if _in v\g_yue_name!, {'Value'}
+        table.insert @expos, v
+        continue
+      if (not @inExp) and v\g_yue_name! == 'In'
+        @inExp = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@ops
+    node\walk visitor for node in *@expos
+    @inExp\walk visitor if @inExp
+    visitor @
+ast_nodes.UnaryExp = UnaryExp
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L883
+class SubBackcall extends Node
+  @yue_name: 'SubBackcall'
+  
+  -- @arrow(true): ast_nodes.FnArrowBack
+  -- @value(true): ast_nodes.ChainValue
+  new: (arrow = nil, value = nil) =>
+    @arrow = arrow
+    @value = value
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @arrow) and v\g_yue_name! == 'FnArrowBack'
+        @arrow = v
+        continue
+      if (not @value) and v\g_yue_name! == 'ChainValue'
+        @value = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @arrow\walk visitor
+    @value\walk visitor
+    visitor @
+ast_nodes.SubBackcall = SubBackcall
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L889
+class ExpListAssign extends Node
+  @yue_name: 'ExpListAssign'
+  
+  -- @expList(true): ast_nodes.ExpList
+  -- @action: _sel_t(false,Update,Assign,SubBackcall)
+  new: (expList = nil, action = nil) =>
+    @expList = expList
+    @action = action
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @expList) and v\g_yue_name! == 'ExpList'
+        @expList = v
+        continue
+      if (not @action) and _in v\g_yue_name!, {'Update','Assign','SubBackcall'}
+        @action = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @expList\walk visitor
+    @action\walk visitor if @action
+    visitor @
+ast_nodes.ExpListAssign = ExpListAssign
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L895
+class IfLine extends Node
+  @yue_name: 'IfLine'
+  
+  -- @type(true): ast_nodes.IfType
+  -- @condition(true): ast_nodes.IfCond
+  new: (type = nil, condition = nil) =>
+    @type = type
+    @condition = condition
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @type) and v\g_yue_name! == 'IfType'
+        @type = v
+        continue
+      if (not @condition) and v\g_yue_name! == 'IfCond'
+        @condition = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @type\walk visitor
+    @condition\walk visitor
+    visitor @
+ast_nodes.IfLine = IfLine
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L901
+class WhileLine extends Node
+  @yue_name: 'WhileLine'
+  
+  -- @type(true): ast_nodes.WhileType
+  -- @condition(true): ast_nodes.Exp
+  new: (type = nil, condition = nil) =>
+    @type = type
+    @condition = condition
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @type) and v\g_yue_name! == 'WhileType'
+        @type = v
+        continue
+      if (not @condition) and v\g_yue_name! == 'Exp'
+        @condition = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @type\walk visitor
+    @condition\walk visitor
+    visitor @
+ast_nodes.WhileLine = WhileLine
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L907
+class Break extends Leaf
+  @yue_name: 'Break'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.Break = Break
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L910
+class Continue extends Leaf
+  @yue_name: 'Continue'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.Continue = Continue
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L913
+class BreakLoop extends Node
+  @yue_name: 'BreakLoop'
+  
+  -- @type: _sel_t(true,Break,Continue)
+  -- @value(false): ast_nodes.Exp
+  new: (type = nil, value = nil) =>
+    @type = type
+    @value = value
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @type) and _in v\g_yue_name!, {'Break','Continue'}
+        @type = v
+        continue
+      if (not @value) and v\g_yue_name! == 'Exp'
+        @value = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @type\walk visitor
+    @value\walk visitor if @value
+    visitor @
+ast_nodes.BreakLoop = BreakLoop
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L920
+class PipeBody extends Node
+  @yue_name: 'PipeBody'
+  
+  -- @values: _list_t(true,UnaryExp)
+  new: (values = {}) =>
+    @values = values
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'UnaryExp'}
+        table.insert @values, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@values
+    visitor @
+ast_nodes.PipeBody = PipeBody
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L926
+class StatementAppendix extends Node
+  @yue_name: 'StatementAppendix'
+  
+  -- @item: _sel_t(true,IfLine,WhileLine,CompInner)
+  new: (item = nil) =>
+    @item = item
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @item) and _in v\g_yue_name!, {'IfLine','WhileLine','CompInner'}
+        @item = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @item\walk visitor
+    visitor @
+ast_nodes.StatementAppendix = StatementAppendix
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L931
+class StatementSep extends Leaf
+  @yue_name: 'StatementSep'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.StatementSep = StatementSep
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L934
+class YueLineComment extends Leaf
+  @yue_name: 'YueLineComment'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.YueLineComment = YueLineComment
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L937
+class MultilineCommentInner extends Leaf
+  @yue_name: 'MultilineCommentInner'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.MultilineCommentInner = MultilineCommentInner
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L940
+class YueMultilineComment extends Node
+  @yue_name: 'YueMultilineComment'
+  
+  -- @inner(true): ast_nodes.MultilineCommentInner
+  new: (inner = nil) =>
+    @inner = inner
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @inner) and v\g_yue_name! == 'MultilineCommentInner'
+        @inner = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @inner\walk visitor
+    visitor @
+ast_nodes.YueMultilineComment = YueMultilineComment
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L945
+class ChainAssign extends Node
+  @yue_name: 'ChainAssign'
+  
+  -- @exprs: _list_t(true,Exp)
+  -- @assign(true): ast_nodes.Assign
+  new: (exprs = {}, assign = nil) =>
+    @exprs = exprs
+    @assign = assign
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'Exp'}
+        table.insert @exprs, v
+        continue
+      if (not @assign) and v\g_yue_name! == 'Assign'
+        @assign = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@exprs
+    @assign\walk visitor
+    visitor @
+ast_nodes.ChainAssign = ChainAssign
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L952
+class Statement extends Node
+  @yue_name: 'Statement'
+  
+  -- @comments: _sel_list_t(false,YueLineComment,YueMultilineComment)
+  -- @content: _sel_t(true,Import,While,Repeat,For,ForEach,Return,Local,Global,Export,Macro,MacroInPlace,BreakLoop,Label,Goto,ShortTabAppending,Backcall,LocalAttrib,PipeBody,ExpListAssign,ChainAssign)
+  -- @appendix(false): ast_nodes.StatementAppendix
+  new: (comments = {}, content = nil, appendix = nil) =>
+    @comments = comments
+    @content = content
+    @appendix = appendix
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'YueLineComment','YueMultilineComment'}
+        table.insert @comments, v
+        continue
+      if (not @content) and _in v\g_yue_name!, {'Import','While','Repeat','For','ForEach','Return','Local','Global','Export','Macro','MacroInPlace','BreakLoop','Label','Goto','ShortTabAppending','Backcall','LocalAttrib','PipeBody','ExpListAssign','ChainAssign'}
+        @content = v
+        continue
+      if (not @appendix) and v\g_yue_name! == 'StatementAppendix'
+        @appendix = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@comments
+    @content\walk visitor
+    @appendix\walk visitor if @appendix
+    visitor @
+ast_nodes.Statement = Statement
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L965
+class Body extends Node
+  @yue_name: 'Body'
+  
+  -- @content: _sel_t(true,Block,Statement)
+  new: (content = nil) =>
+    @content = content
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @content) and _in v\g_yue_name!, {'Block','Statement'}
+        @content = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @content\walk visitor
+    visitor @
+ast_nodes.Body = Body
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L970
+class Block extends Node
+  @yue_name: 'Block'
+  
+  -- @statements: _list_t(false,Statement)
+  new: (statements = {}) =>
+    @statements = statements
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if _in v\g_yue_name!, {'Statement'}
+        table.insert @statements, v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    node\walk visitor for node in *@statements
+    visitor @
+ast_nodes.Block = Block
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L976
+class BlockEnd extends Node
+  @yue_name: 'BlockEnd'
+  
+  -- @block(true): ast_nodes.Block
+  new: (block = nil) =>
+    @block = block
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @block) and v\g_yue_name! == 'Block'
+        @block = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @block\walk visitor
+    visitor @
+ast_nodes.BlockEnd = BlockEnd
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L981
+class File extends Node
+  @yue_name: 'File'
+  
+  -- @block(false): ast_nodes.Block
+  new: (block = nil) =>
+    @block = block
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @block) and v\g_yue_name! == 'Block'
+        @block = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @block\walk visitor if @block
+    visitor @
+ast_nodes.File = File
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L-1
+class FmtWhitespace extends Leaf
+  @yue_name: 'FmtWhitespace'
+  
+  new: (v) => @v = v
+  from_table: (tbl) => @v = tbl[1]
+  walk: (visitor) => visitor @
+ast_nodes.FmtWhitespace = FmtWhitespace
+
+-- be loud on invalid refs
+nodes = { types: ast_nodes }
+nodes.<> = __index: (k) =>
+  unless @types[k]
+    error "invalid ast type #{ k }"
+  @types[k]
+
+export default nodes
+

@@ -1,0 +1,16 @@
+x = '--a'
+x = "--a"
+
+y = '--a' .. '
+--z
+'
+y = "--a" .. "
+--z
+"
+
+z = '--[[not a comment]]'
+z = "--[[not a comment]]"
+
+x = [[
+  --not a comment
+]]

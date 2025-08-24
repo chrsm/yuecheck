@@ -1,0 +1,7 @@
+--[[bad]]
+
+--[[ good
+
+]]
+-- okay
+print 1 --[[ bad]]

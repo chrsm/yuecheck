@@ -1,0 +1,5 @@
+--[[ a
+b]]
+print 1
+print 1 --[[ abcd ]]
+--[[ hmm]]print 1

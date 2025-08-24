@@ -1,0 +1,113 @@
+import 'yuecheck.macros' as { $ }
+
+class Server
+  -- conn.Stdio | conn.Simulated
+  conn: nil
+  opts: {}
+
+  -- (request) -> response{:id, :method, :result, :error}
+  handler: (request) => error 'no request handler specified'
+
+  new: (@conn, @opts) => nil
+
+  set_handler: (handler) => @handler = handler
+
+  serve: =>
+    done = false
+    repeat
+      try
+        req, err = @\read!
+        unless req and (not err)
+          goto _skip_
+
+        resp, err = @handler req
+        if err
+          goto _skip_
+
+        @\write req, resp
+
+        -- unless things are completely broken, we want to handle the next
+        -- request
+        ::_skip_::
+      catch err
+        -- TODO: propagate this up instead of exit(1)-ing
+        done = true
+        os.exit 1
+    until done
+
+
+  -- see: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#contentPart
+  --[[
+    Content-Length: ...\r\n
+    \r\n
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "textDocument/completion",
+      "params": {
+        ...
+      }
+    }
+  ]]
+  read: =>
+    header, err = @conn\read!
+    if err
+      error err
+
+    nl, err = @conn\read!
+    if err
+      error err
+
+    len = header\match 'Content%-Length: (%d+)\r?\n?$'
+    unless len
+      error "server.read: no length found in #{ header }"
+
+    msg, err = @conn\read len
+    if err
+      error err
+
+    json.decode msg
+
+  -- see: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#responseMessage
+  --[[
+      interface ResponseMessage extends Message {
+        /**
+         * The request id.
+         */
+        id: integer | string | null;
+
+        /**
+         * The result of a request. This member is REQUIRED on success.
+         * This member MUST NOT exist if there was an error invoking the method.
+         */
+        result?: LSPAny;
+
+        /**
+         * The error object in case a request fails.
+         */
+        error?: ResponseError;
+      }
+  ]]
+  write: (req, resp, err) =>
+    resperr = nil
+    if err
+      -- see: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#responseMessage
+      -- specifically, ErrorCodes
+      -- using the RequestFailed one for now
+      resperr = { code: -32803, message: err }
+    resp = json.encode {
+      jsonrpc: '2.0'
+      id: req.id
+      result: resp
+      error: resperr
+    }
+
+    unless @conn\write "Content-Length: #{ #resp }\r\n\r\n"
+      error 'error writing content-length'
+
+    unless @conn\write resp
+      error 'error writing response'
+
+export default {
+  :Server
+}

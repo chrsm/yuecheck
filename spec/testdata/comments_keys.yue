@@ -1,0 +1,14 @@
+ok_fn = ->
+  for i, v in ipairs tbl.sub
+    print 1
+
+-- if this is commented out, no complaints
+fn = (tbl) ->
+  for i, v in ipairs tbl['sub'] -- has something to do with this
+    print 1
+
+tbl2 =
+  -- should not have the single-line-comment violation
+  ['--key1']: 1
+  ["--key2"]: 2
+  [[ key3 ]]: 3

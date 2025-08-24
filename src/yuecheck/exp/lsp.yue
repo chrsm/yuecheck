@@ -1,0 +1,78 @@
+import 'yuecheck.macros' as { $ }
+
+import 'inspect'
+import 'json'
+import 'yue'
+
+import 'yuecheck.ast_helpers' as asthelp
+import 'yuecheck.linter'
+
+import 'yuecheck.exp.conn'
+import 'yuecheck.exp.server'
+import 'yuecheck.exp.handlers'
+
+--[[
+experimental, WIP attempt at an LSP server for yue
+
+the LSP spec is huge: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/
+
+personally, i only care about a few things:
+  - suggestions
+    * doesn't need to be complex
+    * file-local (top)
+    * global (top)
+    * possibly/hopefully imported files (probably annoying-ish, but can figure out)
+    * diff between var<>func
+    * import 'x...' completion?
+    * classes
+    * not worried about argument display
+  - goto def/decl
+  - references
+  - formatting
+    * will have to figure something out for this
+    * probably some regexps
+
+right now, all this can do is suggest `Global`s, further work is needed
+in the ast helper package to pull more data. and, of course, reading the
+fuckin' spec.
+]]
+
+srv = server.Server conn.Stdio
+
+-- (request) -> response{:id, :method, :result, :error}
+srv.handler = (request) ->
+  switch request.method
+    when 'initialize'
+      handlers.initialize!
+    when 'textDocument/completion'
+      -- completion request.params.line, request.params.character, request.params.textDocument.uri
+      ln = request.params.line
+      col = request.params.character
+      uri = request.params.textDocument.uri
+      handlers['textDocument/completion'] ln, col, uri
+    when 'textDocument/definition'
+      ln = request.params.line
+      col = request.params.character
+      uri = request.params.textDocument.uri
+      handlers['textDocument/definition'] ln, col, uri
+    when 'textDocument/didChange'
+      __nop=true
+    when 'textDocument/didSave'
+      -- { id: request.id, result: {}}
+      __nop=true
+    when 'exit'
+      os.exit 0
+
+done = false
+repeat
+  try
+    req, err = srv\read!
+    if req
+      resp = srv.handler req
+      if resp
+        srv\write req, resp
+  catch err
+    log yue.traceback err
+    print yue.traceback err
+    os.exit 1
+until done

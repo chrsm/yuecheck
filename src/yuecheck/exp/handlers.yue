@@ -1,0 +1,177 @@
+import 'yuecheck.macros' as { $ }
+
+import 'inspect'
+import 'json'
+
+import 'yuecheck.ast_helpers' as asthelp
+import 'yuecheck.linter'
+
+handlers = {}
+
+--[[
+interface InitializeResult {
+	/**
+	 * The capabilities the language server provides.
+	 */
+	capabilities: ServerCapabilities;
+
+	/**
+	 * Information about the server.
+	 *
+	 * @since 3.15.0
+	 */
+	serverInfo?: {
+		/**
+		 * The name of the server as defined by the server.
+		 */
+		name: string;
+
+		/**
+		 * The server's version as defined by the server.
+		 */
+		version?: string;
+	};
+}
+]]
+handlers['initialize'] = ->
+  {
+    capabilities:
+      textDocumentSync: 1
+      completionProvider:
+        triggerCharacters: [ '.', '\\' ]
+      -- TODO: maybe
+      hoverProvider: nil
+      signatureHelpProvider: nil
+      -- TODO for sure
+      declarationProvider: nil
+      definitionProvider: true
+      typeDefinitionProvider: nil
+      implementationProvider: nil
+      referencesProvider: nil
+      documentFormattingProvider: nil
+      renameProvider: nil
+    serverInfo:
+      name: 'yue-lsp'
+      version: '0.0'
+  }
+
+--[[
+export interface CompletionParams extends TextDocumentPositionParams,
+	WorkDoneProgressParams, PartialResultParams {
+	/**
+	 * The completion context. This is only available if the client specifies
+	 * to send this using the client capability
+	 * `completion.contextSupport === true`
+	 */
+	context?: CompletionContext;
+}
+]]
+typ2kind =
+  string: 1     -- CompletionItemKind.Text
+  function: 3   -- CompletionItemKind.Function
+  number: 6     -- CompletionItemKind.Variable
+  variable: 6   -- CompletionItemKind.Variable
+  const: 21     -- CompletionItemKind.Constant
+  chainvalue: 6 -- CompletionItemKind.Variable (for now)
+  unknown: 1    -- CompletionItemKind.Text
+
+handlers['textDocument/completion'] = (line, col, document_uri) ->
+  document = document_uri\gsub 'file://', ''
+
+  f, err = io.open document, 'r'
+  if err
+    return err
+  src = f\read 'a*'
+  f\close!
+
+  fast = linter.to_ast src
+  symbols = asthelp.extract.file_symbols fast
+
+  items = {}
+  for v in *symbols
+    items[] =
+      label: v.value
+      -- kind: 6 -- CompletionItemKind.Variable
+      kind: typ2kind[v.type] ?? 1
+      detail: v.type
+
+  {
+    -- TODO?
+    isIncomplete: false
+    :items
+  }
+
+--[[
+interface TextDocumentPositionParams {
+	/**
+	 * The text document.
+	 */
+	textDocument: TextDocumentIdentifier;
+
+	/**
+	 * The position inside the text document.
+	 */
+	position: Position;
+}
+
+
+interface TextDocumentIdentifier {
+	/**
+	 * The text document's URI.
+	 */
+	uri: DocumentUri;
+}
+
+interface Position {
+	/**
+	 * Line position in a document (zero-based).
+	 */
+	line: uinteger;
+
+	/**
+	 * Character offset on a line in a document (zero-based). The meaning of this
+	 * offset is determined by the negotiated `PositionEncodingKind`.
+	 *
+	 * If the character value is greater than the line length it defaults back
+	 * to the line length.
+	 */
+	character: uinteger;
+}
+
+Response:
+    result: Location | Location[] | LocationLink[] | null
+    partial result: Location[] | LocationLink[]
+    error: code and message set in case an exception happens during the definition request.
+
+interface Location {
+	uri: DocumentUri;
+	range: Range;
+}
+
+interface Range {
+	/**
+	 * The range's start position.
+	 */
+	start: Position;
+
+	/**
+	 * The range's end position.
+	 */
+	end: Position;
+}
+]]
+handlers['textDocument/definition'] = (line, col, document_uri) ->
+  r =
+    -- temp, point it back
+    uri: document_uri
+    range:
+      start:
+        line: 0
+        character: 0
+      end:
+        line: 0
+        character: 0
+  r
+
+
+export default handlers

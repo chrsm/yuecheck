@@ -1,0 +1,15 @@
+-- b always non-nil
+scopefn = (scopearg_a, scopearg_b = true) ->
+  if scopearg_b == nil
+    print '^should warn'
+    if scopearg_b == nil
+      print '^should skip due to my laziness'
+  scopearg_a
+
+otherfn = (unless_never = true) ->
+  unless unless_never != nil
+    return false
+
+otherfn = (unless_always = true) ->
+  unless unless_always == nil
+    return false

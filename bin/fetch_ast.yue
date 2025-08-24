@@ -1,0 +1,322 @@
+#!/usr/bin/env -S yue -e
+import 'http.request' as request
+import 'inspect'
+
+ast_h = 'https://raw.githubusercontent.com/IppClub/Yuescript/main/src/yuescript/yue_ast.h'
+tobool =
+  ['true']: true
+  ['false']: false
+
+get = ->
+  req = request.new_from_uri ast_h
+
+  hd, stream = req\go 10
+  unless hd
+    error 'request failed'
+
+  b, err = stream\get_body_as_string!
+  unless b
+    error "failed to fetch yue_ast.h: #{ err }"
+
+  b
+
+chop_t = (names) ->
+  names\gsub '([%w_]+)_t', '%1'
+
+split_t = (names) ->
+  n = {}
+  names = names\gsub '[%w_]+<([%w_,]+>', '%1'
+  for name in names\gmatch '([%w_]+),?%s?'
+    -- always skip "required"
+    if name == 'true' or name == 'false'
+      continue
+
+    n[] = name
+  n
+
+special_types = { sel: true, sel_list: true, list: true }
+make_sel = (required, types, name) ->
+  {
+    -- `ast_sel<required, T1, T2, ...> <name>;`
+    type: 'sel'
+    special: true
+    required: tobool[required]
+    :name
+    any: split_t chop_t types
+  }
+
+make_sel_list = (required, types, name) ->
+  {
+    -- `ast_sel_list<required, T1, T2, ...> <name>;`
+    type: 'sel_list'
+    special: true
+    required: tobool[required]
+    :name
+    any: split_t chop_t types
+  }
+
+make_list = (required, types, name) ->
+  {
+    -- ast_sel_list<required, T1, T2, ...> <name>;`
+    type: 'list'
+    special: true
+    required: tobool[required]
+    :name
+    any: split_t chop_t types
+  }
+
+parse_h = (h) ->
+  types = {}
+
+  stack = {}
+  i = 0
+  for ln in h\gmatch "([^\n]*)\n?"
+    -- there's definitely a better way to do this, but i am _quite_ lazy
+    i += 1
+
+    pname = ln\match '^AST_END%([%w_]+%)$'
+    if pname -- end stack
+      unless stack.ast_h
+        stack.ast_h = { '<error handling typedef>', 0 }
+      stack.ast_h[2] = i
+      types[] = stack
+      stack = nil
+      continue
+
+    -- node type
+    decl = ln\match '^AST_NODE%(([%w_]+)%)$'
+    if decl -- new stack
+      stack =
+        type: 'node'
+        decl_name: decl
+        ast_h: { i, 0 }
+        attr: {}
+
+      continue
+
+    -- leaf type
+    decl = ln\match '^AST_LEAF%(([%w_]+)%)$'
+    if decl -- new stack
+      stack =
+        type: 'leaf'
+        decl_name: decl
+        ast_h: { i, 0 }
+        attr: {}
+
+      continue
+
+    -- ast_ptr, ast_sel, ast_list are all important!
+    required, ptr_t, name = ln\match '^%s+ast_ptr<([%w_]+), ([%w_]+)> ([%w_]+);$'
+    if required and ptr_t and name
+      stack.attr[] =
+        type: chop_t ptr_t
+        required: tobool[required]
+        :name
+
+      continue
+
+    required, sel_ts, name = ln\match '^%s+ast_sel<([%w_]+),%s+([%w_,%s]+)> ([%w_]+);$'
+    if required and sel_ts and name
+      stack.attr[] = make_sel required, sel_ts, name
+
+      continue
+
+    -- this actually won't work and requires a bit more thought.
+    -- some of the ast_sel_list decls are split over multiple lines.
+    required, sel_t_l, name = ln\match '^%s+ast_sel_list<([%w_]+),%s+(.+)> ([%w_]+);$'
+    if required and sel_t_l and name
+      stack.attr[] = make_sel_list required, sel_t_l, name
+
+      continue
+
+    required, list_t, name = ln\match '^%s+ast_list<([%w_]+),%s+(.+)> ([%w_]+);$'
+    if required and list_t and name
+      stack.attr[] = make_list required, list_t, name
+
+      continue
+
+    --[[
+    -- other attributes
+    names = ln\match "^%s+AST_MEMBER%([%w_]+, (.+)%)$"
+    if names
+      -- clean up a bit
+      for n in names\gmatch "&?([%w_]+),?%s?"
+        stack.attr[] = n
+      continue
+    ]]
+
+  -- custom type for whitespace, only used by formatter
+  types[] = {
+    type: 'leaf'
+    decl_name: 'FmtWhitespace'
+    ast_h: { -1, -1 }
+    attr: {}
+  }
+
+  types
+
+-- manual handling for now of multiline nodes
+manual_overrides =
+  SimpleValue:
+    attr:
+      * {
+        required: true
+        name: 'value'
+        type: 'sel'
+        any:
+          * 'TableLit'
+          * 'ConstValue'
+          * 'If'
+          * 'Switch'
+          * 'With'
+          * 'ClassDecl'
+          * 'ForEach'
+          * 'For'
+          * 'While'
+          * 'Do'
+          * 'Try'
+          * 'UnaryValue'
+          * 'TblComprehension'
+          * 'Comprehension'
+          * 'FunLit'
+          * 'Num'
+          * 'VarArg'
+      }
+  TableLit:
+    attr:
+      --* { type: 'Seperator', required: true, name: 'sep' }
+      * {
+        required: false
+        name: 'values'
+        type: 'sel_list'
+        any:
+          * 'VariablePairDef'
+          * 'NormalPairDef'
+          * 'SpreadExp'
+          * 'NormalDef'
+          * 'MetaVariablePairDef'
+          * 'MetaNormalPairDef'
+          * 'VariablePair'
+          * 'NormalPair'
+          * 'Exp'
+          * 'MetaVariablePair'
+          * 'MetaNormalPair'
+          * 'TableBlockIndent'
+          * 'SpreadListExp'
+      }
+  TableBlockIndent:
+    attr:
+      --* { type: 'Seperator', required: true, name: 'sep' }
+      * {
+        required: false,
+        name: 'values',
+        type: 'sel_list'
+        any:
+          * 'VariablePair'
+          * 'NormalPair'
+          * 'Exp'
+          * 'TableBlockIndent'
+          * 'MetaVariablePair'
+          * 'MetaNormalPair'
+      }
+  Comprehension:
+    attr:
+      * {
+        required: false
+        name: 'items'
+        type: 'sel_list'
+        any:
+          * 'NormalDef'
+          * 'SpreadListExp'
+          * 'CompInner'
+          * 'Statement'
+      }
+  ChainValue:
+    attr:
+      --* { type: 'Separator', required: false, name: 'sep' }
+      * {
+        required: true
+        name: 'items'
+        type: 'sel_list'
+        any:
+          * 'Callable'
+          * 'Invoke'
+          * 'DotChainItem'
+          * 'ColonChainItem'
+          * 'Slice'
+          * 'Exp'
+          * 'String'
+          * 'InvokeArgs'
+          * 'ExistentialOp'
+          * 'TableAppendingOp'
+          * 'ReversedIndex'
+          * 'PlainItem'
+      }
+  Statement:
+    attr:
+      --* { type: 'Separator', required: false, name: 'sep' }
+      * {
+          required: false,
+          name: 'comments',
+          type: 'sel_list',
+          any:
+            * 'YueLineComment'
+            * 'YueMultilineComment'
+      }
+      * {
+        required: true
+        name: 'content'
+        type: 'sel'
+        any:
+          * 'Import'
+          * 'While'
+          * 'Repeat'
+          * 'For'
+          * 'ForEach'
+          * 'Return'
+          * 'Local'
+          * 'Global'
+          * 'Export'
+          * 'Macro'
+          * 'MacroInPlace'
+          * 'BreakLoop'
+          * 'Label'
+          * 'Goto'
+          * 'ShortTabAppending'
+          * 'Backcall'
+          * 'LocalAttrib'
+          * 'PipeBody'
+          * 'ExpListAssign'
+          * 'ChainAssign'
+      }
+      * { type: 'StatementAppendix', required: false, name: 'appendix' }
+
+types = parse_h get!
+print "-- yuecheck:ignore"
+print "-- #{ #types } types parsed"
+print 'types ='
+for v in *types
+  if manual_overrides[v.decl_name]
+    v.attr = manual_overrides[v.decl_name].attr
+
+  attr = {}
+  for a in *v.attr
+    unless special_types[a.type]
+      attr[] = "      * { type: #{ inspect a.type }, required: #{ a.required }, name: #{ inspect a.name } }"
+    else
+      attr[] = "      * { special: true, type: '#{ a.type }', required: #{ a.required }, name: '#{ a.name }', any: #{ inspect a.any } }"
+
+  unless #attr > 0
+    attr = ' nil'
+  else
+    attr = "\n" .. (table.concat attr, "\n")
+
+  print "  * {\n" ..
+        "    type: '#{ v.type }'\n" ..
+        "    decl_name: '#{ v.decl_name }'\n" ..
+        "    ast_h: { #{ v.ast_h[1] }, #{ v.ast_h[2] } }\n" ..
+        "    attr:#{ attr }\n" ..
+        '  }'
+
+print ''
+print 'export default types'

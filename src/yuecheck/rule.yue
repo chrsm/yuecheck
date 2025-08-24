@@ -1,0 +1,175 @@
+import 'yuecheck.macros' as { $ }
+
+import 'yue'
+import 'inspect'
+import 'json'
+
+import 'yuecheck.ast_helpers' as ast
+import 'yuecheck.types'
+
+invalid_checker = (rule, args) ->
+  args or= {}
+  () =>
+    msg = "#{ rule }/#{ @name }: checker not found. " ..
+          "define one with (#{ table.concat args, ', ' }) as arguments"
+    error msg
+
+class Rule
+  name: ''
+  description: ''
+  on: []
+  config: {}
+  checker: invalid_checker 'Rule'
+
+  new: (opts = {}) =>
+    @name = opts.name
+    @description = opts.description
+    @on = opts.on
+    @checker = opts.checker
+    @config = opts.config
+
+  set_on: (@on) =>
+    assert (type @on) == 'table'
+  set_checker: (@checker) =>
+    assert (type @checker) == 'function'
+
+  report: (severity, message, node) =>
+    {
+      type: severity
+      :message
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+  check: (node) =>
+    @checker node
+
+class AssignRule extends Rule
+  on: { types.ExpListAssign }
+  checker: invalid_checker 'Rule', ['simplified_assigns', 'node']
+
+  new: (opts = {}) =>
+    super opts
+
+  check: (node) =>
+    if ast.is.chainvalue_call node
+      return
+
+    unless node.action
+      return
+
+    assignments = {}
+    unless ast.is.chainvalue_call node
+      assignments = ast.extract.assignments node
+
+    simple = ast.simplify.assignment node
+
+    @checker simple, node
+
+-- FuncRule defines an easy way to create rules that operate on function calls.
+--
+-- fns is a list of function calls to check
+--   ex: ['string.match', 'string.find']
+--
+-- checker should be a function that accepts (fully-qualified-func-name, arguments, varnames, node)
+--   it should return a table-of-tables or table containing violation information
+--
+-- see: rules.yue `rules.stdlib_match`, which builds on this to check string.match/etc calls.
+class FuncRule extends Rule
+  name: 'func_rule'
+  description: 'rule for checking function calls'
+  on: [ types.ExpListAssign, types.ChainValue ]
+  fns: []
+  checker: invalid_checker 'FuncRule', ['fully_qualified_fn_path', 'arguments', 'varnames', 'node']
+
+  new: (opts) =>
+    super opts
+    @fns = opts.fns
+
+  set_funcs: (@fns) =>
+    assert (type @fns) == 'table'
+
+  check: (node) =>
+    pkg = nil
+    ianode = nil
+    path = {}
+    action = nil
+    varnames = {}
+
+    if node\is types.ExpListAssign
+      unless node.action
+        return
+      action = node.action.values
+
+      list = node.expList
+      unless list and list.exprs and action
+        return
+
+      for v in *list.exprs
+        cv = v.pipeExprs[1].expos[1].item
+        unless cv.items
+          continue
+        varnames[] = cv.items[1].item.name.v
+    else
+      action = { node.items }
+
+    for v in *action
+      -- this cv is the "package" or "function" name being executed;
+      -- further DotChainItems are more paths
+      -- eg `string.match`           = package(string) fn(match)
+      --    `love.filesystem.append` = package(love.filesystem) fn(append)
+      cv = nil
+      if node\is types.ExpListAssign
+        unless v.pipeExprs and
+               v.pipeExprs[1]?.expos?[1]?.item?.items?
+          continue
+        cv = v.pipeExprs[1].expos[1].item.items
+      else
+        cv = v
+
+      -- TODO: parens fkn this up; we need getters that will descend and do the
+      -- work for us because this is not fun.jpeg
+      pkg = cv[1].item?.name?.v
+      path[] = pkg
+      for i = 2, #cv
+        ni = cv[i]
+        unless ni
+          break
+
+        switch ni.__class
+          when types.DotChainItem
+            path[] = ni.name.v
+          when types.InvokeArgs, types.Invoke
+            ianode = ni
+            break
+          else
+            break
+
+    found = false
+    fqp = "#{ table.concat path, '.' }"
+    for v in *@fns
+      if fqp\match v
+        found = true
+        break
+
+    unless found
+      return
+
+    -- they have an incomplete call, will be caught by stdlib_usage
+    unless ianode and ianode.args and #ianode.args>0
+      return
+
+    -- specific to string.match
+    argvs = {}
+    for i = 1, #ianode.args
+      argvs[] = ianode.args[i]
+    unless #argvs > 0
+      return
+
+    @checker path, argvs, varnames, node
+
+export default {
+  :Rule
+  :FuncRule
+  :AssignRule
+}

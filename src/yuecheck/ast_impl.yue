@@ -1,0 +1,121 @@
+import 'yuecheck.macros' as { $ }
+class position
+  line: -1
+  col: -1
+
+  new: (t = {}) =>
+    @line = t[1]
+    @col = t[2]
+
+  <eq>: (v) =>
+    @line == v.line and @col == v.col
+  <lt>: (v) =>
+    @line < v.line or (@line == v.line and @col < v.col)
+  <le>: (v) =>
+    @line <= v.line or (@line == v.line and @col <= v.col)
+
+class _ast
+  -- positional data
+  pos: nil
+
+  g_yue_name: => @@yue_name
+  g_yue_type: => @@yue_type
+  g_src_pos: => @pos
+  g_src_line: => @pos.line or 0
+  g_src_col:  => @pos.col or 0
+  set_source: (line, column) =>
+    @pos = position { line, column }
+  is: (typ) =>
+    unless typ
+      error "comparing #{ @\g_yue_name! } to nil"
+    @@ == typ
+  is_any: (...) =>
+    args = { ... }
+    for i = 1, #args
+      return true if @@ == args[i]
+    false
+
+--[[ special types ]]
+class _selector_t extends _ast
+  @yue_type = 'sel_t'
+  @yue_name = 'sel_t'
+
+  new: (types = {}) =>
+    @allowed = types
+    @value = nil
+
+  get: =>
+    @value
+
+  set: (v) =>
+    ok = false
+    for i, ac in ipairs @allowed
+      if ac.__name == v.__name
+        ok = true
+        break
+
+    unless ok
+      error "#{ v.__name } not allowed"
+
+    @value = v
+
+class _selector_list_t extends _ast
+  @yue_type = 'sel_list_t'
+  @yue_name = 'sel_list_t'
+
+  new: (types = {}) =>
+    @allowed = types
+    @value = nil
+
+  get: =>
+    @value
+
+  set: (v) =>
+    ok = false
+    for i, ac in ipairs @allowed
+      if ac.__name == v.__name
+        ok = true
+        break
+
+    unless ok
+      error "#{ v.__name } not allowed"
+
+    @value = v
+
+class _list_t extends _ast
+  @yue_name = 'list_t'
+  @yue_type = 'list_t'
+
+  new: (types = {}) =>
+    @allowed = types
+    @value = nil
+
+  get: =>
+    @value
+
+  set: (v) =>
+    ok = false
+    for i, ac in ipairs @allowed
+      if ac.__name == v.__name
+        ok = true
+        break
+
+    unless ok
+      error "#{ v.__name } not allowed"
+
+    @value = v
+--[[ end special types ]]
+
+class Leaf extends _ast
+  @yue_type = 'Leaf'
+
+class Node extends _ast
+  @yue_type = 'Node'
+
+export default {
+  :_selector_t
+  :_selector_list_t
+  :_list_t
+  :Leaf
+  :Node
+}

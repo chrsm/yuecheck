@@ -1,0 +1,3 @@
+--[[comment3
+]]
+print('stmt')

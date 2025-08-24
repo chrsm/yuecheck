@@ -1,0 +1,59 @@
+x = (
+a = {},
+b = true,
+c = Exp!) ->
+  nil
+
+class X
+  new:  =>  nil
+
+class    state
+  nindent:   2
+  chain:    '\\'
+  table_spacing:   true
+  comprehension_spacing:    true
+  scope:              0
+  _indent:     ''
+
+  push: (
+    n = 1) =>
+    @scope += 1
+    @_indent = string.rep ' ',
+      @scope * @nindent -- hmm
+  pop: (n = 1) =>
+    @scope -= 1
+    @_indent = string.rep ' ',
+      @scope* @nindent
+
+  indent: (str) =>
+    if str and #str > 0
+      @_indent .. str
+    else
+      @_indent
+-- output
+x = (a = {}, b = true, c = Exp!) ->
+  nil
+
+class X
+  new: => nil
+
+class state
+  nindent: 2
+  chain: '\\'
+  table_spacing: true
+  comprehension_spacing: true
+  scope: 0
+  _indent: ''
+
+  push: (n = 1) =>
+    @scope += 1
+    @_indent = string.rep ' ', @scope * @nindent
+  pop: (n = 1) =>
+    @scope -= 1
+    @_indent = string.rep ' ', @scope * @nindent
+
+  indent: (str) =>
+    if str and #str > 0
+      @_indent .. str
+    else
+      @_indent

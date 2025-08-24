@@ -1,0 +1,27 @@
+x=1
+x +=2
+x *=   1
+x  ??=  1
+x = (a,
+b,
+c) -> nil
+x = y*b+(1    *3)
+x[] =  x    for   x   in   *x
+x   |> print   _
+x::y!
+x = {1,2,3}
+x = [1,2,3]
+x = {a: b , c:  'd' , e: 123  , f: Exp! , g: -> nil }
+-- output
+x = 1
+x += 2
+x *= 1
+x ??= 1
+x = (a, b, c) -> nil
+x = y * b + (1 * 3)
+x[] = x for x in *x
+x |> print _
+x\y!
+x = { 1, 2, 3 }
+x = [ 1, 2, 3 ]
+x = { a: b, c: 'd', e: 123, f: Exp!, g: -> nil }

@@ -1,0 +1,76 @@
+#!/usr/bin/env -S yue -e
+import 'lfs'
+import 'argparse'
+import 'json'
+
+import 'yuecheck.exp'
+import 'yuecheck'
+
+argp = argparse!
+  name: 'yue-lsp'
+  description: 'lsp server for Yuescript, part of the yuecheck project'
+  epilog: 'see https://github.com/chrsm/yuecheck'
+
+with argp
+  dbg = \option '-d --debug', 'enables logging, pass a file path to log to'
+
+args = argp\parse!
+
+--[[ handle options ]]
+opts =
+  debug: false
+  logger: nil
+if args.debug
+  opts.debug = args.debug
+
+  unless (lfs.attributes opts.debug, 'mode') == 'file'
+    lfs.touch opts.debug
+
+  fp, err = io.open opts.debug, 'w'
+  if err
+    error "yue-lsp: unable to open #{ opts.debug } for writing debug logs"
+  opts.logger = (msg) ->
+    fp\write msg
+    fp\flush!
+
+--[[ server init ]]
+
+-- probably only going to implement stdio forever, i don't see a compelling reason
+-- to do otherwise
+conn = exp.conn.Stdio { logger: opts.logger }
+-- TODO: cleanup, don't want these defined _here_; copy/paste from exp/lsp.yue
+handlers = exp.handlers
+srv = exp.server.Server conn, { logger: opts.logger }
+
+srv\set_handler (r) =>
+  unless r
+    @\log 'no request received'
+
+  resp = switch r.method
+    when 'initialize'
+      handlers.initialize!
+    when 'textDocument/completion'
+      handlers['textDocument/completion'] r.params.line, r.params.character, r.params.textDocument.uri
+    when 'textDocument/definition'
+      handlers['textDocument/definition'] r.params.line, r.params.character, r.params.textDocument.uri
+    when 'textDocument/didSave'
+      -- reindex?
+      {}
+    when 'exit'
+      @\log 'exit request received'
+      os.exit 0
+
+  @\log "response to #{ r.method }{id: #{ r.id } }: #{ json.encode resp }"
+  resp
+
+try
+  srv\serve!
+catch err
+  print "unhandled error: #{ err }"
+  print yue.traceback err
+
+--[[ cleanup ]]
+::cleanup::
+if opts.logger
+  opts.logger\flush!
+  opts.logger\close!

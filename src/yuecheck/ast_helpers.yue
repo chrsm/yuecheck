@@ -1,0 +1,239 @@
+import 'yuecheck.macros' as { $ }
+
+import 'json'
+
+import 'yuecheck.types'
+import 'yuecheck.util'
+
+extract = {}
+is = {}
+simplify = {}
+
+is.chainvalue_call = (node) ->
+  unless node and node\is types.ChainValue
+    return false
+
+  last = node.items[#node.items]
+  unless last
+    error 'chainvalue_call: no last node'
+  unless ((type last) == 'table') and last.is
+    error "chainvalue_call: last node not a table: #{ json.encode last }"
+  (last\is types.Invoke) or (last\is types.InvokeArgs)
+
+simplify.assignment = (node) ->
+  unless node
+    error 'simplify.assignment: ExpListAssign node required'
+
+  assigns = extract.assignments node
+  unless assigns
+    return
+
+  name = (nodes) ->
+    r = {}
+    for set in *nodes
+      for v in *set
+        switch true
+          when v\is types.Variable
+            r[] = v.name.v
+          when v\is types.DotChainItem
+            r[] = v.name.v
+          when v\is types.Exp
+            for p in *v.pipeExprs
+              for ex in *p.expos
+                if ex.items
+                  for item in *ex.items
+                    r[] = extract.string item
+                else
+                  if ex.item and ex.item\is types.String
+                    r[] = extract.string ex.item
+                  elseif ex.item and ex.item\is types.ChainValue
+                    r[] = "$VAR{#{ ex.item.items[1].item.name.v }}"
+          --[[
+          TODO
+          else
+            error "unknown name node #{ v\g_yue_name! }: #{ json.encode v }"
+          ]]
+    (table.concat r, '.'), r
+  value = (values) ->
+    unless values[1]
+      return
+
+    v = values[1]
+
+    r = switch true
+      when v == nil or v.is == nil
+        nil
+      when v\is types.String
+        { type: 'string', value: util.stripq extract.string v }
+      when (v\is types.SimpleValue) and v.value\is types.Num
+        { type: 'number', value: v.value.v }
+      when (v\is types.SimpleValue) and v.value\is types.ConstValue
+        { type: 'const', value: util.stripq v.value.v }
+      when (v\is types.SimpleValue) and v.value\is types.FunLit
+        { type: 'function', value: nil }
+      when v\is types.ChainValue
+        { type: 'chainvalue', value: v.items[1].item?.name?.v ?? nil }
+      when v\is types.Num
+        { type: 'number', value: v.v }
+      else
+        { type: 'unknown', value: v }
+      --[[
+      else
+        -- error "unknown type node #{ v\g_yue_name! } for value: #{ json.encode v }"
+        if v.g_yue_name
+          print "idk node: #{ v\g_yue_name! } #{ v\g_src_line! } #{ v\g_src_col! }"
+        else
+          print "idk node: #{ type v }"
+        nil
+      ]]
+    r
+
+  ret = {}
+  for assign in *assigns
+    unless assign.values
+      continue
+
+    fqp, path = name assign.items
+    val = value assign.values
+
+    unless val
+      continue
+
+    ret[] =
+      name: fqp
+      path: path
+      value: val
+  ret
+
+extract.string = (node) ->
+  unless node
+    error "string: node required"
+  unless node\is types.String
+    return
+
+  v = nil
+  switch true
+    when node == nil or node.is == nil or node.str == nil or node.str.is == nil
+      return
+    when node.str\is types.DoubleString
+      segs = {}
+      for seg in *node.str.segments
+        segs[] = seg.content.v
+      v = table.concat segs, ''
+    when node.str\is types.SingleString
+      v = node.str.v
+    when node.str\is types.LuaString
+      v = node.str.content.v
+  v
+
+extract.items = (node) ->
+  vars = {}
+  for pipes in *node.pipeExprs
+    for i, expos in ipairs pipes.expos
+      items = expos.item?.items ?? {}
+      var = {}
+      for item in *items
+        v = item.item ?? item
+        continue unless v
+        var[] = v
+
+      vars[] = var
+  vars
+
+extract.assignments = (node) ->
+  unless node and node\is types.ExpListAssign
+    error "expected ExpListAssign, got #{ node\g_yue_name! }"
+
+  unless node.action
+    return
+
+  set = {}
+
+  unless node.action.values
+    -- TODO: support other ops, eg Update, SubBackcall
+    return
+
+  for i, value in ipairs node.action.values
+    unless value and value\is types.Exp
+      continue
+
+    unless set[i]
+      set[i] =
+        items: {}
+        values: {}
+
+    for ii, pipe in ipairs value.pipeExprs
+      for iii, expo in ipairs pipe.expos
+        set[i].values[] = expo.item
+
+  for i, exprs in ipairs node.expList.exprs
+    unless set[i]
+      set[i] =
+        items: {}
+        values: {}
+
+    set[i].items = extract.items exprs
+
+  set
+
+extract.name_list = (node) ->
+  unless node and node.is
+    error "name_list: nil node #{ json.encode node }"
+  unless node\is types.NameList
+    error "expected NameList, got #{ node\g_yue_name! }"
+
+  [n.name.v for n in *node.names]
+
+extract.file_symbols = (node) ->
+  unless node\is types.File
+    error "expected File, got #{ node\g_yue_name! }"
+
+  dowrites = true
+  --[[
+    { value: any, type: string|number|function|const|chainvalue|unknown }
+  ]]
+  symbols = {}
+
+  -- for the moment, let's consider any variable in the "outermost" scope
+  -- as a symbol.
+  statements = node.block.statements
+  for v in *statements
+    -- i *think* we care about:
+    -- Local, Global, Export?, Macro, MacroInPlace?, ExpListAssign, ChainAssign
+    sc = v.content
+    unless sc and ((type sc) == 'table') and sc.is
+      error "sc has no is: #{ json.encode sc }"
+
+    unless sc.is
+      error 'sc has no is method'
+
+    if sc\is types.Global
+      -- TODO: relies on GlobalValues
+      nl = extract.name_list v.content.item.nameList
+      for n in *nl
+        symbols[] = { type: 'variable', value: n }
+    elseif sc\is types.Local
+      item = sc.item
+      if item\is types.LocalValues
+        -- symbols = {...symbols, ...extract.name_list item.nameList}
+        nl = extract.name_list item.nameList
+        for n in *nl
+          symbols[] = { type: 'variable', value: n }
+      else
+        symbols[] = { type: 'variable', value: item.v }
+    elseif sc\is types.Macro
+      symbols[] = { type: 'function', value: sc.name.v }
+    elseif sc\is types.ExpListAssign
+      -- need to do just top-level stuff, but this is being buggy
+      assignments = simplify.assignment sc
+      assignments or= {}
+      for a in *assignments
+        symbols[] = { type: (a.value.type ?? 'unknown'), value: a.name }
+
+  symbols
+
+export default {
+  :is
+  :extract
+  :simplify
+}

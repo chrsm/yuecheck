@@ -1,0 +1,20 @@
+-- comment 1 (l1)
+print 1 -- (l2)
+-- comment 2 (l3)
+
+-- comment 3 (l5)
+--[[
+  a long
+  multiline
+  kinda
+  comment (l6)
+]]
+if y
+  do_thing! -- comment (l13)
+
+class abc
+  -- comment (l16)
+  new: => nil
+
+-- all done? (l19)
+yes!

@@ -1,0 +1,10 @@
+--a!
+-- b
+var_1 = 1 --c
+
+-- var_2 pre
+var_2 = 2 -- line
+-- var_2 post
+
+
+ -- d

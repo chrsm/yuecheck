@@ -1,0 +1,161 @@
+#!/usr/bin/env -S yue -e
+import 'yue'
+import 'lfs'
+import 'argparse'
+
+import 'json'
+import 'inspect'
+
+import 'yuecheck'
+
+-- TODO: cleanup!
+
+--[[ util ]]
+_str_ends_with = (s, suffix) ->
+  len = #s
+  slen = #suffix
+  for i = 0, slen - 1
+    if (s\byte len - i) != suffix\byte (slen - i)
+      return false
+  true
+is_dir = (dir) -> (lfs.attributes dir, 'mode') == 'directory'
+find_files = (path, ext, exclude = {}) ->
+  unless is_dir path
+    return nil, error "(#{ path }, #{ ext }) is not a directory"
+
+  if (path\sub #path, #path) == '/'
+    path = path\sub 1, #path - 1
+
+  files = {}
+  for ent in lfs.dir path
+    continue if ent in { '.', '..' }
+
+    p = "#{ path }/#{ ent }"
+    skip = false
+    for v in *exclude
+      if p\match v
+        skip = true
+        break
+    if skip
+      continue
+
+    if is_dir p
+      -- skip common dirs
+      if p\match '%.git$'
+        continue
+      files = { ...files, ...(find_files p, ext, exclude)}
+    elseif _str_ends_with p, ".#{ ext }"
+      files[] = p
+  files
+--[[ /util ]]
+
+-- find config
+origdir = lfs.currentdir!
+found = false
+while not found
+  cwd = lfs.currentdir!
+  if cwd == '/'
+    break
+
+  for f in lfs.dir cwd
+    if f == '.git'
+      found = true
+      break
+
+  unless found
+    lfs.chdir "#{ cwd }/.."
+
+cfg = if lfs.attributes '.yuecheck', 'mode'
+  yue.dofile '.yuecheck'
+elseif lfs.attributes ("#{ os.getenv 'HOME' }/.yuecheck"), 'mode'
+  yue.dofile "#{ os.getenv 'HOME' }/.yuecheck"
+else
+  nil
+
+lfs.chdir origdir
+argp = argparse!
+  name: 'yuecheck'
+  description: 'tool for analyzing and linting yue code'
+  epilog: 'see https://github.com/chrsm/yuecheck'
+
+with argp
+  dof = \argument 'dir_or_file'
+  dof\args '?'
+
+  d = \option '-d --directory', 'directory containing files to check'
+  d\args 1
+
+  f = \option '-f --file', 'specific file to check'
+  f\args 1
+
+  stdin = \flag '--stdin', 'parse stdin'
+  ignore_config = \flag '--ignore-config', 'ignore repo or user config'
+  to_json = \flag '-j --json', 'output as json'
+
+  exclude = \option '-x --exclude', 'pattern for paths to exclude'
+  exclude\args '*'
+  exclude\overwrite false
+
+  \mutex d, f, dof, stdin
+
+args = argp\parse!
+
+unless args.ignore_config
+  yuecheck.linter.enabled_rules = cfg.enabled_rules
+  yuecheck.linter.enable_compilation = cfg.enable_compilation
+
+  for k, v in pairs (cfg.rules ?? {})
+    yuecheck.rules[k].config = v
+
+src = {}
+if args.stdin
+  src = io.read 'a*'
+
+  -- deal with shebang
+  if #src > 3 and (src\sub 1, 3) == '#!/'
+    src = '-- ' .. src
+
+  -- TODO: refactor dup
+  n = 0
+  ret = {}
+  issues = yuecheck.linter.lint_string src
+
+  unless args.json
+    for v in *issues
+      n += 1
+      print "#{ v.line }:#{ v.col }: #{ v.message }"
+    print ''
+    print "#{ n } issues"
+  else
+    print json.encode issues
+
+  return
+elseif args.directory
+  src = find_files args.directory, 'yue', args.exclude
+elseif args.dir_or_file
+  if (lfs.attributes args.dir_or_file, 'mode') == 'directory'
+    src = find_files args.dir_or_file, 'yue', args.exclude
+  else
+    src = { args.dir_or_file }
+elseif args.file
+  src = { file }
+else
+  error "unknown mode #{ json.encode args }"
+
+ret = {}
+for f in *src
+  ret[f] = {} unless ret[f]
+  issues = yuecheck.linter.lint_file f
+  ret[f][] = v for v in *issues
+
+if args.json
+  print json.encode ret
+else
+  n = 0
+  for f, issues in pairs ret
+    for v in *issues
+      n += 1
+      print "#{ f }:#{ v.line }:#{ v.col }: #{ v.message }"
+
+  print ''
+  print "#{ n } issues"

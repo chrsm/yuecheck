@@ -1,0 +1,8 @@
+*.yue linguist-language=moonscript
+.yuecheck linguist-language=moonscript
+bin/yuecheck linguist-language=moonscript
+
+*.yue text eol=lf
+.yuecheck text eol=lf
+bin/yuecheck text eol=lf
+*.lua text eol=lf

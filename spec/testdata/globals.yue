@@ -1,0 +1,7 @@
+_G.a = '_G.a'
+_G['x'] = '_G.x'
+_G["1"] = "_G.1"
+_G.a.x = '_G.a.x'
+_G = 0
+_G.a, _G.b, _G.c, _G.d = '_G.a multi', "_G.b multi", [[ _G.c multi ]], 5
+_G[a] = 'x'

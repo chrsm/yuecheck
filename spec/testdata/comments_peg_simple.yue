@@ -1,0 +1,10 @@
+-- abc
+--xyz
+print 1
+--[[
+--not a comment
+]]
+x = '--not a comment string'
+print 2 -- print 2
+--[[ --notacomment ]]
+call --[[ a ]]1, 2--[[ b ]], 3 -- eol

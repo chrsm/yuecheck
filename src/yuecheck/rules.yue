@@ -1,0 +1,975 @@
+import 'yuecheck.macros' as { $ }
+import 'yuecheck.types'
+import 'yuecheck.stdlib_defs'
+import 'yuecheck.util'
+import 'yuecheck.rule'
+
+import 'yue'
+import 'inspect'
+import 'json'
+
+_is_any = (node, set = {}) ->
+  for v in *set
+    return true if node\is v
+  false
+
+_exp_simple = (node) ->
+  error '_exp_simple: no node supplied' unless node
+  error "#{ node } is not an Exp" unless node\is types.Exp
+  -- simple if Exp>UnaryExp>Value>SimpleValue.
+  item = node.pipeExprs?[1]?.expos?[1]?.item
+  unless item
+    return
+
+  v = switch item\g_yue_name! -- this isn't necessary but i'm lazy
+    when 'SimpleValue'
+      item.value
+    when 'String'
+      item.str
+    else
+      error "item type #{ item\g_yue_name! } not supported"
+
+  unless _is_any v, {
+    --[[
+      types.TableLit   -- .values[] <VariablePairDef,NormalPairDef,SpreadExp,NormalDef,...>
+                       --           in other words, a LOT, not dealing with this for now.
+    ]]
+    types.ConstValue -- .v
+    types.Num        -- .v
+    -- types.UnaryValue -- NOTE(@chrsm): ???
+    types.DoubleString -- .segments[] -> .content[] -> .v
+    types.SingleString -- .v
+  }
+    return
+
+  ret = v.v
+  if v\is types.DoubleString
+    -- walk and concat, i'm fkn tired
+    ret = {}
+    for seg in *v.segments
+      ret[] = seg.content.v
+    ret = "\"#{ table.concat ret, '' }\""
+
+  -- deal with TableLit etc later
+  ret or false
+
+-- imagine we have:
+--
+-- 1 x = (a, b = true) ->
+-- 2   if b == nil
+-- 3     print "do something silly"
+-- 4
+-- 5   "some value"
+--
+-- `b` on line 2 _can't possibly be nil_ as the compiler inserts a
+-- `if b == nil then b = true end` into the corresponding function body.
+--
+-- TEST: let's scan the first few nodes of the function body, i.e. try to
+-- check something simple:
+-- `(a,b=true) -> 1 if b == nil`
+-- purely looking at `if` nodes.
+-- anyway, we have Body.[]Statement.ExpListAssign + StatementAppendix, where the if lives.
+-- (in this very specific case.)
+-- (note that we don't look at appendixes elsewhere. need to.)
+_check_cond_expr = (iftyp, n, args) ->
+  unless n
+    error 'no node provided to _check_cond_expr'
+  unless n\is types.Exp
+    error "non-exp sent to _check_cond_expr, is #{ n\g_yue_name! }"
+    return
+
+  cond = n
+
+  if #cond.pipeExprs == 0 or #cond.pipeExprs > 1
+    return -- bail for now
+  if #cond.opValues == 0 or #cond.opValues > 1
+    return -- bail for now
+
+  unless cond.pipeExprs[1].expos[1].item\is types.ChainValue
+    return -- bail for now
+
+  varn = cond.pipeExprs[1].expos[1].item.items[1].item.name?.v
+  unless args[varn] != nil
+    return -- no default, skip
+
+  defv = args[varn]
+
+  -- look for the const value
+  cv = cond.opValues[1].pipeExprs[1].expos[1]
+  unless (cv.item\is types.SimpleValue) and
+         (cv.item.value\is types.ConstValue)
+    return -- bail for now
+
+  -- we're only dealing with nil-ness here
+  unless cv.item.value.v == 'nil'
+    return
+
+  -- cool, we have a name now. what are we comparing it against?
+  unless cond.opValues[1].op.v in ['==', '!=', '~=']
+    -- other ops are suspicious but more easily detected.
+    return
+
+  op = cond.opValues[1].op.v
+  op = '!=' if op == '~='
+
+  sw = { ct: iftyp, op: op }
+  why = switch sw
+    -- (x=true)->1 if x == nil
+    -- ^ never
+    when ct: 'if', op: '=='
+      'never'
+    -- (x=true)->1 if x != nil
+    -- ^ always
+    when ct: 'if', op: '!='
+      'always'
+    -- (x=true)->1 unless x == nil
+    -- ^ always
+    when ct: 'unless', op: '=='
+      'always'
+    -- (x=true)->1 unless x != nil
+    -- ^ never
+    when ct: 'unless', op: '!='
+      'never'
+
+  {
+    type: 'WARN'
+    message: "`#{ varn }` defaults to `#{ defv }`; " ..
+             "cond #{ why } occurs `#{ iftyp } #{ varn } #{ op } #{ cv.item.value.v }`"
+    line: n\g_src_line!
+    col: n\g_src_col!
+  }
+
+rules = {}
+
+-- smell_global_writes
+-- warns about using global variables, they should be treated as read-only
+-- checks { _G, _ENV, package }
+-- NOTE(@chrsm): not smart enough to check for: `x = _G; x['a'] = 'b'`
+-- can probably check simple cases and/or assignment of global to a local
+--
+-- example:
+--[[
+_G.a = 'b'
+_G['a'] = 'b'
+_G[a] = 'b'
+]]--
+-- TODO: needs to accept any expr (eg _G[key] = 'a')
+rules.global_writes = rule.AssignRule
+  name: 'global_writes'
+  description: 'checks for writes to known-globals'
+  config:
+    patterns: ['^_G[%.%[]', '^_ENV[%.%[]', '^package[%.%[]', '^_G$']
+  checker: (assigns, node) =>
+    unless assigns and #assigns > 0
+      return
+
+    issues = {}
+    for p in *assigns
+      unless util.match_any p.name, @config.patterns
+        continue
+
+      msg = if #p.path > 0
+        "discourage write to global (#{ util.stripq p.name })"
+      else
+        "discourage write to global (#{ p.path[1] })"
+      issues[] = @report 'WARN', msg, node
+
+    #issues > 0 and issues or nil
+
+-- cond_identical_exprs
+-- warns if both lhs and rhs comparisons are the same
+--
+-- example:
+--[[
+if 1 == 1
+  print 1
+
+if x == x
+  print 1
+
+(etc)
+]]--
+rules.cond_identical_exprs =
+  type: 'WARN'
+  on:
+    * types.IfCond
+  check: (node) ->
+    exp = node.condition
+    v1 = exp.pipeExprs?[1]?.expos?[1]?.item?.value?.v or nil
+    v2 = exp.opValues?[1]?.pipeExprs?[1]?.expos?[1]?.item?.value?.v or nil
+    op = exp.opValues?[1]?.op?.v
+
+    unless (v1 and v2 and op) and (v1 == v2)
+      return
+
+    {
+      type: 'WARN'
+      message: "identical expressions on lhs and rhs of '#{ op }' operator"
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- cond_impossible
+-- NOTE(@chrsm): named badly
+-- warns about bad conditionals
+--
+-- example:
+--[[
+unless false -- always exec'd
+  print 1
+
+if false -- never exec'd
+  print 1
+
+if true -- always exec'd
+  print 1
+
+unless true -- always exec'd
+
+if 1 -- always exec'd
+  print 1
+unless 1 -- never exec'd
+  print 1
+]]--
+rules.cond_impossible =
+  type: 'ERROR'
+  on:
+    * types.If
+  check: (node) ->
+    iftyp = node.type.v
+
+    expos = node.nodes?[1].condition?.pipeExprs?[1]?.expos or {}
+    unless #expos == 1
+      return nil
+
+    unless #(node.nodes?[1].condition?.opValues or {}) == 0
+      return nil
+
+    v = expos[1].item?.value?.v ?? expos[1].item.items[1].item.name.v
+    compv = node.nodes?[1].condition?.opValues?[1]?.pipeExprs?[1]?.expos?[1]?.item?.value?.v ?? ''
+
+    message = ''
+    if v == 'true'
+      isexec = switch iftyp
+        when 'unless'
+          'never'
+        else
+          'always'
+      message = "`#{ iftyp }` expression literal `true` #{ isexec } executed"
+    elseif v == 'false'
+      isexec = switch iftyp
+        when 'unless'
+          'always'
+        else
+          'never'
+      message = "`#{ iftyp }` expression literal `false` #{ isexec } executed"
+    elseif (tonumber v) != nil
+      isexec = switch iftyp
+        when 'unless'
+          'never'
+        else
+          'always'
+      message = "`#{ iftyp }` expression compared to number literal `#{ v }` #{ isexec } executed"
+    else
+      return nil
+
+    {
+      type: 'ERROR'
+      :message
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+rules.nil_comparisons =
+  type: 'ERROR'
+  description: ''
+  on:
+    * types.Exp
+  check: (node) ->
+    getv = (node) ->
+      exp1 = node?.pipeExprs?[1]?.expos?[1]?.item
+      return nil unless exp1
+
+      switch true
+        when not exp1
+          nil
+        when exp1\is types.ChainValue
+          exp1.items?[1]?.item?.name?.v
+        when exp1\is types.SimpleValue
+          exp1.value.v
+        else
+          nil
+
+    lhs = getv node
+    rhs = getv node.opValues?[1]
+    op = node.opValues?[1]?.op?.v
+    unless lhs and rhs and op
+      return
+
+    unless (lhs == 'nil' or rhs == 'nil') and #op > 0
+      return
+
+    unless op in ['>', '>=', '<', '<=', '/', '*', '-', '+', '%', '//', '..', '&', '<<', '>>', '|', '~']
+      return
+
+    {
+      type: 'ERROR'
+      message: "syntax error: `#{ lhs } #{ op } #{ rhs }`"
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- unreachable
+-- warns about unreachable code
+--
+-- example:
+--[[
+repeat
+  print 1
+  break
+  print 2 -- unreachable
+until false
+]]--
+rules.unreachable =
+  type: 'ERROR'
+  on:
+    * types.For
+    * types.While
+    * types.Repeat
+  check: (node) ->
+    -- walk child nodes depending on what we are
+    -- if there's a `break` right at the end (and it's not scoped),
+    -- anything after it is unreachable
+    -- (if there's nothing after it, it's just a code smell)
+
+    -- repeat loop
+    unless node\is types.Repeat
+      return nil
+
+    -- assume block
+    breakfound = false
+    afterbreak = false
+    for i, v in ipairs node.body.statements
+      if v.content\is types.BreakLoop
+        breakfound = true
+        continue
+
+      if breakfound
+        afterbreak = { v\g_src_line!, v\g_src_col! }
+
+    unless breakfound and afterbreak
+      return nil
+
+    {
+      type: 'ERROR'
+      message: 'unreachable code after break statement'
+      line: afterbreak[1]
+      col: afterbreak[2]
+    }
+
+-- style_comment_space
+-- warns about comments that have no leading space after the `--`
+--
+-- example:
+--[[
+--bad
+]]--
+rules.style_comment_space =
+  type: 'WARN'
+  on:
+    * types.YueLineComment
+    * types.YueMultilineComment
+  check: (node) ->
+    if (node\is types.YueLineComment) and ((node.v\match '^%-%- ') or (node.v\match '^%-%-$')) -- yuecheck:ignore
+      return
+    elseif (node\is types.YueMultilineComment) and (node.inner.v\match '%-%-%[%[%s+.+%s+%]%]')
+      return
+
+    typ = '???'
+    if node\is types.YueLineComment
+      typ = 'single-line'
+    else
+      typ = 'multi-line'
+    {
+      type: 'WARN'
+      message: "#{ typ } comment should have space between -- and content"
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- style_zero_index
+-- warns when a table is accessed by 0 index; lua tables start at 1 and this
+-- is likely an error
+--
+-- example:
+--[[
+print x[0]
+]]--
+rules.style_zero_index =
+  type: 'WARN'
+  on:
+    * types.Value
+  check: (node) ->
+    unless node.item\is types.ChainValue
+      return nil
+
+    cv = node.item.items
+    unless cv[1]?.item? and cv[1].item\is types.Variable
+      return nil
+
+    unless cv[2]?\is types.Exp
+      return nil
+
+    unless cv[2].pipeExprs?[1]?.expos?[1]?\is types.Value
+      return nil
+
+    v = cv[2].pipeExprs?[1]?.expos?[1]?.item.value
+    unless v and v\is types.Num
+      return nil
+
+    unless v.v == '0'
+      return nil
+
+    {
+      type: 'WARN'
+      message: 'array indices start at 1, likely error'
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- style_import_as_ident
+-- suggests removing 'as name' from imports when unnecessary
+--
+-- example:
+--[[
+import 'json' as json
+
+->
+
+import 'json'
+]]--
+rules.style_import_as_ident =
+  type: 'WARN'
+  on:
+    * types.ImportAs
+  check: (node) ->
+    unless node.target
+      return nil
+
+    unless node.target\is types.Variable
+      return nil
+
+    -- eg busted.runner as busted not bad
+    unless #node.literal.inners == 1 and node.target.name.v == node.literal.inners[1].v
+      return nil
+
+    {
+      type: 'WARN'
+      message: 'import statement and variable use same name'
+      line: node\g_src_line!
+      -- this is at least 8 chars in.
+      -- should this point to the target name?
+      -- or beginning of line?
+      col: node\g_src_col!
+    }
+
+-- style_unnecessary_doublestring
+-- suggests using single-quoted strings when double-quoted is unneeded
+-- this skips doubles with interps or escape sequences
+--
+-- example:
+--[[
+x = "abcd"
+
+->
+
+x = 'abcd'
+
+-- where these are OK
+x = "#{ interp }"
+x = "'a'"
+]]--
+rules.style_unnecessary_doublestring =
+  type: 'WARN'
+  on:
+    * types.DoubleString
+  check: (node) ->
+    unless #node.segments > 0
+      return
+
+    -- if any segment is an exp, it's an interp, eg `x = "#{ y }"`
+    -- given that interps calls `tostring`, i wouldn't say that a single
+    -- exp is a smell, either.
+    for n in *node.segments
+      if n.content\is types.Exp
+        return
+
+    -- could build list of valid escapes, is that necessary?
+    if (node.segments[1].content.v\match "\\.+") or
+       (node.segments[1].content.v\match "'") -- contains a singlequote, so it's OK
+      return
+
+    {
+      type: 'WARN'
+      message: 'double-quoted string where single-quoted would suffice'
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- style_conditionals
+-- suggests using alternative If when `not` operand is applied
+--
+-- example:
+--[[
+if not x
+  print 1
+
+unless not x
+  print 1
+
+->
+
+unless x
+  print 1
+
+if x
+  print 1
+]]--
+rules.style_conditionals =
+  type: 'WARN'
+  on:
+    * types.If
+  check: (node) ->
+    unless node.nodes[1]?.condition?.pipeExprs?[1]?.ops?[1]?.v == 'not'
+        return
+
+    -- ignore multiple exprs, can likely add them tho
+    unless #node.nodes[1].condition.opValues == 0
+      return
+
+    iftyp = node.type.v
+
+    name = ''
+    vnode = node.nodes[1]?.condition?.pipeExprs?[1].expos?[1]?.item?.items?[1]?.item?.name
+    if vnode\is types.SelfName
+      name = vnode.name.v
+    else
+      name = vnode.v
+    name = util.stripq name
+
+    message = switch iftyp
+      when 'if'
+        "`if not #{ name }` could be `unless #{ name }`"
+      when 'unless'
+        "`unless not #{ name }` could be `if #{ name }`"
+
+    {
+      type: 'WARN'
+      :message
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- style_simplify_if_to_switch
+-- suggests using `switch` when there's an if-elseif-*-else chain comparing only a single value
+--
+-- example:
+--[[
+if x == 1 or x == 2
+  print 1
+elseif x == 3
+  print 3
+elseif x == 4
+  print 4
+else
+  print "idk"
+
+->
+
+switch x
+  when 1, 2
+    print 1
+  when 3
+    print 3
+  when 4
+    print 4
+  else
+    print "idk"
+]]--
+rules.style_simplify_if_to_switch =
+  type: 'WARN'
+  on:
+    * types.If
+  check: (node) ->
+    typ = node.type.v -- `if`, `unless`
+
+    -- N nodes, {[1],[2] = ifcond, (block,statement)
+    nodes = node.nodes
+    sets = {}
+    variables = {}
+
+    nifs = 0
+    names = {}
+    collector = () ->
+      t = {}
+      names[] = t
+      (node) ->
+        if node\is types.Variable
+          t[node.name.v] = true
+    walker = (node) ->
+      if node\is types.IfCond
+        nifs += 1
+        node\walk collector!
+    n\walk walker for n in *nodes
+
+    unless #names > 1 and nifs > 3
+      return
+
+    _len_map = (t) ->
+      i = 0
+      for _, _ in pairs t
+        i += 1
+      i
+    _k = (t) ->
+      r = {}
+      for k, _ in pairs t
+        r[] = k
+      r
+
+    -- take first set
+    n = names[1]
+    has = true -- assume yes by default for shits and giggles
+    for i = 2, #names
+      unless (_len_map names[i]) == (_len_map n)
+        -- their lengths don't match, meaning they can't have the same vars
+        return
+
+      -- ensure all keys are present
+      for k, _ in pairs n
+        unless names[i][k]
+          has = false
+          break
+
+    unless has
+      return
+
+    vars = _k n
+    table.sort vars
+    -- sort for stable testing
+    nstr = table.concat vars, ', '
+    {
+      type: 'WARN'
+      message: "simple conditional chain for variables { #{ nstr } } could be simplified to switch"
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+rules.stdlib_usage = rule.FuncRule
+  name: 'stdlib_usage'
+  description: 'rule for checking stdlib function calls'
+  config:
+    definitions: stdlib_defs
+  on: { types.ChainValue }
+  fns: [
+    'os%.', 'math%.', 'table%.', 'string%.',
+    'package%.', 'io%.', 'debug%.', 'coroutine%.',
+    '.'
+  ]
+  checker: (path, args, varnames, node) =>
+    pkg = path[1]
+    fn = path[2] or ''
+    defs = rules.stdlib_usage.config.definitions or stdlib_defs
+
+    pkg_v = nil
+    if #path == 1 and defs.base[pkg]
+      fn = pkg
+      pkg = 'base'
+      pkg_v = defs.base
+      path = ['base', fn]
+    else
+      pkg_v = defs[pkg]
+
+    unless pkg_v
+      return
+
+    -- get expected args; pkg_v == defs.os at this point (or w/e)
+    for i = 2, #path
+      pkg_v = pkg_v[path[i]]
+
+    unless pkg_v
+      return {
+        type: 'ERROR'
+        message: "#{ fn } not found in std #{ pkg }"
+        line: node\g_src_line!
+        col: node\g_src_col!
+      }
+
+    oargs = args
+    args = {}
+    for v in *oargs
+      continue unless v
+      args[] = v unless (v\is types.SingleString) and (v.v == '!') -- invoke flattened
+
+    defargs = pkg_v.args ?? {}
+    optn, reqn = 0, 0
+    variadic = false
+    for arg in *defargs
+      optn += 1 if arg.optional
+      reqn += 1 unless arg.optional
+      variadic = true if arg.variadic
+
+    if reqn == 0 and #args == 0 -- no args needed or passed
+      return
+    elseif reqn == #args or (#args >= reqn and #args <= reqn+optn)
+      return
+    elseif reqn < #args and #args <= optn
+      return
+    elseif variadic and #args >= reqn
+      return
+
+    msg = {}
+    if reqn > 0
+      s = reqn > 1 and 's' or ''
+      msg[] = "requires #{ reqn } argument#{ s }"
+    if optn > 0
+      s = optn > 1 and 's' or ''
+      unless variadic
+        msg[] = "optionally accepts #{ optn } argument#{ s }"
+      else
+        -- TODO(@chrsm): this is incorrect, the best kind of correct
+        msg[] = 'optionally accepts multiple args'
+    if reqn == 0 and optn == 0
+      msg[] = 'accepts no arguments'
+
+    -- msg is kinda long at this point
+    -- msg[] = "passed #{ #args } arguments"
+
+    cn = if pkg == 'base'
+      fn
+    else
+      "#{ pkg }.#{ fn }"
+
+    typ = if (reqn > 0 and #args < reqn+optn) or -- not enough [req,opt]()
+             (reqn > 0 and #args > reqn+optn) or -- too many   [req,opt,opt](1,2,3,4)
+             (reqn == 0 and #args > reqn+optn)   -- too many   [opt](1,2,3)
+      'ERROR'
+    else
+      'WARN'
+
+    {
+      type: typ
+      message: "#{ cn } #{ table.concat msg, ', ' }"
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+
+rules.style_discourage_require =
+  name: 'style_discourage_require'
+  type: 'WARN'
+  on:
+    * types.Callable
+  check: (node) ->
+    unless node.item?.name? and node.item.name.v == 'require'
+      return
+
+    {
+      type: 'WARN'
+      message: 'use `import` instead of `require`'
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+rules.style_discourage_unnecessary_sb =
+  name: 'style_discourage_unnecessary_sb'
+  type: 'WARN'
+  on:
+    * types.TableLit
+  check: (node) ->
+    -- if values[N] == NormalPairDef, and
+    -- v.pair.key? is an expression resulting in a single SingleString,
+    -- complain. (it's because 'a' in ['a']: v is an expr)
+    -- when it's a literal, eg `x = { b: 1 }`, the NormalPair
+    -- only contains a KeyName->Name.
+    results = {}
+    for v in *node.values
+      if v\is types.NormalPairDef
+        -- check all keys
+        if v.pair.key\is types.Exp
+          pe = v.pair.key.pipeExprs
+          continue if #v.pair.key.opValues > 0
+          -- check all; if we encounter non-strings, we're fineish
+          for vv in *pe
+            continue if vv.opValues
+            if vv.expos[1]\is types.Value
+              if vv.expos[1].item\is types.String
+                if vv.expos[1].item.str\is types.SingleString
+                  k = util.stripq vv.expos[1].item.str.v
+                  -- skip 'keys-like-this' (telescope)
+                  if k\match '%w+%-%w'
+                    continue
+
+                  results[] = {
+                    type: 'WARN'
+                    message: "use `#{ k }:` instead of `['#{ k }']`"
+                    line: vv.expos[1].item.str\g_src_line!
+                    col: vv.expos[1].item.str\g_src_col!
+                  }
+
+    #results > 0 and results or nil
+
+rules.basic_nilness =
+  name: 'basic nilness'
+  description: 'very basic nil-ness analysis'
+  type: 'WARN'
+  on:
+    * types.FunLit
+  check: (node) ->
+    -- TODO(@chrsm): we need to handle scoping (we don't)
+    unless node.body? and node.body.content?
+      return
+
+    args = {}
+    for arg in *(node.argsDef?.defList.definitions ?? {})
+      -- Variable|SelfItem; in checks, SelfItem.Self=@ if @ is supplied (eg `x = (@, b) -> nil`)
+      -- @ = Self, @@ = SelfClass; `self` as a name is just a std var name.
+      -- @__name is SelfName, @@__name is SelfClassName.
+      -- pretty.. self explanatory.
+      -- don't think we need to worry about this here?
+      if arg\is types.SelfItem
+        continue
+
+      if arg.defaultValue
+        args[arg.name.name.v] = _exp_simple arg.defaultValue
+
+    -- node.body = Body
+    -- Body<.content = Block|Statement>
+    -- Block<.statements[] Statement>
+    -- Statement<.comments,.content,.appendix StatementAppendix>
+    stmts = if node.body.content\is types.Block
+      node.body.content.statements
+    else
+      { node.body.content }
+
+    results = {}
+    for stmt in *stmts
+      -- now, we're at top-level of the body, and want to do our scan for ifs/appendix-ifs.
+      if stmt.appendix and stmt.appendix.item\is types.IfLine
+        r = _check_cond_expr stmt.appendix.item.type.v, stmt.appendix.item.condition.condition, args
+        if r
+          -- override the position for the moment, if starts before
+          r.line = stmt.appendix\g_src_line!
+          r.col = stmt.appendix\g_src_col!
+          results[] = r
+
+      target = stmt.content?.expList?.exprs?[1]?.pipeExprs?[1]?.expos?[1]?.item?.value
+      if target and target\is types.If
+        r = _check_cond_expr target.type.v, target.nodes[1].condition, args
+        if r
+          r.line = target\g_src_line!
+          r.col = target\g_src_col!
+          results[] = r
+
+    (#results > 0 and results) or nil
+
+--[[
+    x: (where x is not one of the magic characters ^$()%.[]*+-?) represents the character x itself.
+    .: (a dot) represents all characters.
+    %a: represents all letters.
+    %c: represents all control characters.
+    %d: represents all digits.
+    %g: represents all printable characters except space.
+    %l: represents all lowercase letters.
+    %p: represents all punctuation characters.
+    %s: represents all space characters.
+    %u: represents all uppercase letters.
+    %w: represents all alphanumeric characters.
+    %x: represents all hexadecimal digits.
+    %x: (where x is any non-alphanumeric character) represents the character x. This is the standard way to escape the magic characters. Any non-alphanumeric character (including all punctuation characters, even the non-magical) can be preceded by a '%' when used to represent itself in a pattern.
+    [set]: represents the class which is the union of all characters in set. A range of characters can be specified by separating the end characters of the range, in ascending order, with a '-'. All classes %x described above can also be used as components in set. All other characters in set represent themselves. For example, [%w_] (or [_%w]) represents all alphanumeric characters plus the underscore, [0-7] represents the octal digits, and [0-7%l%-] represents the octal digits plus the lowercase letters plus the '-' character.
+
+    You can put a closing square bracket in a set by positioning it as the first character in the set. You can put a hyphen in a set by positioning it as the first or the last character in the set. (You can also use an escape for both cases.)
+
+    The interaction between ranges and classes is not defined. Therefore, patterns like [%a-z] or [a-%%] have no meaning.
+    [^set]: represents the complement of set, where set is interpreted as above.
+
+For all classes represented by single letters (%a, %c, etc.), the corresponding uppercase letter represents the complement of the class. For instance, %S represents all non-space characters.
+
+The definitions of letter, space, and other character groups depend on the current locale. In particular, the class [a-z] may not be equivalent to %l.
+]]
+rules.stdlib_match = rule.FuncRule
+  name: 'stdlib_match'
+  description: ''
+  type: 'error'
+  on: [ types.ExpListAssign, types.ChainValue ]
+  fns: ['string%.match', 'string%.gmatch', 'string%.find', 'string%.gsub']
+  checker: (path, args, varnames, node) =>
+    -- argv
+    --   * [1] is the string we're operating on
+    --   * [2] is the pattern
+    strn = args[1].pipeExprs?[1]?.expos?[1]?.item?.str
+    str = strn?.v
+    patn = args[2].pipeExprs?[1]?.expos?[1]?.item?.str
+    pat = patn?.v
+
+    issues = {}
+
+    -- empty patterns aren't necessarily _wrong_, just suspicious
+    if pat == '""' or pat == "''"
+      issues[] = @report 'HINT', 'empty pattern', patn
+
+    -- try to validate the pattern
+    success, errmsg = try
+      -- skip '|"
+      ('')\match pat\sub 2, #pat-1
+
+    unless success
+      -- gsub to strip ourselves
+      issues[] = @report 'ERROR',
+        "invalid pattern #{ pat }: #{ errmsg\gsub '[^%]]+%]:%d+: ', '' }",
+        patn
+
+    -- these could be combined, eg
+    -- %[[^%]]%], then string.find 'a-z', 'A-Z', '0-9' and return as one hint
+    -- just depends on how editors integrate/people like their feedback
+    if pat\match '(%[[^0]*0%-9[^9]*%])'
+      issues[] = @report 'HINT', 'use `%d` instead of [0-9]', patn
+    if pat\match '(%[[^a]*a%-z[^z]*%])'
+      issues[] = @report 'HINT', 'use `%l` instead of [a-z]', patn
+    if pat\match '(%[[^A]*A%-Z[^Z]*%])'
+      issues[] = @report 'HINT', 'use `%u` instead of [A-Z]', patn
+
+    --[[
+    potentially bad:
+    v1, v2 = string.match 'abc', '%a'
+    v1, v2 = string.match 'ab', '%a%a'
+
+    ok:
+    v1, v2 = string.match 'ab', '(%a)(%a)'
+
+    basically - capture groups should match # of assignments
+    ]]
+    capgroups = {}
+    for v in pat\gmatch '%([^%)]+%)'
+      capgroups[] = v
+    if #capgroups == 0
+      capgroups[] = ''
+    if #varnames > 0 and #varnames != #capgroups
+      vs = cs = ''
+      if #capgroups > 1
+        cs = 's'
+      if #varnames > 1
+        vs = 's'
+
+      typ = if #varnames > #capgroups
+        'WARN'
+      else
+        'INFO'
+
+      issues[] = @report typ,
+        "#{ table.concat path, '.' } assigns #{ #varnames } var#{ vs }, but has #{ #capgroups } capture#{ cs }",
+        patn
+
+    #issues > 0 and issues or nil
+
+export default rules

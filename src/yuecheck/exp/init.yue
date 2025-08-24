@@ -1,0 +1,10 @@
+path = (...)\gsub '%.init$', ''
+
+macro r = (pkg) ->
+  "require(path .. \".\" .. #{ pkg })"
+
+export default {
+  conn: $r 'conn'
+  handlers: $r 'handlers'
+  server: $r 'server'
+}

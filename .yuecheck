@@ -1,0 +1,72 @@
+import 'yuecheck.rules'
+
+--[[ blatantly copy/pasted from stdlib_defs ]]
+arg = (name) ->
+  { :name, optional: false }
+opt = (name) ->
+  { :name, optional: true }
+variadic = (name, optional = true) ->
+  { :name, :optional, variadic: true }
+
+args = (...) ->
+  t = { args: {} }
+  vs = table.pack ...
+  for v in *vs
+    if (type v) == 'string'
+      v = arg v
+    t.args[] = v
+  t
+--[[ /copy ]]
+
+stdlib =
+  linter:
+    enable_compilation: args opt'bool'
+    enabled_rules: args!
+    define_rule: args 'rule'
+    find_comments: args 'source_code'
+    build_ast: args arg'yue_ast', opt'parent_node'
+    lint_file: args 'path'
+    lint_string: args 'source_code'
+    to_ast: args 'source_code'
+  util:
+    stripq: args 'string'
+    stripnl: args 'string'
+    readfile: args 'filename'
+    exec_cmd_w: args 'cmd', opt'options'
+    match_any: args 'string', 'patterns'
+    dedup: args 'table'
+    writer: args!
+
+for k, v in pairs rules.stdlib_usage.config.definitions
+  stdlib[k] = v
+
+custrules =
+  global_writes:
+    patterns: ['^_G[%.%[]', '^_ENV[%.%[]', '^package[%.%[]', '^_G$']
+  stdlib_usage:
+    definitions: stdlib
+
+cfg =
+  enable_compilation: true
+  rules: custrules
+  enabled_rules:
+    cond_identical_exprs: true
+    cond_impossible: true
+    unreachable: true
+    basic_nilness: true
+    nil_comparisons: true
+    global_writes: true
+
+    stdlib_usage: true
+    stdlib_match: true
+
+    style_comment_space: true
+    style_zero_index: true
+    style_import_as_ident: true
+    style_unnecessary_doublestring: true
+    style_conditionals: true
+    style_simplify_if_to_switch: true
+    style_discourage_require: true
+    style_discourage_unnecessary_sb: true
+
+export default cfg

@@ -1,0 +1,12 @@
+--bad cmt
+_sng_quote = "'"
+_dbl_quote = '"'
+_blk_quote = '['
+str_quotes = [_sng_quote, _dbl_quote, _blk_quote]
+_thingy --[[comm'ent1]] = [[string of text]] --comm[[ent2
+--bad cmt
+-- adsdaksd
+--adsad
+--[[me too!
+]]
+--this is at eof

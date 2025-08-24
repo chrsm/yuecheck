@@ -1,0 +1,256 @@
+import 'yuecheck.macros' as { $ }
+
+import 'inspect'
+import 'json'
+import 'yue'
+
+import 'yuecheck.comments' as ycomments
+import 'yuecheck.rule'
+import 'yuecheck.rules'
+import 'yuecheck.types'
+import 'yuecheck.util'
+
+ruleset = { k, v for k, v in pairs rules }
+
+linter =
+  enable_compilation: false
+  enabled_rules: { k,true for k,_ in pairs rules }
+
+linter.define_rule = (t) ->
+  unless t and type(t) == 'table'
+    error 'define_rule: argument must be a table'
+  unless t.name
+    error 'define_rule: rule must have a name'
+  unless t.on and type(t.on) == 'table'
+    error 'define_rule: on must be a table'
+  unless t.check and type(t.check) == 'function'
+    error 'define_rule: check must be a function'
+  ruleset[t.name] = t
+
+-- TODO: find a new home for these fellas
+linter.to_ast = (src) ->
+  ast, err = yue.to_ast src, 0
+  unless ast
+    error err
+
+  linter.build_ast ast
+
+linter.build_ast = (ast, parent = nil) ->
+  -- self = { 1, 2, 3 }
+  -- 4+ beyond = child nodes
+  { ntype, ln, col } = ast
+
+  -- process children first
+  arg = {}
+  if #ast > 3
+    if (type ast[4]) == 'table'
+      for v in *ast[4,]
+        unless v
+          break
+        arg[] = linter.build_ast v, { ntype, ast }
+    elseif ntype == 'Invoke' -- 4 is !
+      n = types.SingleString ast[4]
+      n\set_source ln, col
+      arg[] = n
+    elseif ntype == 'ReversedIndex' and ast[4] == '[#]'
+        n = types.ReversedIndex!
+        n\set_source ln, col
+        arg[] = n
+    else
+      -- TODO(@chrsm): this needs to be fixed, another special case like !
+      if ntype == 'TableLit' and string.sub(ast[4], 1, 1) == '{'
+        n = types.SingleString ast[4]
+        n\set_source ln, col
+        arg[] = n
+      elseif ast[4] == '' and ntype == 'FnArgDefList'
+        arg[] = types.FnArgDef types.Variable types.Name ''
+      elseif ntype == 'Return' and ast[4] == 'return'
+        ________x = 'noop'
+      elseif ast[4] == '' and ntype == 'DefaultValue'
+        arg[] = types.DefaultValue ''
+      elseif ntype == 'DoubleString'
+        arg[] = types.DoubleString { types.DoubleStringContent types.DoubleStringInner '' }
+      elseif ntype == 'Block' and ast[4] == ''
+        -- empty files; just comments
+        ________x = 'noop'
+      elseif ntype == 'Comprehension' and ast[4] == '[]'
+        ________x = 'noop'
+      elseif ntype == 'ReversedIndex' and ast[4] == '[#]'
+        arg[] = types.ReversedIndex!
+      else
+        arg[] = ast[4]
+
+  node = types[ntype]!
+  node\from_table arg
+  node\set_source ln, col
+  node.typ = ntype
+  node
+
+linter.lint_file = (path) ->
+  fp, err = io.open path, 'r'
+  content = fp\read 'a*'
+  fp\close!
+
+  linter.lint_string content
+
+linter.lint_string = (src) ->
+  ast, err = yue.to_ast src, 0
+
+  -- try to be helpful for syntax errors that prevent anything else from
+  -- being done
+  -- if the caret is there, it gives a pointer to the column (kinda)
+  -- unsure if this is done in every case, so don't rely on it
+  if err
+    col = 0
+    cpos = err\match '(%s+%^)$'
+    if cpos and (cpos\sub 1, 1) == "\n"
+      col = #cpos - 2
+
+    err = err\gsub "\n", ' '
+    line = err\match '^(%d+):'
+    message = (err\match ': (.+)^$')\gsub '^%s*(.-)%s*$', '%1'
+    return {{ type: 'ERROR', :line, :col, :message }}
+
+  violations = {}
+
+  -- @NOTE(chrsm):
+  -- there are some things to_ast doesn't care about, for example `const`:
+  --   yue.to_ast "const x = 1\nx = 2", 0
+  -- is perfectly valid, but a runtime/comp error.
+  -- if the user has set `enable_compilation`, we will check for errors here
+  -- by running `yue -p <f>`, which prints code to stdout.
+  --
+  -- the _potential_ problem here is that macros are run at this time.
+  -- macros can have side effects - not that they should, but they can,
+  -- for instance, run `os.execute "rm -rf /"`. which would be very bad.
+  -- it _might_ be enough to refuse to run this if macros are used.
+  -- i don't really know.
+  --
+  -- the 'neat'? thing is we can probably use the ast to catch some of these,
+  -- since the attrib exists, and skip doing this at some point.
+  if linter.enable_compilation
+    tmpname = os.tmpname!
+    cmd = "yue -- 2>&1 > #{ tmpname }" -- popen is a bit annoying, can't do stdin+stdout
+    ok = util.exec_cmd_w cmd, stdin: src
+
+    unless ok
+      tmp = util.readfile tmpname
+      col = 0
+      cpos = tmp\match '(%s+%^)$'
+      if cpos and (cpos\sub 1, 1) == "\n"
+        col = #cpos - 2
+
+      err = tmp\gsub "\n", ' '
+      line = tmp\match '^(%d+):'
+      message = (tmp\match ': (.+)^')\gsub '^%s*(.-)%s*$', '%1'
+      violations[] = { type: 'ERROR', :message, :line, :col }
+
+    os.remove tmpname
+
+  nodes = linter.build_ast ast
+
+  comments = (linter.find_comments src) or {}
+  ignored = (line) ->
+    unless comments[line]
+      return
+    m = false
+    for ln in *comments[line]
+      m = (ln.v ?? ln.inner.v)\match 'yuecheck:ignore'
+      break if m
+    m
+
+  -- disabled linters should only apply to this specific source,
+  -- otherwise we turn them off everywhere
+  local rules = {}
+  for k, v in pairs linter.enabled_rules
+    rules[k] = v
+
+  -- special ignore for whole file suppression;
+  -- should make this more elegant.
+  if comments[1]?
+    cmt = comments[1][1].v ?? comments[1][1].inner.v
+    if cmt\match '^-- yuecheck:ignore$'
+      rules = {}
+    m = cmt\match '-- yuecheck:ignore=([^\r\n%s]+)'
+    if m
+      for r in m\gmatch '([^,]+)'
+        rules[r] = nil
+
+
+  -- walk the comments; there's at least one that cares.
+  -- TODO: cleanup/refactor, this is a straight copy/paste
+  for i in *comments.indices
+    for cmt in *comments[i]
+      cmt\walk (node) ->
+        if node == nil
+          error 'nil node'
+
+        for k, v in pairs rules
+          unless v
+            continue
+
+          want = false
+          for ntype in *ruleset[k].on
+            if type(ntype) == 'string'
+              ntype = types[ntype]
+            if node.__class == ntype
+              want = true
+              break
+
+          unless want
+            continue
+
+          r = ruleset[k].check node
+          if r != nil and not ignored r.line
+            if r[1] -- it's a table
+              violations[] = _r for _r in *r
+            else
+              violations[] = r
+
+  nodes\walk (node) ->
+    if node == nil
+      error 'nil node'
+
+    for k, v in pairs rules
+      unless v
+        continue
+
+      want = false
+      for ntype in *ruleset[k].on
+        if type(ntype) == 'string'
+          ntype = types[ntype]
+        if node.__class == ntype
+          want = true
+          break
+
+      unless want
+        continue
+
+      _rule = ruleset[k]
+      r = nil
+      if _rule.__class and (_rule.__class == rule.Rule or _rule.__class.__parent == rule.Rule)
+        r = _rule\check node
+      else
+        r = _rule.check node
+      if r != nil and not ignored r.line
+        if r[1] -- it's a table
+          violations[] = _r for _r in *r
+        else
+          violations[] = r
+
+  violations
+
+-- find_comments returns { line, comment } for a given string, which may be a
+-- single line or multiple (e.g. whole file).
+--
+-- this does *NOT* check the provided src via to_ast, as the ast does not
+-- preserve all comments. instead, simple patterns are used to find matches.
+--
+-- this should find all comments, even if they would have been attached to
+-- a statement.
+--
+-- returns a table where line numbers map to comments.
+linter.find_comments = (src) ->
+  ycomments.to_ast src
+
+export default linter

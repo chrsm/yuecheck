@@ -1,0 +1,198 @@
+arg = (name) ->
+  { :name, optional: false }
+opt = (name) ->
+  { :name, optional: true }
+variadic = (name, optional = true) ->
+  { :name, :optional, variadic: true }
+
+args = (...) ->
+  t = { args: {} }
+  vs = table.pack ...
+  for v in *vs
+    if (type v) == 'string'
+      v = arg v
+    t.args[] = v
+  t
+
+base =
+  assert: args arg'v', opt'message'
+  collectgarbage: args opt'opt', opt'arg'
+  dofile: args opt'filename'
+  error: args arg'message', opt'level'
+  getmetatable: args'getmetatable'
+  ipairs: args 't'
+  load:
+    args:
+      * arg'chunk'
+      * opt'chunkname'
+      * opt'mode'
+      * opt'env'
+  loadfile:
+    args:
+      * opt'filename'
+      * opt'mode'
+      * opt'env'
+  pairs: args 't'
+  pcall: args 'f', variadic'args'
+  print: args variadic'...'
+  rawequal: args 'v1', 'v2'
+  rawget: args 'table', 'index'
+  rawlen: args 'v'
+  rawset: args 'table', 'index', 'value'
+  select: args 'index', variadic'...'
+  setmetatable: args 'table', 'metatable'
+  tonumber: args 'e', opt'base'
+  tostring: args 'v'
+  type: args 'v'
+  warn: args 'msg1', variadic'...'
+  xpcall: args 'f', 'msgh', variadic'...'
+  -- special
+  require: args 'modname'
+
+_coroutine =
+  close: args 'co'
+  create: args 'f'
+  isyieldable: args opt'co'
+  resume: args 'co', variadic'...'
+  running:
+    args: nil
+  status: args 'co'
+  wrap: args 'f'
+  yield: args variadic'...'
+
+_debug =
+  debug:
+    args: nil
+  gethook: args opt'thread'
+  getinfo: args opt'thread', 'f', opt'what'
+  getlocal: args opt'thread', 'f', 'local'
+  getmetatable: args 'value'
+  getregistry:
+    args: nil
+  getupvalue: args 'f', 'up'
+  getuservalue: args 'u', 'n'
+  sethook:
+    args:
+      * opt'thread'
+      * arg'hook'
+      * arg'mask'
+      * opt'count'
+  setlocal:
+    args:
+      * opt'thread'
+      * arg'level'
+      * arg'local'
+      * arg'value'
+  setmetatable: args 'value', 'table'
+  setupvalue: args 'f', 'up', 'value'
+  setuservalue: args 'udate', 'value', 'n'
+  traceback:
+    args:
+      * opt'thread'
+      * opt'message'
+      * opt'level'
+  upvalueid: args 'f', 'n'
+  upvaluejoin: args 'f1', 'n1', 'f2', 'n2'
+
+_io =
+  close: args opt'file'
+  flush:
+    args: nil
+  input: args opt'file'
+  lines: args variadic'filename'
+  open: args 'filename', opt'mode'
+  output: args opt'file'
+  popen: args 'prog', opt'mode'
+  read: args variadic'...'
+  tmpfile:
+    args: nil
+  type: args 'obj'
+  write: args variadic'...'
+  -- files offer `seek`, `setvbuf` in addition to some of the above..
+  -- can we handle that somehow?
+
+_math =
+  abs: args 'x'
+  acos: args 'x'
+  asin: args 'x'
+  atan: args 'y', opt'x'
+  ceil: args 'x'
+  cos: args 'x'
+  deg: args 'x'
+  exp: args 'x'
+  floor: args 'x'
+  fmod: args 'x', 'y'
+  log: args 'x', opt'base'
+  max: args 'x', variadic'...'
+  min: args 'x', variadic'...'
+  modf: args 'x'
+  rad: args 'x'
+  random: args opt'm', opt'n'
+  randomseed: args opt'x', opt'y'
+  sin: args 'x'
+  sqrt: args 'x'
+  tan: args 'x'
+  tointeger: args 'x'
+  type: args 'x'
+  ult: args 'm', 'n'
+
+_os =
+  clock:
+    args: nil
+  date: args opt'format', opt'time'
+  difftime: args 't2', 't1'
+  execute: args opt'command'
+  exit: args opt'code', opt'close'
+  getenv: args 'varname'
+  remove: args 'filename'
+  rename: args 'oldname', 'newname'
+  setlocale: args 'locale', opt'category'
+  time: args opt'table'
+  tmpname:
+    args: nil
+
+_package =
+  loadlib: args 'libname', 'funcname'
+  searchpath: args 'name', 'path', opt'sep', opt'rep'
+
+_string =
+  byte: args 's', opt'i', opt'j'
+  char: args variadic'...'
+  dump: args 'function', opt'strip'
+  find: args 's', 'pattern', opt'init', opt'plain'
+  format: args 'formatstring', variadic'...'
+  gmatch: args 's', 'pattern', opt'init'
+  gsub: args 's', 'pattern', 'repl', opt'n'
+  len: args 's'
+  lower: args 's'
+  match: args 's', 'pattern', opt'init'
+  pack: args 'fmt', 'v1', 'v2', variadic'...'
+  packsize: args 'fmt'
+  rep: args 's', 'n', opt'sep'
+  reverse: args 's'
+  sub: args 's', 'i', opt'j'
+  unpack: args 'fmt', 's', opt'pos'
+  upper: args 's'
+
+_table =
+  concat: args 'list', opt'sep', opt'i', opt'j'
+  insert: args 'list', opt'pos', 'value'
+  move: args 'a1', 'f', 'e', 't', opt'a2'
+  pack: args variadic'...'
+  remove: args 'list', opt'pos'
+  sort: args 'list', opt'comp'
+  unpack: args 'list', opt'i', opt'j'
+
+export default {
+  -- base is a special case, functions that aren't a part of a package
+  :base
+
+  coroutine: _coroutine
+  debug: _debug
+  io: _io
+  math: _math
+  os: _os
+  package: _package
+  string: _string
+  table: _table
+}

@@ -1,0 +1,10 @@
+path = (...)\gsub '%.init$', ''
+
+macro r = (pkg) ->
+  "require(path .. \".\" .. #{ pkg })"
+
+export default {
+  linter: $r 'linter'
+  rules: $r 'rules'
+  types: $r 'types'
+}

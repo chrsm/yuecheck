@@ -1,0 +1,20 @@
+import 'yuecheck.macros' as { $ }
+
+-- stdio
+class Stdio
+  read: (n) =>
+    v = io.read tonumber(n) ?? '*l'
+
+    err = nil
+    unless v
+      err = 'stdio: io.read returned nil'
+    v, err
+
+  write: (msg) =>
+    ok = io.write msg
+    io.flush!
+    ok?
+
+export default {
+  :Stdio
+}

@@ -1,0 +1,191 @@
+import 'gen.types_raw' as types
+import 'inspect'
+
+print '-- yuecheck:ignore'
+print '-- generated code; do not edit'
+print "import 'yuecheck.ast_impl' as ast"
+print '_selector_t = ast._selector_t'
+print '_selector_list_t = ast._selector_list_t'
+print '_list_t = ast._list_t'
+print 'Node = ast.Node'
+print 'Leaf = ast.Leaf'
+print 'ast_nodes = {}'
+print [[
+
+_in = (val, set) ->
+  for i,v in ipairs set
+    return true if v == val
+  false
+]]
+
+exclude =
+  -- excluded from generation as it is not available in to_ast.
+  Seperator: true
+
+p = (v) ->
+  print (v\gsub '^%s%s%s%s%s%s', '')
+
+ast_names = {}
+for t in *types
+  ast_names[t.decl_name] = t.decl_name
+  --[[
+  ast_names[t.decl_name] = t.internal_name
+  print "ast_names[\"#{ t.decl_name }\"] = \"#{ t.internal_name }\""
+  ]]
+
+for t in *types
+  -- what do we want to do here?
+  -- most likely, we want a caller to register a handler for this type.
+  -- so we should be calling something like ast._registered[t.decl_name]?
+  -- for example, if we look at go/ast, each type has (at a minimum)
+  -- End()/Pos(). we don't have that in yue ast.
+  --
+  -- as a matter of fact, all we know are what the node bits are.
+  -- so, it seems that
+  typ = t.type
+  switch typ
+    when 'node'
+      typ = 'Node'
+    when 'leaf'
+      typ = 'Leaf'
+
+  if exclude[t.decl_name]
+    continue
+
+  p "-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L#{ t.ast_h[1] }"
+  p "class #{ t.decl_name } extends #{ typ }
+  @yue_name: '#{ t.decl_name }'
+  "
+  -- @internal_name: \"#{ t.internal_name }\"
+
+  if typ == 'Leaf'
+    p '  new: (v) => @v = v'
+    p '  from_table: (tbl) => @v = tbl[1]'
+    p '  walk: (visitor) => visitor @'
+    -- p "    new: (v) => print \"#{ t.decl_name } new: \""
+
+  if t.attr
+    args = {}
+    argassign = {}
+    argassignfrom = {}
+    argwalk = {}
+    for i, v in ipairs t.attr
+      if exclude[ast_names[v.type]]
+        continue
+
+      iname = "ast_nodes.#{ ast_names[v.type] }"
+      argdecl = "#{ v.name } = #{ iname }!"
+      argdesc = "--@#{ v.name }: #{ argdecl }"
+      switch v.type
+        when 'sel'
+          any = [ ast_names[v] for v in *v.any ]
+          argdecl = "_sel_t(#{ v.required or false },#{ table.concat any, "," })"
+          argdesc = "-- @#{ v.name }: #{ argdecl }"
+        when 'sel_list'
+          any = [ ast_names[v] for v in *v.any ]
+          argdecl = "_sel_list_t(#{ v.required or false },#{ table.concat any, "," })"
+          argdesc = "-- @#{ v.name}: #{ argdecl }"
+        when 'list'
+          any = [ ast_names[v] for v in *v.any ]
+          argdecl = "_list_t(#{ v.required or false },#{ table.concat any, "," })"
+          argdesc = "-- @#{ v.name }: #{ argdecl }"
+        else
+          argdesc = "-- @#{ v.name }(#{ v.required or false }): ast_nodes.#{ ast_names[v.type] }"
+
+      print "  #{ argdesc }"
+
+      argtyp = switch v.type
+        when 'sel_list'
+          '{}'
+        when 'list'
+          '{}'
+        else
+          'nil'
+
+      args[] = "#{ v.name } = #{ argtyp }"
+      argassign[] = "    @#{ v.name } = #{ v.name }"
+
+      -- here, if t == thing, put it in @target.
+      assgnstr = ''
+      sp = '  '
+      switch v.type
+        when 'sel_list'
+          names = [ "'#{ ast_names[v] }'" for v in *v.any ]
+          expr = "{#{ table.concat names, ',' }}"
+
+          argassignfrom[] = "      if _in v\\g_yue_name!, #{ expr }"
+          argassignfrom[] = "        table.insert @#{ v.name }, v"
+          argassignfrom[] = "        continue"
+
+          argwalk[] = "#{ sp }  node\\walk visitor for node in *@#{ v.name }"
+        when 'list'
+          names = [ "'#{ ast_names[v] }'" for v in *v.any ]
+          expr = "{#{ table.concat names, ',' }}"
+
+          argassignfrom[] = "      if _in v\\g_yue_name!, #{ expr }"
+          argassignfrom[] = "        table.insert @#{ v.name }, v"
+          argassignfrom[] = "        continue"
+
+          argwalk[] = "#{ sp }  node\\walk visitor for node in *@#{ v.name }"
+        when 'sel'
+          names = [ "'#{ ast_names[v] }'" for v in *v.any ]
+          expr = "{#{ table.concat names, ',' }}"
+
+          argassignfrom[] = "      if (not @#{ v.name }) and _in v\\g_yue_name!, #{ expr }"
+          argassignfrom[] = "        @#{ v.name } = v"
+          argassignfrom[] = "        continue"
+
+          wext = ''
+          unless v.required
+            wext = " if @#{ v.name }"
+          argwalk[] = "#{ sp }  @#{ v.name }\\walk visitor#{ wext }"
+        else
+          argassignfrom[] = "      if (not @#{ v.name }) and v\\g_yue_name! == '#{ v.type }'"
+          argassignfrom[] = "        @#{ v.name } = v"
+          argassignfrom[] = "        continue"
+
+          wext = ''
+          unless v.required
+            wext = " if @#{ v.name }"
+          argwalk[] = "    @#{ v.name }\\walk visitor#{ wext }"
+
+    -- make attributes args to the fn?
+    print "  new: (#{ table.concat args, ', ' }) =>"
+    print table.concat argassign, "\n"
+
+    --[[ generate method that can handle yue.to_ast ]]
+    print ''
+    print '  from_table: (tbl) =>'
+    print '    for i, v in ipairs tbl'
+    print table.concat argassignfrom, "\n"
+    print '      _ = v'
+    print '    nil'
+
+    --[[ generate method that handles ast walking
+      (user) visitor: (node) -> (process & return visitor, or false/error to stop)
+
+      (typelib, example With) ast_walk: (visitor) ->
+        visitor @eop
+        visitor @valueList
+        visitor @assign
+        visitor @body
+    ]]
+    print ''
+    p '  walk: (visitor) =>'
+    print table.concat argwalk, "\n"
+    print '    visitor @'
+
+  print "ast_nodes.#{ t.decl_name } = #{ t.decl_name }"
+  print ''
+
+print [[
+
+-- be loud on invalid refs
+nodes = { types: ast_nodes }
+nodes.<> = __index: (k) =>
+  unless @types[k]
+    error "invalid ast type #{ k }"
+  @types[k]
+
+export default nodes
+]]
