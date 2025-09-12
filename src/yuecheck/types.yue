@@ -2677,7 +2677,7 @@ ast_nodes.Export = Export
 class FnArgDef extends Node
   @yue_name: 'FnArgDef'
   
-  -- @name: _sel_t(true,Variable,SelfItem)
+  -- @name: _sel_t(true,Variable,SelfItem,SimpleTable,TableLit)
   -- @op(false): ast_nodes.ExistentialOp
   -- @label(false): ast_nodes.Name
   -- @defaultValue(false): ast_nodes.Exp
@@ -2689,7 +2689,7 @@ class FnArgDef extends Node
 
   from_table: (tbl) =>
     for i, v in ipairs tbl
-      if (not @name) and _in v\g_yue_name!, {'Variable','SelfItem'}
+      if (not @name) and _in v\g_yue_name!, {'Variable','SelfItem','SimpleTable','TableLit'}
         @name = v
         continue
       if (not @op) and v\g_yue_name! == 'ExistentialOp'
