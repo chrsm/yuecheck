@@ -1,41 +1,11 @@
 yuecheck
 ===
 
-WIP utility/lib for dealing with Yuescript AST (linting, possibly formatting).
+Lint tool for [Yuescript][1].
 
+Current TODOs:
 
-Installation
-===
-
-There is a rockspec, but yuecheck is not yet available on luarocks. It is the
-recommended way to install, however, to provide the `yuecheck` command.
-
-```bash
-git clone git@github.com:chrsm/yuecheck.git
-cd yuecheck
-luarocks make
-# or luarocks --local make
-```
-
-You can subsequently run `yuecheck` anywhere.
-
-
-Functionality
-===
-
-- Full type library of Yue AST definitions
-- Build better in-code types via `build_ast` (when passing `yue.to_ast` content)
-- Define custom lint rules
-
-- [x] Full libary of Yue AST
-- [x] Various configurable rules for linting your code
-- [x] User-based and repo-based configurations
-- [x] Proper comment handling
-  * Requires lpegrex
-
-To come?
-
-- [ ] Only use repo `.yuecheck` if trusted (due to code execution)
+- [ ] Only use repo `.yuecheck` if trusted (due to macro code execution)
 - [ ] General cleanup. Rules are ugly for implementation
 - [ ] Configuration-driven format rules
   * This may require just writing the whole file from AST each time.
@@ -48,40 +18,81 @@ To come?
   luals.
 
 
-Linter built-in rules
-===
-
-More to come, most likely. Most of these are style/preference, or ahead-of-time checks
-before running.
-
-| Rule | Description |
-| :---- | ----------- |
-| style_comment_space | Comments must have a space between `--` or `--[[` and content |
-| style_zero_index | Discourages use of t[0], as tables usually start at 1; Using 0 is likely unintentional. |
-| style_import_as_ident | Warns on redundant import name, i.e. `import 'x' as x` |
-| style_unnecessary_doublestring | Warns on unnecessary use of `"` for strings where `'` is fine |
-| style_discourage_require | Discourages use of `require` in favor of `import` |
-| style_discourage_unnecessary_sb | Discourages use of square brackets in table literals, eg `{ ['a']: true }` can be `{ a: true }` |
-| ... | ... |
-| style_conditionals | Warns on odd conditionals, eg `if true`, `unless false` always execute |
-| style_simplify_if_switch | Warns on chain if-elseif that could be switch instead | 
-| ... | ... |
-| stdlib_usage | Finds issues with standard library functions. Configurable. |
-| stdlib_match | Finds issues with patterns supplied to string.(match,find,gmatch,gsub) and capture groups |
-| ... | ... |
-| global_writes | Warns on writes to global variables (`_G`, `_ENV`, etc). Configurable. |
-| ... | ... |
-| cond_identical_exprs | Warns on conditions that compare a value to itself |
-| cond_impossible | Warns on some types of impossible conditions |
-| unreachable | Warns on code that is unreachable |
-| basic_nilness | Warns on certain types of nil checks that aren't necessary |
-| nil_comparisons | Warns about syntax errors from conditions against nil |
+* [installation](#installation)
+* [usage](#usage)
+* [configuration](#configuration)
+  * [enabling and disabling checks](#enabling-and-disabling-checks)
+* [built-in lint rules](#built-in-linters)
+* [writing custom rules](#writing-custom-rules)
+* [contributing](#contributing)
+* [example neovim setup](#example-neovim-setup)
 
 
-Configuration
-===
+# installation
 
-`yuecheck` can automatically read from a configuration file. It checks two places:
+There is a rockspec, but yuecheck is not yet available on luarocks. It is the
+recommended way to install, however, to provide the `yuecheck` command.
+
+```bash
+git clone git@github.com:chrsm/yuecheck.git
+cd yuecheck
+luarocks make
+# or luarocks --local make
+```
+
+# usage
+
+To lint a specific file or directory, pass it as an argument to `yuecheck`,
+ex `yuecheck .` (all yue files in cwd) or `yuecheck specific.yue` for a single file.
+
+See below for other options.
+
+```
+Usage: yuecheck [-h] [--ignore-config] [-j]
+       ([-d <directory>] | [-f <file>] | [<dir_or_file>] | [--stdin])
+       [-x [<exclude>] ...]
+
+Options:
+   -h, --help            Show this help message and exit.
+            -d <directory>,
+   --directory <directory>
+                         directory containing files to check
+       -f <file>,        specific file to check
+   --file <file>
+   --stdin               parse stdin
+   --ignore-config       ignore repo or user config
+   -j, --json            output as json
+          -x [<exclude>] ...,
+   --exclude [<exclude>] ...
+                         pattern for paths to exclude
+
+```
+
+Simple example: `sample.yue`
+
+```moonscript
+x = "abcd"
+```
+
+```
+$ yuecheck sample.yue
+sample.yue:1:3: double-quoted string where single-quoted would suffice
+
+1 issues
+```
+
+
+## example neovim setup
+
+If you're a neovim user, you can refer to my dotfiles for how I hooked this up via [nvim-lint][2]:
+[nvim_lint config][3].
+
+
+# configuration
+
+All rules are enabled by default. For further customization, it is recommended
+to write a `.yuecheck` file with your desired settings. This file can be placed
+in two locations:
 
 - `(root dir with .git)/.yuecheck`
   * TODO: make this so that yuecheck must trust it first, since it can run code.
@@ -164,10 +175,9 @@ export default cfg
 ```
 
 
-Enabling and Disabling Checks
-===
+## enabling and disabling checks
 
-## Per Project
+### per project
 
 Configuration can be set up at the root of the repository. The config is Yuescript,
 so you can write it however you want. Some rules allow additional configuration.
@@ -190,7 +200,7 @@ export default {
 ```
 
 
-## Per file
+### per file
 
 Linters can be disabled by having a comment at the top of the file, even if
 the config file or command line arguments enable them.
@@ -208,15 +218,45 @@ os.clock 'ignored'
 _G['is also'] = 'acceptable'
 ```
 
-## Per line
+
+### per line
 
 ```moonscript
 _G['a'] = 'ignored' -- yuecheck:ignore
 os.clock 'not ignored'
 ```
 
-Custom Checks
-===
+
+# built-in lint rules
+
+More to come, most likely. Most of these are style/preference, or ahead-of-time checks
+before running.
+
+| Rule | Description |
+| :---- | ----------- |
+| style_comment_space | Comments must have a space between `--` or `--[[` and content |
+| style_zero_index | Discourages use of t[0], as tables usually start at 1; Using 0 is likely unintentional. |
+| style_import_as_ident | Warns on redundant import name, i.e. `import 'x' as x` |
+| style_unnecessary_doublestring | Warns on unnecessary use of `"` for strings where `'` is fine |
+| style_discourage_require | Discourages use of `require` in favor of `import` |
+| style_discourage_unnecessary_sb | Discourages use of square brackets in table literals, eg `{ ['a']: true }` can be `{ a: true }` |
+| ... | ... |
+| style_conditionals | Warns on odd conditionals, eg `if true`, `unless false` always execute |
+| style_simplify_if_switch | Warns on chain if-elseif that could be switch instead | 
+| ... | ... |
+| stdlib_usage | Finds issues with standard library functions. Configurable. |
+| stdlib_match | Finds issues with patterns supplied to string.(match,find,gmatch,gsub) and capture groups |
+| ... | ... |
+| global_writes | Warns on writes to global variables (`_G`, `_ENV`, etc). Configurable. |
+| ... | ... |
+| cond_identical_exprs | Warns on conditions that compare a value to itself |
+| cond_impossible | Warns on some types of impossible conditions |
+| unreachable | Warns on code that is unreachable |
+| basic_nilness | Warns on certain types of nil checks that aren't necessary |
+| nil_comparisons | Warns about syntax errors from conditions against nil |
+
+
+# writing custom rules
 
 Custom checks can be added to the linter very easily. The best way to add one
 is by adding it to your `.yuecheck` file.
@@ -277,10 +317,9 @@ You can look at `src/yuecheck/rules.yue` `stdlib_match`, which uses the premade
 `FuncRule`.
 
 
-Important Notes
-===
+# important notes
 
-## AST Simplification
+## AST simplification
 
 `yue.to_ast` even with flatten=0 does simplify some parts, requiring specific
 handling within `linter.build_ast`.
@@ -296,7 +335,7 @@ handling within `linter.build_ast`.
 There are likely more simplifications that are not listed. I am adding cases as I find them.
 
 
-## Type definitions
+## type definitions
 
 `src/types.yue` is a generated file. To regenerate it, run `make generate`.
 
@@ -312,7 +351,7 @@ This calls two scripts:
   * allows walking ast and comparing types
 
 
-## Comments
+## comments
 
 Comments from `yue.to_ast` are only preserved on `Statement`.
 
@@ -370,12 +409,12 @@ for idx in *comments.indices
 ```
 
 
-Contributing
-===
+# contributing
 
 - **don't be an ass**
-- use [Yuescript][1]
 - write decent commit messages
 
 
 [1]: https://github.com/IppClub/YueScript
+[2]: https://github.com/mfussenegger/nvim-lint
+[3]: https://github.com/chrsm/dotfiles/blob/master/neovim/.config/nvim/lua/plug/nvim_lint.yue#L14
