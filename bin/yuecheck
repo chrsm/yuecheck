@@ -101,8 +101,11 @@ with argp
 args = argp\parse!
 
 unless args.ignore_config
-  yuecheck.linter.enabled_rules ??= cfg?.enabled_rules
-  yuecheck.linter.enable_compilation ??= cfg?.enable_compilation
+  if cfg?.enabled_rules
+    yuecheck.linter.enabled_rules = cfg.enabled_rules
+
+  if cfg?.enable_compilation
+    yuecheck.linter.enable_compilation = cfg.enable_compilation
 
   for k, v in pairs (cfg?.rules ?? {})
     yuecheck.rules[k].config = v
