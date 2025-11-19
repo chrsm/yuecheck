@@ -1405,13 +1405,13 @@ ast_nodes.CompInner = CompInner
 class Assign extends Node
   @yue_name: 'Assign'
   
-  -- @values: _sel_list_t(true,With,If,Switch,TableBlock,Exp)
+  -- @values: _sel_list_t(true,With,If,Switch,TableBlock,Exp,SpreadListExp)
   new: (values = {}) =>
     @values = values
 
   from_table: (tbl) =>
     for i, v in ipairs tbl
-      if _in v\g_yue_name!, {'With','If','Switch','TableBlock','Exp'}
+      if _in v\g_yue_name!, {'With','If','Switch','TableBlock','Exp','SpreadListExp'}
         table.insert @values, v
         continue
       _ = v
