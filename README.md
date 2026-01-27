@@ -26,6 +26,7 @@ Current TODOs:
 * [writing custom rules](#writing-custom-rules)
 * [contributing](#contributing)
 * [example neovim setup](#example-neovim-setup)
+* [changelog](#changelog)
 
 
 # installation
@@ -418,3 +419,11 @@ for idx in *comments.indices
 [1]: https://github.com/IppClub/YueScript
 [2]: https://github.com/mfussenegger/nvim-lint
 [3]: https://github.com/chrsm/dotfiles/blob/master/neovim/.config/nvim/lua/plug/nvim_lint.yue#L14
+
+
+# changelog
+
+2026-01
+  * updated to YueScript 0.32.4; possible breaking changes
+
+

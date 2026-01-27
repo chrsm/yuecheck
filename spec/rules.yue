@@ -79,7 +79,7 @@ describe 'find_comments lpegrex', ->
     for v in *expect
       rv = r[v.line][1]
       assert.same v, {
-        comment: rv.inner.v
+        comment: rv.v
         line: rv\g_src_line!
         col: rv\g_src_col!
       }
@@ -104,7 +104,7 @@ describe 'find_comments lpegrex', ->
       got[k] = {} unless got[k]
 
       for kk,vv in ipairs r[k]
-        got[k][kk] = { line: vv\g_src_line!, col: vv\g_src_col!, comment: vv.inner?.v ?? vv.v }
+        got[k][kk] = { line: vv\g_src_line!, col: vv\g_src_col!, comment: vv.v }
         assert.same expect[k], got[k]
 
   it 'should handle retrieving mixed comments', ->
@@ -118,10 +118,7 @@ describe 'find_comments lpegrex', ->
       -- NOTE(@chrsm): todo, look into
       -- can't do an `is` here, the classes are different (busted? src.types?)
       -- been a while since i had to deal with package crap
-      if r[v.line][1]\g_yue_name! == 'YueMultilineComment'
-        assert.same v.comment, r[v.line][1].inner.v
-      else
-        assert.same v.comment, r[v.line][1].v
+      assert.same v.comment, r[v.line][1].v
 
   it 'should handle inline multicomments', ->
     r = linter.find_comments fget '../spec/testdata/comments_inline.yue'
@@ -130,7 +127,7 @@ describe 'find_comments lpegrex', ->
       * n: 1, line: 2, comment: '--[[ typ ]]'
       * n: 2, line: 2, comment: '--[[ typ2 ]]'
     for v in *expect
-      assert.same v.comment, r[v.line][v.n].inner.v
+      assert.same v.comment, r[v.line][v.n].v
 
   it 'should not treat special key differently', ->
     r = linter.find_comments fget '../spec/testdata/comments_keys.yue'
@@ -141,7 +138,7 @@ describe 'find_comments lpegrex', ->
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
-      assert.same v.comment, (r[v.line][v.n].inner?.v ?? r[v.line][v.n].v)
+      assert.same v.comment, r[v.line][v.n].v
 
 describe 'comments/between', ->
   linter.enabled_rules = {}
@@ -160,7 +157,7 @@ describe 'comments/between', ->
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
-      assert.same v.comment, (r[v.line][v.n].inner?.v ?? r[v.line][v.n].v)
+      assert.same v.comment, r[v.line][v.n].v
 
     r = cmt.comments_between ast, 4, 12
     expect =
@@ -171,7 +168,7 @@ describe 'comments/between', ->
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
-      assert.same v.comment, (r[v.line][v.n].inner?.v ?? r[v.line][v.n].v)
+      assert.same v.comment, r[v.line][v.n].v
 
     r = cmt.comments_between ast, 15, 19
     expect =
@@ -182,7 +179,7 @@ describe 'comments/between', ->
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
-      assert.same v.comment, (r[v.line][v.n].inner?.v ?? r[v.line][v.n].v)
+      assert.same v.comment, r[v.line][v.n].v
 
 describe 'comment/string handling', ->
   linter.enabled_rules = {}
@@ -194,7 +191,7 @@ describe 'comment/string handling', ->
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
-      assert.same v.comment, (r[v.line][v.n].inner?.v ?? r[v.line][v.n].v)
+      assert.same v.comment, r[v.line][v.n].v
 
     r = linter.find_comments "x = \"1 --2\"\nprint x -- 'hmm'\na!"
     expect =
@@ -202,7 +199,7 @@ describe 'comment/string handling', ->
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
-      assert.same v.comment, (r[v.line][v.n].inner?.v ?? r[v.line][v.n].v)
+      assert.same v.comment, r[v.line][v.n].v
 
     r = linter.find_comments "x = [[1 --2]]\nprint x --[[ hmm ]]\na!"
     expect =
@@ -210,7 +207,7 @@ describe 'comment/string handling', ->
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
-      assert.same v.comment, (r[v.line][v.n].inner?.v ?? r[v.line][v.n].v)
+      assert.same v.comment, r[v.line][v.n].v
 
   it 'should deal with escapes (lol)', ->
     r = linter.find_comments "x = \"'\"\n--2\n"
@@ -219,7 +216,7 @@ describe 'comment/string handling', ->
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
-      assert.same v.comment, (r[v.line][v.n].inner?.v ?? r[v.line][v.n].v)
+      assert.same v.comment, r[v.line][v.n].v
 
     r = linter.find_comments "x = \"'\" --a\n-- b\n--cdefg"
     expect =
@@ -229,7 +226,7 @@ describe 'comment/string handling', ->
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
-      assert.same v.comment, (r[v.line][v.n].inner?.v ?? r[v.line][v.n].v)
+      assert.same v.comment, r[v.line][v.n].v
 
   it 'should pass the example file', ->
     r = linter.find_comments fget '../spec/testdata/comments_not_real_comments.yue'
@@ -249,7 +246,7 @@ describe 'comment/string handling', ->
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
-      assert.same v.comment, (r[v.line][v.n].inner?.v ?? r[v.line][v.n].v)
+      assert.same v.comment, r[v.line][v.n].v
 
   it 'should pass crude mix file', ->
     r = linter.find_comments fget '../spec/testdata/comments_nrc_wrc.yue'
@@ -269,7 +266,7 @@ describe 'comment/string handling', ->
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
-      assert.same v.comment, (r[v.line][v.n].inner?.v ?? r[v.line][v.n].v)
+      assert.same v.comment, r[v.line][v.n].v
 
 describe 'rule_style_comment', ->
   linter.enabled_rules = { style_comment_space: true }
@@ -507,7 +504,7 @@ describe 'rule_unreachable', ->
         type: 'ERROR'
         message: 'unreachable code after break statement'
         line: 4
-        col: 1
+        col: 3
       }
     }, r
 
@@ -1158,4 +1155,4 @@ describe 'lpegrex grammar check', ->
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
-      assert.same v.comment, (r[v.line][v.n].inner?.v ?? r[v.line][v.n].v)
+      assert.same v.comment, r[v.line][v.n].v

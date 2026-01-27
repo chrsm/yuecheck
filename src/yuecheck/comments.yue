@@ -57,7 +57,7 @@ to_ast = (src) ->
     t = nil
     switch v.tag
       when 'YueMultilineComment'
-        t = types.YueMultilineComment types.MultilineCommentInner content
+        t = types.YueMultilineComment content
       when 'YueLineComment'
         t = types.YueLineComment util.stripnl content
       else

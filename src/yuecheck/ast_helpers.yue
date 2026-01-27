@@ -1,5 +1,6 @@
 import 'yuecheck.macros' as { $ }
 
+import 'inspect'
 import 'json'
 
 import 'yuecheck.types'
@@ -46,13 +47,18 @@ simplify.assignment = (node) ->
                 else
                   if ex.item and ex.item\is types.String
                     r[] = extract.string ex.item
+                  -- TODO: come back to this, seems like a ast/p change that has wider impact (and this is lazy/ugly)
                   elseif ex.item and ex.item\is types.ChainValue
-                    r[] = "$VAR{#{ ex.item.items[1].item.name.v }}"
-          --[[
-          TODO
+                    if ex.item.items[1].item?.name?.v?
+                      r[] = "$VAR{#{ ex.item.items[1].item.name.v }}"
+                    elseif ex.item.items[1]\is types.String
+                      r[] = extract.string ex.item.items[1]
+                    else
+                      error "unknown ex-cv node #{ v\g_yue_name! }: #{ json.encode v }"
+                  else
+                    error "unknown ex node #{ v\g_yue_name! }: #{ json.encode v }"
           else
             error "unknown name node #{ v\g_yue_name! }: #{ json.encode v }"
-          ]]
     (table.concat r, '.'), r
   value = (values) ->
     unless values[1]
@@ -106,9 +112,8 @@ simplify.assignment = (node) ->
   ret
 
 extract.string = (node) ->
-  unless node
-    error "string: node required"
-  unless node\is types.String
+  unless node and node\is types.String
+    error 'extract.string: String node required'
     return
 
   v = nil

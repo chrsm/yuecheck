@@ -21,11 +21,22 @@ _exp_simple = (node) ->
   unless item
     return
 
-  v = switch item\g_yue_name! -- this isn't necessary but i'm lazy
-    when 'SimpleValue'
+  -- v = switch item\g_yue_name! -- this isn't necessary but i'm lazy
+  v = switch true
+    when item\is types.SimpleValue
       item.value
-    when 'String'
+    when item\is types.String
       item.str
+    when item\is types.ChainValue
+      unless #item.items == 1
+        error "complex ChainValue not supported, has #{ #item.items } elements"
+      vv = item.items[1]
+      if vv\is types.SimpleValue
+        vv.value
+      elseif vv\is types.String
+        vv.str
+      else
+        error "ChainValue contains type i am too lazy to add: #{ vv\g_yue_name! }"
     else
       error "item type #{ item\g_yue_name! } not supported"
 
@@ -152,7 +163,8 @@ rules = {}
 _G.a = 'b'
 _G['a'] = 'b'
 _G[a] = 'b'
-]]--
+]]
+--
 -- TODO: needs to accept any expr (eg _G[key] = 'a')
 rules.global_writes = rule.AssignRule
   name: 'global_writes'
@@ -188,7 +200,8 @@ if x == x
   print 1
 
 (etc)
-]]--
+]]
+--
 rules.cond_identical_exprs =
   type: 'WARN'
   on:
@@ -230,7 +243,8 @@ if 1 -- always exec'd
   print 1
 unless 1 -- never exec'd
   print 1
-]]--
+]]
+--
 rules.cond_impossible =
   type: 'ERROR'
   on:
@@ -329,7 +343,7 @@ repeat
   break
   print 2 -- unreachable
 until false
-]]--
+]]
 rules.unreachable =
   type: 'ERROR'
   on:
@@ -349,7 +363,7 @@ rules.unreachable =
     -- assume block
     breakfound = false
     afterbreak = false
-    for i, v in ipairs node.body.statements
+    for i, v in ipairs node.body.statementOrComments
       if v.content\is types.BreakLoop
         breakfound = true
         continue
@@ -373,7 +387,7 @@ rules.unreachable =
 -- example:
 --[[
 --bad
-]]--
+]]
 rules.style_comment_space =
   type: 'WARN'
   on:
@@ -382,7 +396,7 @@ rules.style_comment_space =
   check: (node) ->
     if (node\is types.YueLineComment) and ((node.v\match '^%-%- ') or (node.v\match '^%-%-$')) -- yuecheck:ignore
       return
-    elseif (node\is types.YueMultilineComment) and (node.inner.v\match '%-%-%[%[%s+.+%s+%]%]')
+    elseif (node\is types.YueMultilineComment) and (node.v\match '%-%-%[%[%s+.+%s+%]%]')
       return
 
     typ = '???'
@@ -404,7 +418,8 @@ rules.style_comment_space =
 -- example:
 --[[
 print x[0]
-]]--
+]]
+--
 rules.style_zero_index =
   type: 'WARN'
   on:
@@ -447,7 +462,8 @@ import 'json' as json
 ->
 
 import 'json'
-]]--
+]]
+--
 rules.style_import_as_ident =
   type: 'WARN'
   on:
@@ -488,7 +504,8 @@ x = 'abcd'
 -- where these are OK
 x = "#{ interp }"
 x = "'a'"
-]]--
+]]
+--
 rules.style_unnecessary_doublestring =
   type: 'WARN'
   on:
@@ -534,7 +551,8 @@ unless x
 
 if x
   print 1
-]]--
+]]
+--
 rules.style_conditionals =
   type: 'WARN'
   on:
@@ -595,7 +613,8 @@ switch x
     print 4
   else
     print "idk"
-]]--
+]]
+--
 rules.style_simplify_if_to_switch =
   type: 'WARN'
   on:
@@ -802,9 +821,15 @@ rules.style_discourage_unnecessary_sb =
           for vv in *pe
             continue if vv.opValues
             if vv.expos[1]\is types.Value
-              if vv.expos[1].item\is types.String
-                if vv.expos[1].item.str\is types.SingleString
-                  k = util.stripq vv.expos[1].item.str.v
+              item = vv.expos[1].item
+
+              -- TODO: see if this is an AST/parser change or not..
+              if (item\is types.ChainValue) and (item.items[1]\is types.String)
+                item = item.items[1]
+
+              if item\is types.String
+                if item.str\is types.SingleString
+                  k = util.stripq item.str.v
                   -- skip 'keys-like-this' (telescope)
                   if k\match '%w+%-%w'
                     continue
@@ -812,8 +837,8 @@ rules.style_discourage_unnecessary_sb =
                   results[] = {
                     type: 'WARN'
                     message: "use `#{ k }:` instead of `['#{ k }']`"
-                    line: vv.expos[1].item.str\g_src_line!
-                    col: vv.expos[1].item.str\g_src_col!
+                    line: item.str\g_src_line!
+                    col: item.str\g_src_col!
                   }
 
     #results > 0 and results or nil
@@ -847,7 +872,7 @@ rules.basic_nilness =
     -- Block<.statements[] Statement>
     -- Statement<.comments,.content,.appendix StatementAppendix>
     stmts = if node.body.content\is types.Block
-      node.body.content.statements
+      node.body.content.statementOrComments
     else
       { node.body.content }
 
@@ -907,9 +932,9 @@ rules.stdlib_match = rule.FuncRule
     -- argv
     --   * [1] is the string we're operating on
     --   * [2] is the pattern
-    strn = args[1].pipeExprs?[1]?.expos?[1]?.item?.str
+    strn = args[1].pipeExprs?[1]?.expos?[1]?.item?.items?[1]?.str
     str = strn?.v
-    patn = args[2].pipeExprs?[1]?.expos?[1]?.item?.str
+    patn = args[2].pipeExprs?[1]?.expos?[1]?.item?.items?[1]?.str
     pat = patn?.v
 
     issues = {}

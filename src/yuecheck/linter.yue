@@ -53,9 +53,13 @@ linter.build_ast = (ast, parent = nil) ->
       n\set_source ln, col
       arg[] = n
     elseif ntype == 'ReversedIndex' and ast[4] == '[#]'
-        n = types.ReversedIndex!
-        n\set_source ln, col
-        arg[] = n
+      n = types.ReversedIndex!
+      n\set_source ln, col
+      arg[] = n
+    elseif ntype == 'VarArgDef' and ast[4] == '...'
+      n = types.VarArgDef types.Variable types.Name '...'
+      n\set_source ln, col
+      arg[] = n
     else
       -- TODO(@chrsm): this needs to be fixed, another special case like !
       if ntype == 'TableLit' and string.sub(ast[4], 1, 1) == '{'
@@ -155,7 +159,7 @@ linter.lint_string = (src) ->
       return
     m = false
     for ln in *comments[line]
-      m = (ln.v ?? ln.inner.v)\match 'yuecheck:ignore'
+      m = ln.v\match 'yuecheck:ignore'
       break if m
     m
 
@@ -168,7 +172,7 @@ linter.lint_string = (src) ->
   -- special ignore for whole file suppression;
   -- should make this more elegant.
   if comments[1]?
-    cmt = comments[1][1].v ?? comments[1][1].inner.v
+    cmt = comments[1][1].v
     if cmt\match '^-- yuecheck:ignore$'
       rules = {}
     m = cmt\match '-- yuecheck:ignore=([^\r\n%s]+)'
