@@ -1,0 +1,337 @@
+-- yuecheck:ignore=stdlib_usage,style_comment_space
+import 'busted.runner' as busted
+busted!
+
+import 'yuecheck.formatter' as fmt
+
+--[[
+  most of these cases are pretty basic, and only check that the input ends up being the output.
+  some of them do check oddities/spacing, but the most important part is that what comes out
+  is as expected.
+]]
+fget = (path) ->
+  fp, err = io.open "../spec/testdata/#{ path }.yue", 'r'
+  error err if err
+  content = fp\read 'a*'
+  fp\close!
+  content
+
+parse_td = (src) ->
+  ipos = src\find '-- input'
+  epos = src\find '-- expect'
+  unless epos and ipos
+    error 'cannot find input/expect markers in testdata'
+
+  -- `-- input` / `-- expect` len
+  input = src\sub ipos + 9, epos
+  expect = src\sub epos + 9
+
+  input, output
+
+describe 'formatter', ->
+  describe 'basic formatting', ->
+    it 'should not add nl to eof', ->
+      r = fmt.format 'x=1\nx=2'
+      assert.same 'x = 1\nx = 2', r
+
+    it 'should format simple assignment', ->
+      r = fmt.format 'x = 1'
+      assert.same 'x = 1', r
+
+    it 'should normalize spacing', ->
+      r = fmt.format 'x=1'
+      assert.same 'x = 1', r
+
+    it 'should format binary expressions', ->
+      r = fmt.format 'x = 1 + 2'
+      assert.same 'x = 1 + 2', r
+
+      r = fmt.format 'x = 1+2'
+      assert.same 'x = 1 + 2', r
+
+    it 'should format update assignments', ->
+      r = fmt.format 'x -= 1'
+      assert.same 'x -= 1', r
+
+      r = fmt.format 'x -=1'
+      assert.same 'x -= 1', r
+
+  describe 'inline comment preservation', ->
+    it 'should preserve inline comment on variable', ->
+      r = fmt.format 'b --[[ x ]] = 2'
+      assert.same 'b --[[ x ]] = 2', r
+
+    it 'should preserve inline comments on function params', ->
+      r = fmt.format 'x = (a --[[ typ ]], b --[[ typ2 ]]) -> nil'
+      assert.same 'x = (a --[[ typ ]], b --[[ typ2 ]]) -> nil', r
+
+    it 'should preserve end-of-line comments', ->
+      r = fmt.format 'x = 1 -- comment'
+      assert.same 'x = 1 -- comment', r
+
+    it 'should preserve above-line comments', ->
+      r = fmt.format '-- above\nx = 1'
+      assert.same '-- above\nx = 1', r
+
+  describe 'comment formatting', ->
+    it 'should add spacing between statement and trailing comment', ->
+      r = fmt.format 'x = 1-- lol'
+      assert.same 'x = 1 -- lol', r
+
+    it 'should preserve comments above switch when clauses', ->
+      input = 'switch x\n  -- comment\n  when 1\n    y = 1'
+      r = fmt.format input
+      assert.same 'switch x\n  -- comment\n  when 1\n    y = 1', r
+
+  describe 'eof comments', ->
+    it 'should keep comments that at eof', ->
+      r = fmt.format 'x = 1\n-- eof comment'
+      assert.same 'x = 1\n-- eof comment', r
+
+    it 'should preserve multiple trailing comments at end of file', ->
+      r = fmt.format 'x = 1\n-- one\n-- two'
+      assert.same 'x = 1\n-- one\n-- two', r
+
+    it 'should preserve blank line before trailing comment', ->
+      r = fmt.format 'x = 1\n\n-- trailing'
+      assert.same 'x = 1\n\n-- trailing', r
+
+  describe 'tables', ->
+    it 'should format inline table', ->
+      r = fmt.format 'x = {a:1,b:2}'
+      assert.same 'x = { a: 1, b: 2 }', r
+
+    it 'should format table with string value', ->
+      r = fmt.format 'x = { a: "str" }'
+      assert.same "x = { a: 'str' }", r
+
+  -- mostly verification that these don't get messed up
+  describe 'functions', ->
+    it 'should format simple function', ->
+      r = fmt.format 'x = -> nil'
+      assert.same 'x = -> nil', r
+
+    it 'should format function with args', ->
+      r = fmt.format 'x = (a, b) -> nil'
+      assert.same 'x = (a, b) -> nil', r
+
+    it 'should format vararg function', ->
+      r = fmt.format 'x = (...) -> nil'
+      assert.same 'x = (...) -> nil', r
+
+    it 'should format function with args and vararg', ->
+      r = fmt.format 'x = (a, ...) -> nil'
+      assert.same 'x = (a, ...) -> nil', r
+
+  describe 'control flow', ->
+    it 'should format if/else', ->
+      r = fmt.format 'if x\n  y = 1\nelse\n  y = 2'
+      assert.same 'if x\n  y = 1\nelse\n  y = 2', r
+
+    it 'should format for loop', ->
+      r = fmt.format 'for i=1,10\n  print i'
+      assert.same 'for i = 1, 10\n  print i', r
+
+    it 'should format foreach', ->
+      r = fmt.format 'for x in *items\n  print x'
+      assert.same 'for x in *items\n  print x', r
+
+    it 'should format while', ->
+      r = fmt.format 'while x > 0\n  x -= 1'
+      assert.same 'while x > 0\n  x -= 1', r
+
+  describe 'local attributes', ->
+    it 'should format const declaration', ->
+      r = fmt.format 'const z=42'
+      assert.same 'const z = 42', r
+
+    it 'should format const with multiple vars', ->
+      r = fmt.format 'const a,b=1,2'
+      assert.same 'const a, b = 1, 2', r
+
+    it 'should format close declaration', ->
+      r = fmt.format 'close f = io.open "file"'
+      assert.same "close f = io.open 'file'", r
+
+  describe 'pipe bodies', ->
+    it 'should format multi-line pipe chain with indent', ->
+      r = fmt.format 'x = 1\n  |> fn1\n  |> fn2'
+      assert.same 'x = 1\n  |> fn1\n  |> fn2', r
+
+    it 'should format single pipe body with indent', ->
+      r = fmt.format 'x = val\n  |> transform'
+      assert.same 'x = val\n  |> transform', r
+
+  describe 'control structures', ->
+    it 'should format do block', ->
+      r = fmt.format 'do\n  x = 1'
+      assert.same 'do\n  x = 1', r
+
+    it 'should format with block', ->
+      r = fmt.format 'with x\n  .foo = 1'
+      assert.same 'with x\n  .foo = 1', r
+
+    it 'should format try/catch', ->
+      r = fmt.format 'try\n  risky!\ncatch err\n  handle err'
+      assert.same 'try\n  risky!\ncatch err\n  handle err', r
+
+    it 'should format repeat/until', ->
+      r = fmt.format 'repeat\n  x += 1\nuntil x > 10'
+      assert.same 'repeat\n  x += 1\nuntil x > 10', r
+
+  describe 'other shit', ->
+    it 'should format slice', ->
+      r = fmt.format 'x[1, 3]'
+      assert.same 'x[1,3]', r
+
+    it 'should format global', ->
+      r = fmt.format 'global x = 1'
+      assert.same 'global x = 1', r
+
+    it 'should format label and goto', ->
+      r = fmt.format '::label::\ngoto label'
+      assert.same '::label::\ngoto label', r
+
+    it 'should format chain assignment', ->
+      r = fmt.format 'a = b = c = 1'
+      assert.same 'a = b = c = 1', r
+
+    it 'should format backcall', ->
+      r = fmt.format 'fn <- bc'
+      assert.same 'fn <- bc', r
+
+    it 'should format import from', ->
+      r = fmt.format 'import fn1, fn2 from "mod"'
+      assert.same "import fn1, fn2 from 'mod'", r
+
+  describe 'classes', ->
+    it 'should format simple class', ->
+      r = fmt.format 'class Foo\n  x: 1'
+      assert.same 'class Foo\n  x: 1', r
+
+  describe 'metatables', ->
+    it 'should format metatable literal', ->
+      r = fmt.format '{ <metatable>: {__index: t} }'
+      assert.same '{ <metatable>: { __index: t } }', r
+
+    it 'should format metamethod', ->
+      r = fmt.format '{ <index>: val }'
+      assert.same '{ <index>: val }', r
+
+  describe 'import/export', ->
+    it 'should format export default', ->
+      r = fmt.format 'export default -> 1'
+      assert.same 'export default -> 1', r
+
+    it 'should format from import', ->
+      r = fmt.format 'from "mod" import x, y'
+      assert.same "from 'mod' import x, y", r
+
+  describe 'spread and global', ->
+    it 'should format spread list', ->
+      r = fmt.format 'x = ...items'
+      assert.same 'x = ...items', r
+
+    it 'should format global star', ->
+      r = fmt.format 'global *'
+      assert.same 'global *', r
+
+  describe 'chain operators', ->
+    it 'should format existential op', ->
+      r = fmt.format 'x?.y'
+      assert.same 'x?.y', r
+
+    it 'should format table appending', ->
+      r = fmt.format 't[] = 1'
+      assert.same 't[] = 1', r
+
+  describe 'self references', ->
+    it 'should format self class', ->
+      r = fmt.format 'class X\n  m: => @@'
+      assert.same 'class X\n  m: => @@', r
+
+  describe 'table key simplification', ->
+    it 'should simplify valid identifier keys', ->
+      r = fmt.format '{ ["key"]: 1 }'
+      assert.same '{ key: 1 }', r
+
+    it 'should keep invalid identifier keys bracketed', ->
+      r = fmt.format '{ ["1key"]: 1, ["key-name"]: 2 }'
+      assert.same "{ ['1key']: 1, ['key-name']: 2 }", r
+
+    it 'should keep reserved keywords bracketed', ->
+      r = fmt.format '{ ["for"]: 1, ["class"]: 2 }'
+      assert.same "{ ['for']: 1, ['class']: 2 }", r
+
+    it 'should preserve implicit indexes', ->
+      r = fmt.format '{ 0, 1, ["k"]: 2 }'
+      assert.same '{ 0, 1, k: 2 }', r
+
+    it 'should simplify mixed valid and invalid keys', ->
+      r = fmt.format '{ ["valid"]: 1, ["in-valid"]: 2, simple: 3 }'
+      assert.same "{ valid: 1, ['in-valid']: 2, simple: 3 }", r
+
+    it 'should preserve numeric index keys', ->
+      r = fmt.format '{ [0]: "zero", [1]: "one", key: "val" }'
+      assert.same "{ [0]: 'zero', [1]: 'one', key: 'val' }", r
+
+  describe 'comprehension arrays', ->
+    it 'should format inline presupplied array', ->
+      r = fmt.format "x = ['a', 'b', 'c']"
+      assert.same "x = ['a', 'b', 'c']", r
+
+    it 'should respect one-per-line array formatting', ->
+      input = "x = [\n  'a',\n  'b',\n]"
+      r = fmt.format input
+      assert.same "x = [\n  'a',\n  'b',\n]", r
+
+    it 'should respect source line grouping for arrays', ->
+      input = "x = [\n  'a', 'b',\n  'c',\n]"
+      r = fmt.format input
+      assert.same "x = [\n  'a', 'b',\n  'c',\n]", r
+
+    it 'should keep key-value pairs on own lines', ->
+      input = 'x = {\n  a: 1\n  b: 2\n  c: 3\n}'
+      r = fmt.format input
+      assert.same 'x = {\n  a: 1\n  b: 2\n  c: 3\n}', r
+
+    it 'should separate implicit values from key-value pairs', ->
+      input = "x = {\n  'val1', 'val2',\n  k: true\n}"
+      r = fmt.format input
+      assert.same "x = {\n  'val1', 'val2',\n  k: true\n}", r
+
+    it 'should preserve blank lines between table sections', ->
+      input = "x = {\n  'a'\n  2\n\n  k: true\n}"
+      r = fmt.format input
+      assert.same "x = {\n  'a',\n  2,\n\n  k: true\n}", r
+
+    it 'should handle multi-line function in table', ->
+      input = "x = {\n  require('x')\n  ->\n    y = 1\n}"
+      r = fmt.format input
+      assert.same "x = {\n  require('x'),\n  ->\n    y = 1,\n}", r
+
+    it 'should handle key-value pair with TableBlock value', ->
+      input = "x = {\n  args: \n    * '--stdin'\n  key: true\n}"
+      r = fmt.format input
+      assert.same "x = {\n  args: \n    * '--stdin'\n  key: true\n}", r
+
+  -- TODO: add some more thorough test cases
+  -- mostly adding these as i work on stuff and dogfood the formatter
+  describe 'golden files', ->
+    it 'should handle tables respecting max line length, but preserve current where <max', ->
+      src, expect = parse_td fget 'fmt_tables'
+
+      r = fmt.format src
+      assert.same expect, r
+
+    it 'should handle switch when should not lose comments (regression guard)', ->
+      src, expect = parse_td fget 'fmt_switch_comments'
+
+      r = fmt.format src
+      assert.same expect, r
+
+    it 'should not fuck up indents in a weird mixed table', ->
+      src, expect = parse_td fget 'fmt_mixed_table'
+
+      r = fmt.format src
+      assert.same expect, r

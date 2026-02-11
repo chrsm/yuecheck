@@ -1,13 +1,30 @@
 yuecheck
 ===
 
-Lint tool for [Yuescript][1].
+Tools for writing [Yuescript][1].
+
+- linter (`yuecheck`)
+- formatter (`yuefmt`)
+
+`yuecheck` came about due to the fact that I love writing code in Yuescript, but
+there aren't really any tools for it. It started as a standard linter I am attempting
+to expand that to a formatter (`yuefmt`).
+
+`yuefmt`, much like `yuecheck`, is based on my opinions of how code should be
+written and formatted. `yuecheck` is configurable at this point but `yuefmt` lacks
+that. There may be things I will make configurable but ultimately it was a huge
+PITA to put together. If you have any suggestions, please feel free to file an
+issue.
+
+
+----
 
 Current TODOs:
 
 - [ ] Only use repo `.yuecheck` if trusted (due to macro code execution)
 - [ ] General cleanup. Rules are ugly for implementation
-- [ ] Configuration-driven format rules
+  * [x] categorized, but still more to do
+- [x] Configuration-driven format rules (WONTFIX)
   * This may require just writing the whole file from AST each time.
   * For the record I have taken a pass at this but got frustrated by comment
     placement. I will probably come back to it.
@@ -17,9 +34,9 @@ Current TODOs:
   and less likely will it work with non-Yue code. Possibly could redirect to
   luals.
 
-
 * [installation](#installation)
-* [usage](#usage)
+* [yuecheck usage](#usage-of-yuecheck)
+* [yuefmt usage](#usage-of-yuefmt)
 * [configuration](#configuration)
   * [enabling and disabling checks](#enabling-and-disabling-checks)
 * [built-in lint rules](#built-in-linters)
@@ -41,7 +58,7 @@ luarocks make
 # or luarocks --local make
 ```
 
-# usage
+# usage of yuecheck
 
 To lint a specific file or directory, pass it as an argument to `yuecheck`,
 ex `yuecheck .` (all yue files in cwd) or `yuecheck specific.yue` for a single file.
@@ -81,6 +98,37 @@ sample.yue:1:3: double-quoted string where single-quoted would suffice
 
 1 issues
 ```
+
+
+# usage of yuefmt
+
+To format a specific file, pass it as an argument to `yuefmt`, eg `yuefmt file.yue`.
+You can also pass via `-f file.yue` or pump to `yuefmt` via stdin (`--stdin`).
+
+See below for other options.
+
+```
+Usage: yuefmt [-h] [-w] ([-f <file>] | [<dir_or_file>] | [--stdin])
+       [-x [<exclude>] ...]
+
+tool for formatting yue code
+
+Arguments:
+   dir_or_file
+
+Options:
+   -h, --help            Show this help message and exit.
+       -f <file>,        file to format
+   --file <file>
+   --stdin               parse stdin
+          -x [<exclude>] ...,
+   --exclude [<exclude>] ...
+                         pattern for paths to exclude
+   -w, --write           write changes to disk
+
+see https://github.com/chrsm/yuecheck
+```
+
 
 
 ## example neovim setup

@@ -1,0 +1,35 @@
+-- misc: my nvim config got borked, `->`/`args` ended up bol and `args` ahead of `exe`, `* '--stdin'` orphaned
+-- input
+import 'macros' as { $ }
+
+cfg = 
+  logging: true
+  log_level: vim.log.levels.WARN
+  filetype: 
+    yue: {
+      require('formatter.filetypes.any') -- yuecheck:ignore
+      ->
+        {
+          exe: 'yuefmt'
+          args: 
+            * '--stdin'
+          stdin: true
+        }
+    }
+-- expect
+import 'macros' as { $ }
+
+cfg = 
+  logging: true
+  log_level: vim.log.levels.WARN
+  filetype: 
+    yue: {
+      require('formatter.filetypes.any'), -- yuecheck:ignore
+      ->
+        {
+          exe: 'yuefmt'
+          args: 
+            * '--stdin'
+          stdin: true
+        },
+    }

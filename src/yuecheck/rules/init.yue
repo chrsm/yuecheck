@@ -1,0 +1,7 @@
+rules = {}
+
+for v in *['correctness', 'globals', 'stdlib', 'style']
+  set = require "yuecheck.rules.#{ v }" -- yuecheck:ignore
+  rules[k] = v for k, v in pairs set
+
+export default rules

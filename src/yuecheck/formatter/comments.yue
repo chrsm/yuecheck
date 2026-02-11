@@ -1,0 +1,227 @@
+-- comment association for the formatter
+-- associates parsed comments with AST nodes based on position
+import 'yuecheck.types'
+
+-- comment association types:
+-- 'trailing' - after identifier, before next token on same line: `x --[[t]] = 1`
+-- 'end_of_line' - at end of statement: `x = 1 -- comment`
+-- 'above' - on line immediately before a statement
+-- 'orphan' - standalone comment not attached to code (ex: eof comments)
+
+class CommentData
+  new: =>
+    @associations = {}
+    @node_comments = {}
+    @nodes_by_line = {}
+    @orphans = {}
+  get_comments: (node, assoc_type = nil) =>
+    id = tostring node
+    nc = @node_comments[id]
+    return {} unless nc
+
+    if assoc_type
+      nc[assoc_type] or {}
+    else
+      result = {}
+      for _, list in pairs nc
+        for c in *list
+          result[] = c
+
+      result
+  has_comment_at: (line, col) =>
+    for comment, assoc in pairs @associations
+      if comment\g_src_line! == line
+        ccol = comment\g_src_col!
+        if ccol >= col - 1 and ccol <= col + 1
+          return true, comment
+    false, nil
+
+-- priority for node types; higher = more specific, prefer for trailing comments
+-- leaf nodes should be preferred over containers
+node_priority = {
+  Name: 100
+  UnicodeName: 100
+  Num: 100
+  Self: 100
+  ConstValue: 100
+  SingleString: 100
+  Variable: 90
+  SelfName: 90
+  VarArg: 90
+  Callable: 80
+  SimpleValue: 70
+  Value: 60
+  UnaryExp: 50
+  Exp: 40
+  ChainValue: 40
+  ExpList: 30
+  ExpListAssign: 20
+  Statement: 10
+  Block: 5
+  File: 1
+}
+
+get_priority = (node) ->
+  node_priority[node\g_yue_name!] or 50
+
+-- associate comments with AST nodes
+-- takes: source string, AST root, parsed comments (from comments.to_ast)
+-- returns: CommentData instance
+associate = (src, ast, comments) ->
+  data = CommentData!
+
+  unless comments?.indices? and #comments.indices > 0
+    return data
+
+  -- build a map of all AST nodes with their positions
+  node_list = {}
+  nodes_by_line = data.nodes_by_line
+
+  collect_nodes = (node) ->
+    unless node and node.is -- skip non-AST values
+      return
+
+    -- some nodes may not have pos set, check safely
+    line = col = nil
+    if pos := node.pos
+      line = pos.line
+      col = pos.col
+
+    unless line and col
+      return
+
+    node_list[] = node
+    nodes_by_line[line] or= {}
+    nodes_by_line[line][] = {
+      node: node
+      col: col
+    }
+
+  -- walk AST to collect all nodes
+  walk_ast = (node) ->
+    unless node and (type node) == 'table'
+      return
+
+    collect_nodes node
+
+    -- walk children
+    for k, v in pairs node
+      if k in ['is', 'typ', '_src_line', '_src_col']
+        continue
+
+      if (type v) == 'table'
+        if v.is -- it's a node
+          walk_ast v
+        else
+          for item in *v
+            walk_ast item if (type item) == 'table'
+
+  walk_ast ast
+
+  -- sort nodes on each line by column
+  for line, nodes in pairs nodes_by_line
+    table.sort nodes, (a, b) -> a.col < b.col
+
+  -- now associate each comment with a node
+  associations = data.associations
+  node_comments = data.node_comments
+
+  for line_idx in *comments.indices
+    line_comments = comments[line_idx]
+    continue unless line_comments
+
+    for comment in *line_comments
+      comment_col = comment\g_src_col!
+      comment_line = comment\g_src_line!
+
+      -- find the best node to attach this comment to
+      best_node = nil
+      best_type = 'orphan'
+      best_priority = -1
+
+      -- check for nodes on the same line (trailing or end_of_line comment)
+      same_line_nodes = nodes_by_line[comment_line]
+      best_col = -1
+      if same_line_nodes and #same_line_nodes > 0
+        -- find the most specific node that starts before the comment
+        -- priority: higher type priority wins; same priority → higher column wins
+        for entry in *same_line_nodes
+          if entry.col < comment_col
+            priority = get_priority entry.node
+
+            -- prefer higher priority (more specific) nodes
+            -- on equal priority, prefer closer (higher column) nodes
+            if priority > best_priority or (priority == best_priority and entry.col > best_col)
+              best_node = entry.node
+              best_type = 'trailing'
+              best_priority = priority
+              best_col = entry.col
+
+        -- _if_ we found a node, check if comment is truly at end of line
+        if best_node
+          -- check if there are more tokens after this comment on the line
+          has_more = false
+          for entry in *same_line_nodes
+            if entry.col > comment_col
+              has_more = true
+              break
+
+          unless has_more
+            best_type = 'end_of_line'
+
+      -- special case: if the only/best node on this line is a Block,
+      -- and the comment appears to be indented content, treat as "above" for next line
+      --[[
+	      this handles: 
+		    ```
+          if x
+            -- comment
+            actual_code
+        ```
+      ]]
+      if best_node and best_type == 'end_of_line'
+        if best_node\is_any types.Block, types.Body
+          -- look for the actual statement on the next line
+          next_line = comment_line + 1
+          while next_line <= comment_line + 50 -- arbitrary search 50 lines ahead
+            if nodes_by_line[next_line] and #nodes_by_line[next_line] > 0
+              best_node = nodes_by_line[next_line][1].node
+              best_type = 'above'
+              break
+
+            next_line += 1
+
+      -- _if_ there isn't a same-line node, check if this is an 'above' comment
+      unless best_node
+        -- look for first node on the next non-empty line
+        -- look ahead up to 50 lines (to handle multi-line comments and blank sections)
+        -- 50 is arbitrary, can be adjusted
+        next_line = comment_line + 1
+        while next_line <= comment_line + 50
+          if nodes_by_line[next_line] and #nodes_by_line[next_line] > 0
+            best_node = nodes_by_line[next_line][1].node
+            best_type = 'above'
+            break
+
+          next_line += 1
+
+      -- store the association
+      associations[comment] = {
+        node: best_node
+        type: best_type
+      }
+
+      -- also store reverse mapping: node -> comments
+      if best_node
+        id = tostring(best_node)
+        node_comments[id] or= { trailing: {}, end_of_line: {}, above: {} }
+        node_comments[id][best_type] or= {}
+        node_comments[id][best_type][] = comment
+      else
+        data.orphans[] = comment
+
+  data
+
+export default {
+  :associate
+}

@@ -1,0 +1,116 @@
+#!/usr/bin/env -S yue -e
+--[[
+  yuefmt
+
+  yuefmt is an opinionated linter for Yuescript
+]]
+import 'yue'
+import 'lfs'
+import 'argparse'
+
+import 'json'
+import 'inspect'
+
+import 'yuecheck.formatter'
+
+--[[ util ]]
+_str_ends_with = (s, suffix) ->
+  len = #s
+  slen = #suffix
+  for i = 0, slen - 1
+    if (s\byte len - i) != suffix\byte (slen - i)
+      return false
+  true
+is_dir = (dir) -> (lfs.attributes dir, 'mode') == 'directory'
+find_files = (path, ext, exclude = {}) ->
+  unless is_dir path
+    return nil, error "(#{ path }, #{ ext }) is not a directory"
+
+  if (path\sub #path, #path) == '/'
+    path = path\sub 1, #path - 1
+
+  files = {}
+  for ent in lfs.dir path
+    continue if ent in { '.', '..' }
+
+    p = "#{ path }/#{ ent }"
+    skip = false
+    for v in *exclude
+      if p\match v
+        skip = true
+        break
+    if skip
+      continue
+
+    if is_dir p
+      -- skip common dirs
+      if p\match '%.git$'
+        continue
+      files = { ...files, ...(find_files p, ext, exclude) }
+    elseif _str_ends_with p, ".#{ ext }"
+      files[] = p
+  files
+--[[ /util ]]
+
+argp = argparse!
+  name: 'yuefmt'
+  description: 'tool for formatting yue code'
+  epilog: 'see https://github.com/chrsm/yuecheck'
+
+with argp
+  dof = \argument 'dir_or_file'
+  dof\args '?'
+
+  f = \option '-f --file', 'file to format'
+  f\args 1
+
+  stdin = \flag '--stdin', 'parse stdin'
+
+  exclude = \option '-x --exclude', 'pattern for paths to exclude'
+  exclude\args '*'
+  exclude\overwrite false
+
+  write = \flag '-w --write', 'write changes to disk'
+
+  \mutex f, dof, stdin
+
+args = argp\parse!
+
+if args.stdin
+  src = io.read 'a*'
+
+  ret, err = formatter.format src
+  if err
+    io.stderr\write err
+    os.exit 1
+
+  print ret
+  return
+
+file = nil
+if args.dir_or_file
+  if is_dir args.dir_or_file
+    error "dof must be a file, given #{ args.dir_or_file }"
+
+  file = args.dir_or_file
+elseif args.file
+  file = args.file
+else
+  error "unknown mode: #{ json.encode args }"
+
+fp, err = io.open file, 'r'
+src = fp\read 'a*'
+fp\close!
+
+ret, err = formatter.format src
+if err
+  io.stderr\write err
+  os.exit 1
+
+unless args.write
+  print ret
+  return
+
+fp, err = io.open file, 'w'
+fp\write ret
+fp\close!

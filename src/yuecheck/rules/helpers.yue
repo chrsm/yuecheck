@@ -1,0 +1,89 @@
+-- Shared helper functions for rules
+
+import 'yuecheck.ast' as ast
+import 'yuecheck.types'
+
+-- Alias for simple value extraction
+_exp_simple = ast.extract.simple_value
+
+-- Helper to check if node matches any type in set
+_is_any = (node, set = {}) ->
+  for v in *set
+    return true if node\is v
+  false
+
+-- Check conditional expression against function default args
+-- Used by basic_nilness rule
+_check_cond_expr = (iftyp, n, args) ->
+  unless n
+    error 'no node provided to _check_cond_expr'
+  unless n\is types.Exp
+    error "non-exp sent to _check_cond_expr, is #{ n\g_yue_name! }"
+    return
+
+  cond = n
+
+  if #cond.pipeExprs == 0 or #cond.pipeExprs > 1
+    return -- bail for now
+  if #cond.opValues == 0 or #cond.opValues > 1
+    return -- bail for now
+
+  unless cond.pipeExprs[1].expos[1].item\is types.ChainValue
+    return -- bail for now
+
+  varn = cond.pipeExprs[1].expos[1].item.items[1].item.name?.v
+  unless args[varn] != nil
+    return -- no default, skip
+
+  defv = args[varn]
+
+  -- look for the const value
+  cv = cond.opValues[1].pipeExprs[1].expos[1]
+  unless (cv.item\is types.SimpleValue) and
+         (cv.item.value\is types.ConstValue)
+    return -- bail for now
+
+  -- we're only dealing with nil-ness here
+  unless cv.item.value.v == 'nil'
+    return
+
+  -- cool, we have a name now. what are we comparing it against?
+  unless cond.opValues[1].op.v in ['==', '!=', '~=']
+    -- other ops are suspicious but more easily detected.
+    return
+
+  op = cond.opValues[1].op.v
+  op = '!=' if op == '~='
+
+  sw = { ct: iftyp, op: op }
+  why = switch sw
+    -- (x=true)->1 if x == nil
+    -- ^ never
+    when ct: 'if', op: '=='
+      'never'
+    -- (x=true)->1 if x != nil
+    -- ^ always
+    when ct: 'if', op: '!='
+      'always'
+    -- (x=true)->1 unless x == nil
+    -- ^ always
+    when ct: 'unless', op: '=='
+      'always'
+    -- (x=true)->1 unless x != nil
+    -- ^ never
+    when ct: 'unless', op: '!='
+      'never'
+
+  {
+    type: 'WARN'
+    message: "`#{ varn }` defaults to `#{ defv }`; " ..
+             "cond #{ why } occurs `#{ iftyp } #{ varn } #{ op } #{ cv.item.value.v }`"
+    line: n\g_src_line!
+    col: n\g_src_col!
+  }
+
+export default {
+  :_exp_simple
+  :_is_any
+  :_check_cond_expr
+}

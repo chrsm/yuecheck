@@ -1,10 +1,6 @@
-import 'yuecheck.macros' as { $ }
-
 import 'yue'
-import 'inspect'
-import 'json'
 
-import 'yuecheck.ast_helpers' as ast
+import 'yuecheck.ast' as ast
 import 'yuecheck.types'
 
 invalid_checker = (rule, args) ->

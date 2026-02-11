@@ -1,0 +1,258 @@
+import 'yuecheck.ast' as ast
+import 'yuecheck.types'
+import 'yuecheck.rules.helpers' as helpers
+
+-- cond_identical_exprs
+-- warns if both lhs and rhs comparisons are the same
+--
+-- example:
+--[[
+if 1 == 1
+  print 1
+
+if x == x
+  print 1
+]]
+cond_identical_exprs =
+  type: 'WARN'
+  on:
+    * types.IfCond
+  check: (node) ->
+    exp = node.condition
+    v1 = ast.extract.exp_value exp
+    v2 = ast.extract.exp_rhs_value exp
+    op = ast.extract.exp_operator exp
+
+    unless (v1 and v2 and op) and (v1 == v2)
+      return
+
+    {
+      type: 'WARN'
+      message: "identical expressions on lhs and rhs of '#{ op }' operator"
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- cond_impossible
+-- NOTE(@chrsm): named badly
+-- warns about bad conditionals
+--
+-- example:
+--[[
+unless false -- always exec'd
+  print 1
+
+if false -- never exec'd
+  print 1
+
+if true -- always exec'd
+  print 1
+
+unless true -- always exec'd
+
+if 1 -- always exec'd
+  print 1
+unless 1 -- never exec'd
+  print 1
+]]
+cond_impossible =
+  type: 'ERROR'
+  on:
+    * types.If
+  check: (node) ->
+    iftyp = node.type.v
+
+    expos = node.nodes?[1].condition?.pipeExprs?[1]?.expos or {}
+    unless #expos == 1
+      return nil
+
+    unless #(node.nodes?[1].condition?.opValues or {}) == 0
+      return nil
+
+    v = expos[1].item?.value?.v ?? expos[1].item.items[1].item.name.v
+    compv = node.nodes?[1].condition?.opValues?[1]?.pipeExprs?[1]?.expos?[1]?.item?.value?.v ?? ''
+
+    message = ''
+    if v == 'true'
+      isexec = switch iftyp
+        when 'unless'
+          'never'
+        else
+          'always'
+      message = "`#{ iftyp }` expression literal `true` #{ isexec } executed"
+    elseif v == 'false'
+      isexec = switch iftyp
+        when 'unless'
+          'always'
+        else
+          'never'
+      message = "`#{ iftyp }` expression literal `false` #{ isexec } executed"
+    elseif (tonumber v) != nil
+      isexec = switch iftyp
+        when 'unless'
+          'never'
+        else
+          'always'
+      message = "`#{ iftyp }` expression compared to number literal `#{ v }` #{ isexec } executed"
+    else
+      return nil
+
+    {
+      type: 'ERROR'
+      :message
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- nil_comparisons
+-- warns about invalid nil comparisons
+nil_comparisons =
+  type: 'ERROR'
+  description: ''
+  on:
+    * types.Exp
+  check: (node) ->
+    getv = (exp) ->
+      item = ast.extract.exp_first_value exp
+      return nil unless item
+
+      switch true
+        when not item
+          nil
+        when item\is types.ChainValue
+          ast.extract.chainvalue_base item
+        when item\is types.SimpleValue
+          item.value.v
+        else
+          nil
+
+    lhs = getv node
+    rhs = getv node\first 'opValues'
+    op = ast.extract.exp_operator node
+    unless lhs and rhs and op
+      return
+
+    unless (lhs == 'nil' or rhs == 'nil') and #op > 0
+      return
+
+    unless op in ['>', '>=', '<', '<=', '/', '*', '-', '+', '%', '//', '..', '&', '<<', '>>', '|', '~']
+      return
+
+    {
+      type: 'ERROR'
+      message: "syntax error: `#{ lhs } #{ op } #{ rhs }`"
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- unreachable
+-- warns about unreachable code
+--
+-- example:
+--[[
+repeat
+  print 1
+  break
+  print 2 -- unreachable
+until false
+]]
+unreachable =
+  type: 'ERROR'
+  on:
+    * types.For
+    * types.While
+    * types.Repeat
+  check: (node) ->
+    -- walk child nodes depending on what we are
+    -- if there's a `break` right at the end (and it's not scoped),
+    -- anything after it is unreachable
+    -- (if there's nothing after it, it's just a code smell)
+
+    -- repeat loop
+    unless node\is types.Repeat
+      return nil
+
+    -- assume block
+    breakfound = false
+    afterbreak = false
+    for i, v in ipairs node.body.statementOrComments
+      if v.content\is types.BreakLoop
+        breakfound = true
+        continue
+
+      if breakfound
+        afterbreak = { v\g_src_line!, v\g_src_col! }
+
+    unless breakfound and afterbreak
+      return nil
+
+    {
+      type: 'ERROR'
+      message: 'unreachable code after break statement'
+      line: afterbreak[1]
+      col: afterbreak[2]
+    }
+
+-- basic_nilness
+-- very basic nil-ness analysis
+basic_nilness =
+  name: 'basic nilness'
+  description: 'very basic nil-ness analysis'
+  type: 'WARN'
+  on:
+    * types.FunLit
+  check: (node) ->
+    -- TODO(@chrsm): we need to handle scoping (we don't)
+    unless node.body? and node.body.content?
+      return
+
+    args = {}
+    for arg in *(node.argsDef?.defList.definitions ?? {})
+      -- Variable|SelfItem; in checks, SelfItem.Self=@ if @ is supplied (eg `x = (@, b) -> nil`)
+      -- @ = Self, @@ = SelfClass; `self` as a name is just a std var name.
+      -- @__name is SelfName, @@__name is SelfClassName.
+      -- pretty.. self explanatory.
+      -- don't think we need to worry about this here?
+      if arg\is types.SelfItem
+        continue
+
+      if arg.defaultValue
+        args[arg.name.name.v] = helpers._exp_simple arg.defaultValue
+
+    -- node.body = Body
+    -- Body<.content = Block|Statement>
+    -- Block<.statements[] Statement>
+    -- Statement<.comments,.content,.appendix StatementAppendix>
+    stmts = if node.body.content\is types.Block
+      node.body.content.statementOrComments
+    else
+      { node.body.content }
+
+    results = {}
+    for stmt in *stmts
+      -- now, we're at top-level of the body, and want to do our scan for ifs/appendix-ifs.
+      if stmt.appendix and stmt.appendix.item\is types.IfLine
+        r = helpers._check_cond_expr stmt.appendix.item.type.v, stmt.appendix.item.condition.condition, args
+        if r
+          -- override the position for the moment, if starts before
+          r.line = stmt.appendix\g_src_line!
+          r.col = stmt.appendix\g_src_col!
+          results[] = r
+
+      target = stmt.content?.expList?.exprs?[1]?.pipeExprs?[1]?.expos?[1]?.item?.value
+      if target and target\is types.If
+        r = helpers._check_cond_expr target.type.v, target.nodes[1].condition, args
+        if r
+          r.line = target\g_src_line!
+          r.col = target\g_src_col!
+          results[] = r
+
+    (#results > 0 and results) or nil
+
+export default {
+  :cond_identical_exprs
+  :cond_impossible
+  :nil_comparisons
+  :unreachable
+  :basic_nilness
+}

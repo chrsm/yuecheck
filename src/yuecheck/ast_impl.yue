@@ -1,12 +1,9 @@
-import 'yuecheck.macros' as { $ }
 class position
   line: -1
   col: -1
-
   new: (t = {}) =>
     @line = t[1]
     @col = t[2]
-
   <eq>: (v) =>
     @line == v.line and @col == v.col
   <lt>: (v) =>
@@ -17,12 +14,11 @@ class position
 class _ast
   -- positional data
   pos: nil
-
   g_yue_name: => @@yue_name
   g_yue_type: => @@yue_type
   g_src_pos: => @pos
   g_src_line: => @pos.line or 0
-  g_src_col:  => @pos.col or 0
+  g_src_col: => @pos.col or 0
   set_source: (line, column) =>
     @pos = position { line, column }
   is: (typ) =>
@@ -35,18 +31,35 @@ class _ast
       return true if @@ == args[i]
     false
 
+  -- get first element of a list property, or nil if empty/missing
+  -- ex: exp\first 'pipeExprs'
+  first: (prop) =>
+    list = @[prop]
+    (list and #list > 0) and list[1] or nil
+
+  -- get nested value via path of keys/indices, returns nil if any step fails
+  -- ex: exp\get 'pipeExprs', 1, 'expos', 1, 'item', 'value', 'v'
+  get: (...) =>
+    current = @
+    for step in *{ ... }
+      return nil unless current
+      current = if (type step) == 'number'
+        current[step]
+      elseif (type current) == 'table'
+        current[step]
+      else
+        nil
+    current
+
 --[[ special types ]]
 class _selector_t extends _ast
   @yue_type = 'sel_t'
   @yue_name = 'sel_t'
-
   new: (types = {}) =>
     @allowed = types
     @value = nil
-
   get: =>
     @value
-
   set: (v) =>
     ok = false
     for i, ac in ipairs @allowed
@@ -62,14 +75,11 @@ class _selector_t extends _ast
 class _selector_list_t extends _ast
   @yue_type = 'sel_list_t'
   @yue_name = 'sel_list_t'
-
   new: (types = {}) =>
     @allowed = types
     @value = nil
-
   get: =>
     @value
-
   set: (v) =>
     ok = false
     for i, ac in ipairs @allowed
@@ -85,14 +95,11 @@ class _selector_list_t extends _ast
 class _list_t extends _ast
   @yue_name = 'list_t'
   @yue_type = 'list_t'
-
   new: (types = {}) =>
     @allowed = types
     @value = nil
-
   get: =>
     @value
-
   set: (v) =>
     ok = false
     for i, ac in ipairs @allowed

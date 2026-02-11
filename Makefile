@@ -43,6 +43,7 @@ install:
 	cp -R src/yuecheck $(INST_LUADIR)/
 	cp bin/yuecheck $(INST_BINDIR)/
 	cp bin/yue-lsp $(INST_BINDIR)/
+	cp bin/yuefmt $(INST_BINDIR)/
 
 .PHONY: generate
 ## generate code from yue typedefs
@@ -56,14 +57,13 @@ generate:
 test:
 	export LUA_PATH='$(YCT_LPATH)' && cd src && \
 		yue -e ../spec/rules.yue -v -C . -o gtest --exclude-tags='ignore' && \
-		yue -e ../spec/lsp.yue -v -C . -o gtest --exclude-tags='ignore'
-	# && \
-	#	yue -e ../spec/formatter.yue -v -C . -o gtest --exclude-tags='ignore'
+		yue -e ../spec/lsp.yue -v -C . -o gtest --exclude-tags='ignore' && \
+		yue -e ../spec/formatter.yue -v -C . -o gtest --exclude-tags='ignore'
 
-.PHONY: fmt
-fmt:
-	export LUA_PATH='$(YCT_LPATH)' && cd src && \
-		yue -e yuecheck/formatter.yue
+# .PHONY: fmt
+# fmt:
+#	export LUA_PATH='$(YCT_LPATH)' && cd src && \
+#		yue -e yuecheck/formatter.yue
 
 .PHONY: lint
 ## run linter against itself
@@ -80,6 +80,7 @@ uninstall:
 	luarocks remove yuecheck
 	rm -rf $(HOME)/.luarocks/bin/yuecheck
 	rm -rf $(HOME)/.luarocks/bin/yue-lsp
+	rm -rf $(HOME)/.luarocks/bin/yuefmt
 	rm -rf $(HOME)/.luarocks/lib/luarocks/rocks-5.4/yuecheck
 	rm -rf $(HOME)/.luarocks/share/lua/5.4/yuecheck
 

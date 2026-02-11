@@ -1,0 +1,177 @@
+import 'yuecheck.ast'
+import 'yuecheck.comments' as comment_parser
+import 'yuecheck.types'
+
+import 'yuecheck.formatter.comments' as comment_assoc
+import 'yuecheck.formatter.state' as state
+import 'yuecheck.formatter.visit' as visit
+
+join_import = (inners) ->
+  s = []
+  table.concat s, '.'
+
+-- extract module name from an Import statement (for sorting)
+get_import_module_name = (stmt) ->
+  unless stmt?.content?
+    return nil
+
+  content = stmt.content
+  unless content and content\is types.Import
+    return nil
+
+  -- Import contains either ImportAs or FromImport
+  inner = content.content
+  unless inner
+    return nil
+
+  -- TODO(@chrsm): support ImportFrom, ImportGlobal and ImportAllGlobal
+  -- 
+  switch true
+    -- ImportAs: import 'module' or import 'module' as x
+    when inner\is types.ImportAs
+      literal = inner.literal
+      if literal?.inners? and #literal.inners > 0
+        return join_import literal.inners
+
+    -- FromImport: from 'module' import x
+    when inner\is types.FromImport
+      literal = inner.item
+      if literal and literal\is types.ImportLiteral
+        if literal?.inners? and #literal.inners > 0
+          return join_import literal.inners
+
+  nil
+
+-- sort consecutive import statements in a block alphabetically by module name
+--
+-- similar to Go, imports are grouped, so:
+--[[
+import 'y'
+import 'x'
+
+import 'c'
+import 'a'
+]]
+-- will be sorted distinctly
+sort_imports = (block) ->
+  unless block and block.statementOrComments
+    return
+
+  stmts = block.statementOrComments
+  unless #stmts > 0
+    return
+
+  -- find groups of consecutive imports and sort each group
+  i = 1
+  while i <= #stmts
+    -- check if this is an import
+    stmt = stmts[i]
+    module_name = get_import_module_name stmt
+
+    unless module_name
+      i += 1
+      continue
+
+    -- found an import, collect consecutive imports (no blank lines between)
+    group_start = i
+    group = { { stmt: stmt, module: module_name, line: stmt\g_src_line! } }
+    prev_line = stmt\g_src_line!
+    first_line = prev_line
+
+    j = i + 1
+    while j <= #stmts
+      next_stmt = stmts[j]
+      next_module = get_import_module_name next_stmt
+      break unless next_module
+
+      -- check for blank line between imports (line gap > 1)
+      next_line = next_stmt\g_src_line!
+      if prev_line and next_line and (next_line - prev_line) > 1
+        -- blank line found, start new group
+        break
+
+      table.insert group, { stmt: next_stmt, module: next_module, line: next_line }
+      prev_line = next_line
+      j += 1
+
+    -- sort the group by module name (case-insensitive; never seen upcase'd imports/requires myself)
+    if #group > 1
+      table.sort group, (a, b) -> a.module\lower! < b.module\lower!
+
+      -- replace statements in place and fix source line numbers
+      for k, entry in ipairs group
+        stmts[group_start + k - 1] = entry.stmt
+
+        -- update pos to maintain sequential line numbers within group
+        if entry.stmt.pos
+          entry.stmt.pos.line = first_line + k - 1
+
+    i = j
+
+format = (src, opts = {}) ->
+  -- yue parser helpfully skips shebang line; need to keep it tho
+  shebang = nil
+  if (src\sub 1, 3) == '#!/'
+    nl = src\find '\n'
+    shebang = src\sub 1, nl - 1
+    src = src\sub nl + 1
+
+  parsed_ast, err = ast.parse src
+  unless parsed_ast
+    return nil, err
+
+  -- OPINIONATED(@chrsm):
+  -- sort top-level imports in ast before formatting
+  sort_imports parsed_ast.block
+
+  comments = comment_parser.to_ast src
+  comment_data = comment_assoc.associate src, parsed_ast, comments
+
+  fstate = state opts
+
+  -- track source lines for comments and interpolated strings
+  source_lines = {}
+  for line in src\gmatch '[^\n]*'
+    table.insert source_lines, line
+
+  ctx = {
+    :comment_data
+    :source_lines
+    table_spacing: opts.table_spacing ?? true
+    source: src
+  }
+
+  -- visit all nodes, visitors write to fstate
+  visit fstate, parsed_ast, ctx
+
+  -- write orphaned comments (e.g., trailing comments at end of file)
+  --
+  -- NOTE(@chrsm): this is kinda ugly because it digs into the State, try to
+  -- push this into State instead
+  if comment_data.orphans and #comment_data.orphans > 0
+    for comment in *comment_data.orphans
+      -- flush current line if needed
+      fstate\newline! if #fstate.current_line > 0
+
+      -- preserve blank line before comment if source had one
+      comment_line = comment\g_src_line!
+      if comment_line and comment_line > 1
+        prev = source_lines[comment_line - 1]
+        if prev and prev\match '^%s*$'
+          last_output = fstate.output[#fstate.output]
+
+          unless last_output and last_output\match '^%s*$'
+            fstate\newline!
+
+      fstate\write comment.v
+
+  result = fstate\result!
+
+  if shebang
+    result = "#{ shebang }\n#{ result }"
+
+  result
+
+export default {
+  :format
+}

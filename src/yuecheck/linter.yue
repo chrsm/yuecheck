@@ -1,9 +1,6 @@
-import 'yuecheck.macros' as { $ }
-
-import 'inspect'
-import 'json'
 import 'yue'
 
+import 'yuecheck.ast' as ast
 import 'yuecheck.comments' as ycomments
 import 'yuecheck.rule'
 import 'yuecheck.rules'
@@ -27,68 +24,13 @@ linter.define_rule = (t) ->
     error 'define_rule: check must be a function'
   ruleset[t.name] = t
 
--- TODO: find a new home for these fellas
 linter.to_ast = (src) ->
-  ast, err = yue.to_ast src, 0
-  unless ast
+  node, err = ast.parse src
+  unless node
     error err
-
-  linter.build_ast ast
-
-linter.build_ast = (ast, parent = nil) ->
-  -- self = { 1, 2, 3 }
-  -- 4+ beyond = child nodes
-  { ntype, ln, col } = ast
-
-  -- process children first
-  arg = {}
-  if #ast > 3
-    if (type ast[4]) == 'table'
-      for v in *ast[4,]
-        unless v
-          break
-        arg[] = linter.build_ast v, { ntype, ast }
-    elseif ntype == 'Invoke' -- 4 is !
-      n = types.SingleString ast[4]
-      n\set_source ln, col
-      arg[] = n
-    elseif ntype == 'ReversedIndex' and ast[4] == '[#]'
-      n = types.ReversedIndex!
-      n\set_source ln, col
-      arg[] = n
-    elseif ntype == 'VarArgDef' and ast[4] == '...'
-      n = types.VarArgDef types.Variable types.Name '...'
-      n\set_source ln, col
-      arg[] = n
-    else
-      -- TODO(@chrsm): this needs to be fixed, another special case like !
-      if ntype == 'TableLit' and string.sub(ast[4], 1, 1) == '{'
-        n = types.SingleString ast[4]
-        n\set_source ln, col
-        arg[] = n
-      elseif ast[4] == '' and ntype == 'FnArgDefList'
-        arg[] = types.FnArgDef types.Variable types.Name ''
-      elseif ntype == 'Return' and ast[4] == 'return'
-        ________x = 'noop'
-      elseif ast[4] == '' and ntype == 'DefaultValue'
-        arg[] = types.DefaultValue ''
-      elseif ntype == 'DoubleString'
-        arg[] = types.DoubleString { types.DoubleStringContent types.DoubleStringInner '' }
-      elseif ntype == 'Block' and ast[4] == ''
-        -- empty files; just comments
-        ________x = 'noop'
-      elseif ntype == 'Comprehension' and ast[4] == '[]'
-        ________x = 'noop'
-      elseif ntype == 'ReversedIndex' and ast[4] == '[#]'
-        arg[] = types.ReversedIndex!
-      else
-        arg[] = ast[4]
-
-  node = types[ntype]!
-  node\from_table arg
-  node\set_source ln, col
-  node.typ = ntype
   node
+
+linter.build_ast = ast.build
 
 linter.lint_file = (path) ->
   fp, err = io.open path, 'r'
@@ -98,7 +40,7 @@ linter.lint_file = (path) ->
   linter.lint_string content
 
 linter.lint_string = (src) ->
-  ast, err = yue.to_ast src, 0
+  raw_ast, err = yue.to_ast src, 0
 
   -- try to be helpful for syntax errors that prevent anything else from
   -- being done
@@ -135,7 +77,7 @@ linter.lint_string = (src) ->
   if linter.enable_compilation
     tmpname = os.tmpname!
     cmd = "yue -- 2>&1 > #{ tmpname }" -- popen is a bit annoying, can't do stdin+stdout
-    ok = util.exec_cmd_w cmd, stdin: src
+    ok, _, _ = util.exec_cmd_w cmd, stdin: src
 
     unless ok
       tmp = util.readfile tmpname
@@ -151,7 +93,7 @@ linter.lint_string = (src) ->
 
     os.remove tmpname
 
-  nodes = linter.build_ast ast
+  nodes = ast.build raw_ast
 
   comments = (linter.find_comments src) or {}
   ignored = (line) ->
@@ -180,67 +122,44 @@ linter.lint_string = (src) ->
       for r in m\gmatch '([^,]+)'
         rules[r] = nil
 
+  -- run a single rule against a node, collecting violations
+  run_rule = (k, node) ->
+    _rule = ruleset[k]
+    r = nil
+    if _rule.__class and (_rule.__class == rule.Rule or _rule.__class.__parent == rule.Rule)
+      r = _rule\check node
+    else
+      r = _rule.check node
+    if r != nil and not ignored r.line
+      if r[1] -- it's a table of violations
+        violations[] = _r for _r in *r
+      else
+        violations[] = r
 
-  -- walk the comments; there's at least one that cares.
-  -- TODO: cleanup/refactor, this is a straight copy/paste
-  for i in *comments.indices
-    for cmt in *comments[i]
-      cmt\walk (node) ->
-        if node == nil
-          error 'nil node'
+  -- check if rule applies to this node type
+  rule_matches = (k, node) ->
+    for ntype in *ruleset[k].on
+      if type(ntype) == 'string'
+        ntype = types[ntype]
+      if node.__class == ntype
+        return true
+    false
 
-        for k, v in pairs rules
-          unless v
-            continue
-
-          want = false
-          for ntype in *ruleset[k].on
-            if type(ntype) == 'string'
-              ntype = types[ntype]
-            if node.__class == ntype
-              want = true
-              break
-
-          unless want
-            continue
-
-          r = ruleset[k].check node
-          if r != nil and not ignored r.line
-            if r[1] -- it's a table
-              violations[] = _r for _r in *r
-            else
-              violations[] = r
-
-  nodes\walk (node) ->
+  -- walk and apply rules to nodes
+  apply_rules = (node) ->
     if node == nil
       error 'nil node'
-
     for k, v in pairs rules
-      unless v
-        continue
+      continue unless v
+      continue unless rule_matches k, node
+      run_rule k, node
 
-      want = false
-      for ntype in *ruleset[k].on
-        if type(ntype) == 'string'
-          ntype = types[ntype]
-        if node.__class == ntype
-          want = true
-          break
+  -- walk the comments; there's at least one rule that cares
+  for i in *comments.indices
+    for cmt in *comments[i]
+      cmt\walk apply_rules
 
-      unless want
-        continue
-
-      _rule = ruleset[k]
-      r = nil
-      if _rule.__class and (_rule.__class == rule.Rule or _rule.__class.__parent == rule.Rule)
-        r = _rule\check node
-      else
-        r = _rule.check node
-      if r != nil and not ignored r.line
-        if r[1] -- it's a table
-          violations[] = _r for _r in *r
-        else
-          violations[] = r
+  nodes\walk apply_rules
 
   violations
 

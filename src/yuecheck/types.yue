@@ -3331,20 +3331,20 @@ ast_nodes.YueMultilineComment = YueMultilineComment
 class YueComment extends Node
   @yue_name: 'YueComment'
   
-  -- @comment: _sel_t(true,YueLineComment,YueMultilineComment)
-  new: (comment = nil) =>
-    @comment = comment
+  -- @comments: _sel_list_t(true,YueLineComment,YueMultilineComment)
+  new: (comments = {}) =>
+    @comments = comments
 
   from_table: (tbl) =>
     for i, v in ipairs tbl
-      if (not @comment) and _in v\g_yue_name!, {'YueLineComment','YueMultilineComment'}
-        @comment = v
+      if _in v\g_yue_name!, {'YueLineComment','YueMultilineComment'}
+        table.insert @comments, v
         continue
       _ = v
     nil
 
   walk: (visitor) =>
-    @comment\walk visitor
+    node\walk visitor for node in *@comments
     visitor @
 ast_nodes.YueComment = YueComment
 

@@ -1,0 +1,42 @@
+import 'yuecheck.rule'
+import 'yuecheck.util'
+
+-- global_writes
+-- warns about using global variables, they should be treated as read-only
+-- checks { _G, _ENV, package }
+-- NOTE(@chrsm): not smart enough to check for: `x = _G; x['a'] = 'b'`
+-- can probably check simple cases and/or assignment of global to a local
+--
+-- example:
+--[[
+_G.a = 'b'
+_G['a'] = 'b'
+_G[a] = 'b'
+]]
+--
+-- TODO: needs to accept any expr (eg _G[key] = 'a')
+global_writes = rule.AssignRule
+  name: 'global_writes'
+  description: 'checks for writes to known-globals'
+  config: 
+    patterns: ['^_G[%.%[]', '^_ENV[%.%[]', '^package[%.%[]', '^_G$']
+  checker: (assigns, node) =>
+    unless assigns and #assigns > 0
+      return
+
+    issues = {}
+    for p in *assigns
+      unless util.match_any p.name, @config.patterns
+        continue
+
+      msg = if #p.path > 0
+        "discourage write to global (#{ util.stripq p.name })"
+      else
+        "discourage write to global (#{ p.path[1] })"
+      issues[] = @report 'WARN', msg, node
+
+    #issues > 0 and issues or nil
+
+export default {
+  :global_writes
+}

@@ -1,0 +1,201 @@
+import 'yuecheck.types'
+import 'yuecheck.rule'
+import 'yuecheck.stdlib_defs'
+
+-- stdlib_usage
+-- validates stdlib function calls have correct arguments
+stdlib_usage = rule.FuncRule
+  name: 'stdlib_usage'
+  description: 'rule for checking stdlib function calls'
+  config:
+    definitions: stdlib_defs
+  on: { types.ChainValue }
+  fns: [
+    'os%.', 'math%.', 'table%.', 'string%.',
+    'package%.', 'io%.', 'debug%.', 'coroutine%.',
+    '.'
+  ]
+  checker: (path, args, varnames, node) =>
+    pkg = path[1]
+    fn = path[2] or ''
+    defs = @config.definitions or stdlib_defs
+
+    pkg_v = nil
+    if #path == 1 and defs.base[pkg]
+      fn = pkg
+      pkg = 'base'
+      pkg_v = defs.base
+      path = ['base', fn]
+    else
+      pkg_v = defs[pkg]
+
+    unless pkg_v
+      return
+
+    -- get expected args; pkg_v == defs.os at this point (or w/e)
+    for i = 2, #path
+      pkg_v = pkg_v[path[i]]
+
+    unless pkg_v
+      return {
+        type: 'ERROR'
+        message: "#{ fn } not found in std #{ pkg }"
+        line: node\g_src_line!
+        col: node\g_src_col!
+      }
+
+    oargs = args
+    args = {}
+    for v in *oargs
+      continue unless v
+      args[] = v unless (v\is types.SingleString) and (v.v == '!') -- invoke flattened
+
+    defargs = pkg_v.args ?? {}
+    optn, reqn = 0, 0
+    variadic = false
+    for arg in *defargs
+      optn += 1 if arg.optional
+      reqn += 1 unless arg.optional
+      variadic = true if arg.variadic
+
+    if reqn == 0 and #args == 0 -- no args needed or passed
+      return
+    elseif reqn == #args or (#args >= reqn and #args <= reqn+optn)
+      return
+    elseif reqn < #args and #args <= optn
+      return
+    elseif variadic and #args >= reqn
+      return
+
+    msg = {}
+    if reqn > 0
+      s = reqn > 1 and 's' or ''
+      msg[] = "requires #{ reqn } argument#{ s }"
+    if optn > 0
+      s = optn > 1 and 's' or ''
+      unless variadic
+        msg[] = "optionally accepts #{ optn } argument#{ s }"
+      else
+        -- TODO(@chrsm): this is incorrect, the best kind of correct
+        msg[] = 'optionally accepts multiple args'
+    if reqn == 0 and optn == 0
+      msg[] = 'accepts no arguments'
+
+    -- msg is kinda long at this point
+    -- msg[] = "passed #{ #args } arguments"
+
+    cn = if pkg == 'base'
+      fn
+    else
+      "#{ pkg }.#{ fn }"
+
+    typ = if (reqn > 0 and #args < reqn+optn) or -- not enough [req,opt]()
+             (reqn > 0 and #args > reqn+optn) or -- too many   [req,opt,opt](1,2,3,4)
+             (reqn == 0 and #args > reqn+optn)   -- too many   [opt](1,2,3)
+      'ERROR'
+    else
+      'WARN'
+
+    {
+      type: typ
+      message: "#{ cn } #{ table.concat msg, ', ' }"
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+--[[
+    x: (where x is not one of the magic characters ^$()%.[]*+-?) represents the character x itself.
+    .: (a dot) represents all characters.
+    %a: represents all letters.
+    %c: represents all control characters.
+    %d: represents all digits.
+    %g: represents all printable characters except space.
+    %l: represents all lowercase letters.
+    %p: represents all punctuation characters.
+    %s: represents all space characters.
+    %u: represents all uppercase letters.
+    %w: represents all alphanumeric characters.
+    %x: represents all hexadecimal digits.
+    %x: (where x is any non-alphanumeric character) represents the character x.
+    [set]: represents the class which is the union of all characters in set.
+    [^set]: represents the complement of set.
+]]
+stdlib_match = rule.FuncRule
+  name: 'stdlib_match'
+  description: ''
+  type: 'error'
+  on: [ types.ExpListAssign, types.ChainValue ]
+  fns: ['string%.match', 'string%.gmatch', 'string%.find', 'string%.gsub']
+  checker: (path, args, varnames, node) =>
+    -- argv
+    --   * [1] is the string we're operating on
+    --   * [2] is the pattern
+    strn = args[1].pipeExprs?[1]?.expos?[1]?.item?.items?[1]?.str
+    str = strn?.v
+    patn = args[2].pipeExprs?[1]?.expos?[1]?.item?.items?[1]?.str
+    pat = patn?.v
+
+    issues = {}
+
+    -- empty patterns aren't necessarily _wrong_, just suspicious
+    if pat == '""' or pat == "''"
+      issues[] = @report 'HINT', 'empty pattern', patn
+
+    -- try to validate the pattern
+    success, errmsg = try
+      -- skip '|"
+      ('')\match pat\sub 2, #pat-1
+
+    unless success
+      -- gsub to strip ourselves
+      issues[] = @report 'ERROR',
+        "invalid pattern #{ pat }: #{ errmsg\gsub '[^%]]+%]:%d+: ', '' }",
+        patn
+
+    -- these could be combined, eg
+    -- %[[^%]]%], then string.find 'a-z', 'A-Z', '0-9' and return as one hint
+    -- just depends on how editors integrate/people like their feedback
+    if pat\match '(%[[^0]*0%-9[^9]*%])'
+      issues[] = @report 'HINT', 'use `%d` instead of [0-9]', patn
+    if pat\match '(%[[^a]*a%-z[^z]*%])'
+      issues[] = @report 'HINT', 'use `%l` instead of [a-z]', patn
+    if pat\match '(%[[^A]*A%-Z[^Z]*%])'
+      issues[] = @report 'HINT', 'use `%u` instead of [A-Z]', patn
+
+    --[[
+    potentially bad:
+    v1, v2 = string.match 'abc', '%a'
+    v1, v2 = string.match 'ab', '%a%a'
+
+    ok:
+    v1, v2 = string.match 'ab', '(%a)(%a)'
+
+    basically - capture groups should match # of assignments
+    ]]
+    capgroups = {}
+    for v in pat\gmatch '%([^%)]+%)'
+      capgroups[] = v
+    if #capgroups == 0
+      capgroups[] = ''
+    if #varnames > 0 and #varnames != #capgroups
+      vs = cs = ''
+      if #capgroups > 1
+        cs = 's'
+      if #varnames > 1
+        vs = 's'
+
+      typ = if #varnames > #capgroups
+        'WARN'
+      else
+        'INFO'
+
+      issues[] = @report typ,
+        "#{ table.concat path, '.' } assigns #{ #varnames } var#{ vs }, but has #{ #capgroups } capture#{ cs }",
+        patn
+
+    #issues > 0 and issues or nil
+
+export default {
+  :stdlib_usage
+  :stdlib_match
+}

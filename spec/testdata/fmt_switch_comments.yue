@@ -1,0 +1,17 @@
+-- regression test: comments were lost on `when` statements
+-- input
+switch true
+  -- comment1
+  when var
+    return nil
+  -- comment2
+  when var2
+    return nil
+-- expect
+switch true
+  -- comment1
+  when var
+    return nil
+  -- comment2
+  when var2
+    return nil

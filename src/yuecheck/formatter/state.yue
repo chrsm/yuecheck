@@ -1,0 +1,72 @@
+-- State maintains everything related to the output
+class State
+  new: (opts = {}) =>
+    @indent_size = opts.indent_size or 2
+    @indent_char = opts.indent_char or ' '
+    @table_spacing = opts.table_spacing ?? true
+
+    -- TODO(@chrsm): use this
+    @chain_style = opts.chain_style or '\\'
+    -- TODO(@chrsm): need to figure out how to do this properly
+    @line_width = opts.line_width or 84
+
+    @scope = 0
+    @_indent = ''
+    @output = {}
+    @current_line = {}
+    @line_num = 1
+
+  -- push scope
+  push: =>
+    @scope += 1
+    @_indent = string.rep @indent_char, @scope * @indent_size
+
+  -- pop scope
+  pop: =>
+    @scope -= 1
+    @scope = 0 if @scope < 0
+    @_indent = string.rep @indent_char, @scope * @indent_size
+
+  -- indent char
+  indent: => @_indent
+  -- chain chars ('\' or '::')
+  chain: => @chain_style
+
+  -- write (build output)
+  write: (str) =>
+    return unless str
+    @current_line[] = str
+
+  -- write with current indent prefix
+  write_indent: =>
+    @current_line[] = @_indent if #@current_line == 0
+
+  -- length of the current line being built
+  current_line_len: =>
+    len = 0
+    for part in *@current_line
+      len += #part
+    len
+
+  -- end current line and start a new one
+  newline: =>
+    line = table.concat @current_line, ''
+    @output[] = line
+    @current_line = {}
+    @line_num += 1
+
+  -- get the final formatted output
+  result: =>
+    -- flush any remaining content
+    if #@current_line > 0
+      @newline!
+
+    result = table.concat @output, '\n'
+
+    -- not sure if i want to end in nl or not
+    -- if #result > 0 and result\sub(-1) != '\n'
+    --    result ..= '\n'
+
+    result
+
+export default State

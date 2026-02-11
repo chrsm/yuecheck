@@ -1,0 +1,1720 @@
+import 'yuecheck.ast'
+import 'yuecheck.types'
+import 'yuecheck.comments' as comment_parser
+
+-- reserved keywords, cannot be used as simple identifiers
+-- see `ast_parser.cpp` :15 and :28
+reserved_keywords = {
+  -- lua keywords
+  'and', 'break', 'do', 'else', 'elseif',
+  'end', 'false', 'for', 'function', 'goto',
+  'if', 'in', 'local', 'nil', 'not',
+  'or', 'repeat', 'return', 'then', 'true',
+  'until', 'while',
+
+  -- yue keywords
+  'as', 'class', 'continue', 'export', 'extends',
+  'from', 'global', 'import', 'macro', 'switch',
+  'try', 'unless', 'using', 'when', 'with',
+}
+
+-- check if a string is a valid identifier that can be used as a simple key
+is_valid_identifier = (str) ->
+  unless str and #str > 0
+    return false
+
+  -- must start with letter or underscore
+  first = str\sub 1, 1
+  unless first\match '[a-zA-Z_]'
+    return false
+
+  -- rest must be alphanumeric or underscore
+  if str\match '[^a-zA-Z0-9_]'
+    return false
+
+  if str in reserved_keywords
+    return false
+
+  true
+
+-- extract a simple string value from an Exp node if it's a plain string literal
+-- returns the string value if simplifiable, nil otherwise
+extract_simple_string = (exp_node) ->
+  unless exp_node and exp_node\is types.Exp
+    return nil
+
+  -- Exp has pipeExprs (list of UnaryExp), must have exactly one with no pipe operators
+  pipe_exprs = exp_node.pipeExprs
+  unless pipe_exprs and #pipe_exprs == 1
+    return nil
+
+  -- must not have binary operators
+  if exp_node.opValues and #exp_node.opValues > 0
+    return nil
+
+  -- check for UnaryExp -> Value -> ChainValue -> String -> DoubleString/SingleString
+  unary = pipe_exprs[1]
+  unless unary and unary\is types.UnaryExp
+    return nil
+
+  -- _must not_ have unary operators
+  if unary.ops and #unary.ops > 0
+    return nil
+
+  -- UnaryExp has expos (list of Values), must have exactly one
+  expos = unary.expos
+  unless expos and #expos == 1
+    return nil
+
+  value = expos[1]
+  unless value and value\is types.Value
+    return nil
+
+  -- inner value should be ChainValue or SimpleValue
+  inner = value.item
+  unless inner
+    return nil
+
+  -- handle ChainValue with just a String
+  if inner\is types.ChainValue
+    items = inner.items
+    unless items and #items == 1
+      return nil
+
+    str_node = items[1]
+    unless str_node\is types.String
+      return nil 
+
+    str_content = str_node.str
+    unless str_content
+      return nil
+
+    switch true
+      when str_content\is types.DoubleString
+        segments = str_content.segments
+
+        -- _must_ have exactly one segment that's a simple inner string
+        unless segments and #segments == 1
+          return nil
+
+        inner_content = segments[1]
+        unless inner_content\is types.DoubleStringContent
+          return nil
+
+        inner_str = inner_content.content
+        unless inner_str and inner_str\is types.DoubleStringInner
+          return nil
+
+        return inner_str.v
+
+      when str_content\is types.SingleString
+        return str_content.v
+
+  nil
+
+visitors = {}
+
+-- Helper to visit a node (dispatches to appropriate visitor)
+visit = (state, node, ctx) ->
+  return unless node
+
+  -- Handle raw strings/values (leaf nodes that are just strings)
+  unless (type node) == 'table'
+    state\write tostring node
+    return
+
+  -- Handle nodes without 'is' method (raw tables)
+  unless node.is
+    state\write tostring node
+    return
+
+  typ = node\g_yue_name!
+  visitor = visitors[typ]
+
+  if visitor
+    visitor state, node, ctx
+  else
+    if node.v
+      state\write node.v
+    elseif typ
+      -- state\write "<?#{ typ }?>"
+      error "unhandled node type #{ typ }"
+
+write_comment = (state, comment) ->
+  return unless comment
+
+  state\write comment.v
+
+write_trailing = (state, ctx, node) ->
+  return unless ctx?.comment_data
+
+  comments = ctx.comment_data\get_comments node, 'trailing'
+  for c in *comments
+    state\write ' '
+    write_comment state, c
+
+-- end-of-line comments for a specific node
+write_eol = (state, ctx, node) ->
+  return unless ctx?.comment_data
+
+  comments = ctx.comment_data\get_comments node, 'end_of_line'
+  for c in *comments
+    state\write ' '
+    write_comment state, c
+
+-- ALL end-of-line comments for a given source line
+-- tracks emitted lines to avoid duplicates
+write_eol_for_line = (state, ctx, line) ->
+  unless ctx?.comment_data and line
+    return
+
+  -- track which lines we've emitted comments for
+  ctx.emitted_eol_lines = ctx.emitted_eol_lines or {}
+  if ctx.emitted_eol_lines[line]
+    return
+  ctx.emitted_eol_lines[line] = true
+
+  -- check all associations for `end_of_line` comments on this line
+  for comment, assoc in pairs ctx.comment_data.associations
+    if assoc.type == 'end_of_line' and comment\g_src_line! == line
+      state\write ' '
+      write_comment state, comment
+
+-- comments above a node
+write_above = (state, ctx, node) ->
+  unless ctx?.comment_data
+    return
+
+  comments = ctx.comment_data\get_comments node, 'above'
+  unless #comments > 0
+    return
+
+  -- blank line before the first above comment?
+  first_comment_line = comments[1]\g_src_line!
+  if first_comment_line and first_comment_line > 1
+    source_lines = ctx.source_lines
+    if source_lines
+      prev_line = source_lines[first_comment_line - 1]
+      if prev_line and prev_line\match '^%s*$'
+        last_output = state.output[#state.output]
+
+        -- only add blank if last output wasn't already blank
+        unless last_output and last_output\match '^%s*$'
+          state\newline!
+
+  for c in *comments
+    state\write_indent!
+    write_comment state, c
+    state\newline!
+
+  -- blank line between the last comment and the node?
+  last_comment_line = comments[#]\g_src_line!
+  node_line = node\g_src_line!
+  if last_comment_line and node_line and node_line > last_comment_line + 1
+    source_lines = ctx.source_lines
+    if source_lines
+      -- line between comment and node is blank?
+      between_line = source_lines[last_comment_line + 1]
+      if between_line and between_line\match '^%s*$'
+        state\newline!
+
+-- render a node to string without writing to the output
+-- returns: rendered string, is_multiline boolean
+render_to_string = (state, node, ctx) ->
+  saved_line = state.current_line
+  saved_output = state.output
+  saved_line_num = state.line_num
+  saved_scope = state.scope
+  saved_indent = state._indent
+  state.current_line = {}
+  state.output = {}
+  visit state, node, ctx
+  last_part = table.concat state.current_line, ''
+  is_multiline = #state.output > 0
+
+  result = if is_multiline
+    -- join all flushed lines + remaining current_line
+    full = [line for line in *state.output]
+    full[] = last_part if #last_part > 0
+    table.concat full, '\n'
+  else
+    last_part
+
+  state.current_line = saved_line
+  state.output = saved_output
+  state.line_num = saved_line_num
+  state.scope = saved_scope
+  state._indent = saved_indent
+  result, is_multiline
+
+-- check if an item is a key-value pair type
+is_pair_type = (item) ->
+  unless item and item.g_yue_name
+    return false
+
+  -- lazy
+  return (string.find item\g_yue_name!, 'Pair') != nil
+
+-- pack items onto lines respecting line_width
+-- items: list of AST nodes, state/ctx: formatter state
+-- eol_fn: optional (state, ctx, item) -> called to emit EOL comments
+write_packed_items = (state, items, ctx, eol_fn) ->
+  state\newline!
+  state\push!
+  indent_len = #state\indent!
+  need_space = false
+
+  for i, item in ipairs items
+    rendered, is_multiline = render_to_string state, item, ctx
+    is_pair = is_pair_type item
+    prev_was_pair = i > 1 and is_pair_type items[i - 1]
+
+    -- multi-line items always get their own line
+    if is_multiline
+      if state\current_line_len! > indent_len
+        if eol_fn and i > 1
+          eol_fn state, ctx, items[i - 1]
+        state\newline!
+
+      -- check for blank line gap
+      if i > 1 and ctx and ctx.source_lines
+        prev_line = items[i - 1]\g_src_line!
+        cur_line = item\g_src_line!
+        if prev_line and cur_line and cur_line > prev_line + 1
+          for ln = prev_line + 1, cur_line - 1
+            if ctx.source_lines[ln] and ctx.source_lines[ln]\match '^%s*$'
+              state\newline!
+              break
+
+      if state\current_line_len! == 0
+        state\write_indent!
+      visit state, item, ctx
+      state\write ',' unless is_pair
+      need_space = false
+
+      if i == #items
+        if eol_fn
+          eol_fn state, ctx, item
+        state\newline!
+      else
+        if eol_fn
+          eol_fn state, ctx, item
+        state\newline!
+
+      continue
+
+    -- pairs always start a new line, also break when transitioning to/from pairs
+    force_newline = is_pair or (prev_was_pair and not is_pair)
+
+    -- respect source line breaks for non-pair items if line fits within line_width
+    if not force_newline and not is_pair and i > 1
+      prev_line = items[i - 1]\g_src_line!
+      cur_line = item\g_src_line!
+      if prev_line and cur_line and cur_line != prev_line
+        if indent_len + #rendered + 1 <= state.line_width
+          force_newline = true
+
+    -- check for blank line gap in source between consecutive items
+    has_blank_before = false
+    if i > 1 and ctx and ctx.source_lines
+      prev_line = items[i - 1]\g_src_line!
+      cur_line = item\g_src_line!
+      if prev_line and cur_line and cur_line > prev_line + 1
+        for ln = prev_line + 1, cur_line - 1
+          if ctx.source_lines[ln] and ctx.source_lines[ln]\match '^%s*$'
+            has_blank_before = true
+            break
+
+    if state\current_line_len! == 0
+      if has_blank_before
+        state\newline!
+      state\write_indent!
+      need_space = false
+
+    cur_len = state\current_line_len!
+
+    if force_newline and cur_len > indent_len
+      if eol_fn and i > 1
+        eol_fn state, ctx, items[i - 1]
+      state\newline!
+      if has_blank_before
+        state\newline!
+      state\write_indent!
+      need_space = false
+    elseif not force_newline
+      -- check if item fits on current line
+      extra = if need_space then 1 else 0
+      if cur_len > indent_len and cur_len + extra + #rendered + 1 > state.line_width
+        if eol_fn and i > 1
+          eol_fn state, ctx, items[i - 1]
+        state\newline!
+        state\write_indent!
+        need_space = false
+
+    state\write ' ' if need_space
+    state\write rendered
+    state\write ',' unless is_pair
+    need_space = not is_pair
+
+    if i == #items
+      if eol_fn
+        eol_fn state, ctx, item
+      state\newline!
+
+  state\pop!
+  state\write_indent!
+
+--[[ actual visitors per ast type ]]
+
+visitors.Num = (state, node, ctx) ->
+  state\write node.v
+  write_trailing state, ctx, node
+
+visitors.Name = (state, node, ctx) ->
+  state\write node.v
+  write_trailing state, ctx, node
+
+visitors.UnicodeName = (state, node, ctx) ->
+  state\write node.v
+  write_trailing state, ctx, node
+
+visitors.Self = (state, node, ctx) ->
+  state\write '@'
+  write_trailing state, ctx, node
+
+visitors.ConstValue = (state, node, ctx) ->
+  state\write node.v
+  write_trailing state, ctx, node
+
+visitors.SingleString = (state, node) ->
+  v = node.v
+
+  -- if the string has something that would otherwise need to be escaped, don't
+  -- change it
+  if v\match "^'" or v\match '^"'
+    state\write v
+  else
+    -- otherwise, i want it as single-quoted
+    state\write "'"
+    state\write v
+    state\write "'"
+
+visitors.LuaString = (state, node) ->
+  state\write '[['
+  state\write node.content.v if node.content
+  state\write ']]'
+
+--[[ identifiers ]]
+
+visitors.Variable = (state, node, ctx) ->
+  visit state, node.name, ctx
+  write_trailing state, ctx, node
+
+visitors.SelfName = (state, node, ctx) ->
+  state\write '@'
+  visit state, node.name, ctx
+
+visitors.VarArg = (state, node) ->
+  state\write '...'
+
+visitors.VarArgDef = (state, node) ->
+  state\write '...'
+
+--[[ exprs ]]
+
+visitors.Exp = (state, node, ctx) ->
+  -- a |> b |> c
+  for i, pipe in ipairs node.pipeExprs
+    state\write ' |> ' if i > 1
+    visit state, pipe, ctx
+
+  -- any ops
+  if node.opValues
+    for op_val in *node.opValues
+      state\write ' '
+      visit state, op_val.op, ctx
+      state\write ' '
+      for pipe in *op_val.pipeExprs
+        visit state, pipe, ctx
+
+  -- nil coal
+  if node.nilCoalesed
+    state\write ' ?? '
+    visit state, node.nilCoalesed, ctx
+
+visitors.UnaryExp = (state, node, ctx) ->
+  -- visit unary operators
+  if node.ops
+    for op in *node.ops
+      visit state, op, ctx
+      -- space after 'not' but not after '-' or '#'
+      if op.v == 'not'
+        state\write ' '
+
+  -- values
+  for i, val in ipairs node.expos
+    visit state, val, ctx
+
+  -- 'in' expression i.e. `x in { 1, 2 }`
+  if node.inExp
+    state\write ' in '
+    visit state, node.inExp.value, ctx
+
+visitors.ExpOpValue = (state, node, ctx) ->
+  visit state, node.op, ctx
+
+visitors.UnaryOperator = (state, node) ->
+  state\write node.v
+
+visitors.BinaryOperator = (state, node, ctx) ->
+  op = node.v
+
+  -- OPINIONATED(@chrsm):
+  -- fixup `~=` to `!=`
+  if op == '~='
+    op = '!='
+
+  state\write op
+
+visitors.Value = (state, node, ctx) ->
+  visit state, node.item, ctx
+
+visitors.SimpleValue = (state, node, ctx) ->
+  visit state, node.value, ctx
+
+--[[ chain value: ugly as hell, sorry ]]
+visitors.ChainValue = (state, node, ctx) ->
+  for i, item in ipairs node.items
+    switch true
+      when item\is types.Callable
+        visit state, item, ctx
+      when item\is types.DotChainItem
+        state\write '.'
+        visit state, item.name, ctx
+      when item\is types.ColonChainItem
+        state\write state\chain_style!
+        visit state, item.name, ctx
+      when item\is types.Invoke
+        -- empty call `!` shows up as single arg with value '!'
+        is_empty_call = false
+        if item.args and #item.args == 1
+          arg = item.args[1]
+          if (arg\is types.SingleString) and arg.v == '!'
+            is_empty_call = true
+        if is_empty_call
+          state\write '!'
+        elseif item.args and #item.args > 0
+          state\write '('
+          for j, arg in ipairs item.args
+            visit state, arg, ctx
+            state\write ', ' if j < #item.args
+          state\write ')'
+        else
+          state\write '!'
+      when item\is types.InvokeArgs
+        visit state, item, ctx
+      when item\is types.Slice
+        visit state, item, ctx
+      when item\is types.Exp
+        -- brackets, i.e. `x[expr]`
+        state\write '['
+        visit state, item, ctx
+        state\write ']'
+      when item\is types.String
+        -- no bracket
+        visit state, item, ctx
+      when item\is types.ExistentialOp
+        state\write '?'
+      when item\is types.TableAppendingOp
+        state\write '[]'
+      when item\is types.ReversedIndex
+        state\write '[#]'
+      else 
+        visit state, item, ctx
+
+visitors.Callable = (state, node, ctx) ->
+  visit state, node.item, ctx
+
+visitors.Invoke = (state, node, ctx) ->
+  -- Invoke without parens, e.g., func! or func arg
+  -- empty call `!` shows up as single arg with value '!'
+  if node.args and #node.args == 1
+    arg = node.args[1]
+    if (arg\is types.SingleString) and arg.v == '!'
+      state\write '!'
+      return
+
+  if node.args and #node.args > 0
+    state\write '('
+    for i, arg in ipairs node.args
+      visit state, arg, ctx
+      state\write ', ' if i < #node.args
+    state\write ')'
+  else
+    state\write '!'
+
+visitors.InvokeArgs = (state, node, ctx) ->
+  --[[
+    handle case where table block is the first arg and separated
+    ```
+      x = a!
+        key: 'val'
+    ```
+    where the table following the `a!` is actually an arg to the resulting fn from `a!`.
+    maybe that's me writing code in a silly fashion, but i like how it looks, sue me
+  ]]
+  unless node.args?[1]?\is types.TableBlock
+    state\write ' '
+
+  -- space-separated args (no parens in original)
+  if node.args
+    for i, arg in ipairs node.args
+      visit state, arg, ctx
+      state\write ', ' if i < #node.args
+
+visitors.DotChainItem = (state, node, ctx) ->
+  state\write '.'
+  visit state, node.name, ctx
+
+visitors.ColonChainItem = (state, node, ctx) ->
+  state\write '\\'
+  visit state, node.name, ctx
+
+--[[ string handling ]]
+
+visitors.String = (state, node, ctx) ->
+  visit state, node.str, ctx
+
+visitors.DoubleString = (state, node, ctx) ->
+  -- yue ast does not preserve interpolated strings (`x = "#{ a }"`) in an
+  -- immediately obvious way.
+  -- we'll just check the source and just write it back if need be.
+  src_line = node\g_src_line!
+  src_col = node\g_src_col!
+
+  if src_line and src_col and ctx.source_lines
+    line = ctx.source_lines[src_line]
+
+    if line
+      str_start = line\find '"', src_col
+
+      if str_start
+        -- find closing, handling escapes
+        pos = str_start + 1
+        while pos <= #line
+          ch = line\sub pos, pos
+          if ch == '\\'
+            pos += 2 -- skip escaped char
+          elseif ch == '"'
+            original_str = line\sub str_start, pos
+
+            -- preserve
+            if original_str\find '#{', 1, true
+              state\write original_str
+              return
+            break
+          else
+            pos += 1
+
+  content = ''
+  if node.segments
+    for seg in *node.segments
+      if seg.content and seg.content.v
+        content ..= seg.content.v
+
+  -- if there's no interp, convert it to to correct one
+  -- (a `'` can't contain a `'` unless it's escaped)
+  if content\find "'", 1, true
+    state\write '"'
+    state\write content
+    state\write '"'
+  else
+    state\write "'"
+    state\write content
+    state\write "'"
+
+visitors.DoubleStringContent = (state, node, ctx) ->
+  visit state, node.content, ctx
+
+visitors.DoubleStringInner = (state, node) ->
+  state\write node.v if node.v
+
+visitors.Interpolation = (state, node, ctx) ->
+  state\write '#{'
+  visit state, node.value, ctx
+  state\write '}'
+
+--[[ function handling ]]
+
+visitors.FunLit = (state, node, ctx) ->
+  -- arguments in argsDef.defList.definitions
+  defList = node.argsDef?.defList
+  has_defs = defList and defList.definitions and #defList.definitions > 0
+  has_vararg = defList and defList.varArg
+  has_args = has_defs or has_vararg
+  if has_args
+    state\write '('
+    visit state, defList, ctx
+    state\write ') '
+
+  arrow = node.arrow?.v or '->'
+  state\write arrow
+
+  -- body - check if it's a simple single-statement body for inline formatting
+  if node.body
+    content = node.body.content
+    is_inline = content and content\is types.Statement
+
+    -- for inline style: `-> nil` or `-> x + 1`
+    if is_inline
+      state\write ' '
+      visit state, content, ctx
+    else
+      state\newline!
+      state\push!
+      visit state, node.body, ctx
+      state\pop!
+
+visitors.FnArgDefList = (state, node, ctx) ->
+  has_defs = node.definitions and #node.definitions > 0
+  has_vararg = node.varArg
+
+  if has_defs
+    for i, arg in ipairs node.definitions
+      visit state, arg, ctx
+      write_trailing state, ctx, arg
+      state\write ', ' if i < #node.definitions or has_vararg
+
+  if has_vararg
+    visit state, node.varArg, ctx
+
+visitors.FnArgDef = (state, node, ctx) ->
+  visit state, node.name, ctx
+  write_trailing state, ctx, node.name if node.name
+
+  if node.defaultValue
+    state\write ' = '
+    visit state, node.defaultValue, ctx
+
+visitors.DefaultValue = (state, node, ctx) ->
+  visit state, node.value, ctx
+
+--[[ assignment handling ]]
+visitors.NameList = (state, node, ctx) ->
+  for i, n in ipairs node.names
+    visit state, n, ctx
+    state\write ', ' if i < #node.names
+
+visitors.AssignableNameList = (state, node, ctx) ->
+  for i, n in ipairs node.items
+    visit state, n, ctx
+    state\write ', ' if i < #node.items
+
+visitors.NameOrDestructure = (state, node, ctx) ->
+  visit state, node.item, ctx
+
+visitors.AssignableChain = (state, node, ctx) ->
+  for i, item in ipairs node.items
+    if item\is types.DotChainItem
+      state\write '.' if i > 1
+      visit state, item.name, ctx
+    elseif item\is types.Exp
+      state\write '['
+      visit state, item, ctx
+      state\write ']'
+    else
+      visit state, item, ctx
+
+visitors.Assignable = (state, node, ctx) ->
+  visit state, node.item, ctx
+
+visitors.ExpListAssign = (state, node, ctx) ->
+  -- lhs
+  visit state, node.expList, ctx
+
+  -- type of assignment
+  if node.action
+    state\write ' '
+    visit state, node.action, ctx
+
+visitors.ExpList = (state, node, ctx) ->
+  for i, expr in ipairs node.exprs
+    visit state, expr, ctx
+    state\write ', ' if i < #node.exprs
+
+visitors.Assign = (state, node, ctx) ->
+  op = node.op?.v or '='
+  state\write op
+  state\write ' '
+
+  -- actual values (rhs)
+  if node.values
+    for i, val in ipairs node.values
+      visit state, val, ctx
+      state\write ', ' if i < #node.values
+
+visitors.Update = (state, node, ctx) ->
+  visit state, node.op, ctx
+  state\write '= '
+  visit state, node.value, ctx
+
+visitors.UpdateOp = (state, node, ctx) ->
+  state\write node.v
+
+--[[ table handling ]]
+
+visitors.TableLit = (state, node, ctx) ->
+  -- check if this was a multi-line table in the source; allow inline table decl
+  table_line = node\g_src_line!
+  is_multiline = false
+  if node.values and #node.values > 0
+    for val in *node.values
+      val_line = val\g_src_line!
+      if val_line and table_line and val_line != table_line
+        is_multiline = true
+        break
+
+  state\write '{'
+  if node.values and #node.values > 0
+    if is_multiline
+      eol_fn = (s, c, val) ->
+        val_line = val\g_src_line!
+        write_eol_for_line s, c, val_line if val_line
+      write_packed_items state, node.values, ctx, eol_fn
+    else
+      state\write ' ' if ctx?.table_spacing
+      for i, val in ipairs node.values
+        visit state, val, ctx
+        if i < #node.values
+          state\write ','
+          state\write ' '
+      state\write ' ' if ctx?.table_spacing
+  state\write '}'
+
+visitors.TableValue = (state, node, ctx) ->
+  visit state, node.value, ctx
+
+visitors.SpreadExp = (state, node, ctx) ->
+  state\write '...'
+  visit state, node.exp, ctx
+
+visitors.KeyValue = (state, node, ctx) ->
+  visit state, node.key, ctx
+  state\write ': '
+  visit state, node.value, ctx
+
+visitors.NormalDef = (state, node, ctx) ->
+  -- expression, optionally with default value
+  visit state, node.item, ctx
+  if node.defVal
+    state\write ' = '
+    visit state, node.defVal, ctx
+
+visitors.NormalPairDef = (state, node, ctx) ->
+  visit state, node.pair, ctx
+  if node.defVal
+    state\write ' = '
+    visit state, node.defVal, ctx
+
+visitors.NormalPair = (state, node, ctx) ->
+  -- attempt to simplify `["key"]:` to `key:`
+  key = node.key
+  if key and key\is types.Exp
+    -- see if we can simplify
+    simple_str = extract_simple_string key
+    if simple_str and is_valid_identifier simple_str
+      -- visit as simple key instead of bracketed string
+      state\write simple_str
+      state\write ': '
+      visit state, node.value, ctx
+      return
+
+    -- key is not simplifiable - needs brackets (e.g., [0], [expr], ["invalid-key"])
+    state\write '['
+    visit state, key, ctx
+    state\write ']: '
+    visit state, node.value, ctx
+    return
+
+  -- default: key is KeyName or similar, visit as-is
+  visit state, key, ctx
+  state\write ': '
+  visit state, node.value, ctx
+
+visitors.KeyName = (state, node, ctx) ->
+  visit state, node.name, ctx
+
+visitors.VariablePair = (state, node, ctx) ->
+  state\write ':'
+  visit state, node.name, ctx
+
+visitors.VariablePairDef = (state, node, ctx) ->
+  visit state, node.pair, ctx
+  if node.defVal
+    state\write ' = '
+    visit state, node.defVal, ctx
+
+visitors.TableBlock = (state, node, ctx) ->
+  -- table with block indentation
+  -- `Exp` are lists `* v` and `NormalPair` are `key: value`
+  state\newline!
+  state\push!
+
+  for i, val in ipairs node.values
+    state\write_indent!
+
+    unless val\is types.NormalPair
+      state\write '* '
+
+    visit state, val, ctx
+    state\newline! if i < #node.values
+
+  state\pop!
+
+visitors.TableBlockIndent = (state, node, ctx) ->
+  for i, val in ipairs node.values
+    visit state, val, ctx
+    state\newline! if i < #node.values
+
+--[[ metatable handling ]]
+-- <key>: value in table lit
+visitors.MetaNormalPair = (state, node, ctx) ->
+  state\write '<'
+  visit state, node.key, ctx
+  state\write '>: '
+  visit state, node.value, ctx
+
+visitors.MetaNormalPairDef = (state, node, ctx) ->
+  visit state, node.pair, ctx
+  if node.defVal
+    state\write ' = '
+    visit state, node.defVal, ctx
+
+-- 'metatable' for <metatable>: {...}
+visitors.Metatable = (state, node) ->
+  state\write node.v
+
+-- <methodname> in table lit
+visitors.Metamethod = (state, node, ctx) ->
+  state\write '<'
+  visit state, node.item, ctx
+  state\write '>'
+
+-- <:var> shorthand in table lit
+visitors.MetaVariablePair = (state, node, ctx) ->
+  state\write '<:'
+  visit state, node.name, ctx
+  state\write '>'
+
+visitors.MetaVariablePairDef = (state, node, ctx) ->
+  visit state, node.pair, ctx
+  if node.defVal
+    state\write ' = '
+    visit state, node.defVal, ctx
+
+visitors.SimpleTable = (state, node, ctx) ->
+  for i, pair in ipairs node.pairs
+    visit state, pair, ctx
+    state\write ', ' if i < #node.pairs
+
+--[[ control flow ]]
+-- `print x if cond`
+visitors.IfLine = (state, node, ctx) ->
+  -- type.v is `if` or `unless`
+  state\write node.type.v
+  state\write ' '
+  visit state, node.condition, ctx
+
+visitors.WhileLine = (state, node, ctx) ->
+  -- type.v is `while` or `until`
+  state\write node.type.v
+  state\write ' '
+  visit state, node.condition, ctx
+
+visitors.If = (state, node, ctx) ->
+  -- nodes contains alternating IfCond and Block/Statement items
+  -- pattern: IfCond, Block, [IfCond, Block, ...], [Block (else)]
+  nodes = node.nodes or {}
+
+  -- check if this is 'unless' vs 'if'
+  iftyp = node.type?.v or 'if'
+
+  i = 1
+  first = true
+  while i <= #nodes
+    item = nodes[i]
+    if item\is types.IfCond
+      -- it's a condition (unless, if or elseif)
+      if first
+        state\write iftyp
+        state\write ' '
+        first = false
+      else
+        state\write_indent!
+        state\write 'elseif '
+      visit state, item.condition, ctx
+
+      -- visit EOL comment for this condition line
+      write_eol_for_line state, ctx, item\g_src_line!
+      state\newline!
+
+      -- body
+      i += 1
+      if i <= #nodes
+        state\push!
+        visit state, nodes[i], ctx
+        state\pop!
+
+        -- add newline after body if there's more (elseif/else) coming
+        state\newline! if i < #nodes
+    elseif item\is types.Block or item\is types.Statement
+      -- this is an else block (no condition before it)
+      state\write_indent!
+      state\write 'else'
+      state\newline!
+      state\push!
+      visit state, item, ctx
+      state\pop!
+    i += 1
+
+visitors.IfCond = (state, node, ctx) ->
+  visit state, node.condition, ctx
+
+visitors.Unless = (state, node, ctx) ->
+  state\write 'unless '
+  visit state, node.condition, ctx
+  state\newline!
+  state\push!
+  visit state, node.body, ctx
+  state\pop!
+
+visitors.Switch = (state, node, ctx) ->
+  state\write 'switch '
+  visit state, node.target, ctx
+  state\newline!
+  state\push!
+
+  -- visit each case (`when`) branch
+  for branch in *node.branches
+    visit state, branch, ctx
+
+  -- visit else branch if present
+  if node.lastBranch
+    state\write_indent!
+    state\write 'else '
+
+    -- is single statement (then-style) or block?
+    if node.lastBranch\is types.Statement
+      visit state, node.lastBranch.content, ctx
+    else
+      state\newline!
+      state\push!
+      visit state, node.lastBranch, ctx
+      state\pop!
+
+  state\pop!
+
+visitors.SwitchCase = (state, node, ctx) ->
+  write_above state, ctx, node
+  state\write_indent!
+  state\write 'when '
+  visit state, node.condition, ctx
+
+  -- `when x -- comment`
+  cond_line = node.condition\g_src_line!
+  write_eol_for_line state, ctx, cond_line if cond_line
+
+  -- is single statement (then-style) or block?
+  if node.body\is types.Statement
+    state\write ' then '
+    visit state, node.body.content, ctx
+    state\newline!
+  else
+    state\newline!
+    state\push!
+    visit state, node.body, ctx
+    state\pop!
+    state\newline!
+
+visitors.SwitchList = (state, node, ctx) ->
+  for i, expr in ipairs node.exprs
+    visit state, expr, ctx
+    state\write ', ' if i < #node.exprs
+
+--[[ loop handling ]]
+-- For wraps ForNum or ForEach
+visitors.For = (state, node, ctx) ->
+  visit state, node.forLoop, ctx
+
+visitors.ForStepValue = (state, node, ctx) ->
+  visit state, node.value, ctx
+
+visitors.ForNum = (state, node, ctx) ->
+  state\write 'for '
+  visit state, node.varName, ctx
+  state\write ' = '
+  visit state, node.startValue, ctx
+  state\write ', '
+  visit state, node.stopValue, ctx
+  if node.stepValue
+    state\write ', '
+    visit state, node.stepValue.value, ctx
+  state\newline!
+  state\push!
+  visit state, node.body, ctx
+  state\pop!
+  state\newline!
+
+visitors.ForEach = (state, node, ctx) ->
+  state\write 'for '
+  visit state, node.nameList, ctx
+  state\write ' in '
+  visit state, node.loopValue, ctx
+  state\newline!
+
+  state\push!
+  visit state, node.body, ctx
+  state\pop!
+  state\newline!
+
+visitors.While = (state, node, ctx) ->
+  state\write 'while '
+  visit state, node.condition, ctx
+  state\newline!
+
+  state\push!
+  visit state, node.body, ctx
+  state\pop!
+  state\newline!
+
+visitors.Repeat = (state, node, ctx) ->
+  state\write 'repeat'
+  state\newline!
+
+  state\push!
+  visit state, node.body, ctx
+  state\pop!
+
+  state\newline!
+  state\write_indent!
+  state\write 'until '
+  visit state, node.condition, ctx
+  state\newline!
+
+visitors.Do = (state, node, ctx) ->
+  state\write 'do'
+  state\newline!
+
+  state\push!
+  visit state, node.body, ctx
+  state\pop!
+
+visitors.With = (state, node, ctx) ->
+  state\write 'with '
+  visit state, node.valueList, ctx
+
+  if node.assign
+    state\write ' '
+    visit state, node.assign, ctx
+
+  state\newline!
+  state\push!
+  visit state, node.body, ctx
+  state\pop!
+
+visitors.Try = (state, node, ctx) ->
+  state\write 'try'
+  state\newline!
+
+  state\push!
+  visit state, node.func, ctx
+  state\pop!
+
+  state\newline!
+  if node.catchBlock
+    visit state, node.catchBlock, ctx
+
+visitors.CatchBlock = (state, node, ctx) ->
+  state\write_indent!
+  state\write 'catch '
+  visit state, node.err, ctx
+
+  state\newline!
+  state\push!
+  visit state, node.block, ctx
+  state\pop!
+
+--[[ class handling ]]
+
+visitors.ClassDecl = (state, node, ctx) ->
+  state\write 'class '
+  visit state, node.name, ctx
+
+  if node.extend
+    state\write ' extends '
+    visit state, node.extend, ctx
+
+  state\newline!
+  state\push!
+  visit state, node.body, ctx
+  state\pop!
+
+visitors.ClassBlock = (state, node, ctx) ->
+  contents = node.contents or {}
+  for item in *contents
+    write_above state, ctx, item
+    state\write_indent!
+    visit state, item, ctx
+    src_line = item\g_src_line!
+    write_eol_for_line state, ctx, src_line if src_line
+    state\newline!
+
+visitors.ClassMemberList = (state, node, ctx) ->
+  values = node.values or {}
+  for i, val in ipairs values
+    state\write_indent! if i > 1
+    visit state, val, ctx
+    state\newline! if i < #values
+
+--[[ self (class) references ]]
+visitors.SelfItem = (state, node, ctx) ->
+  visit state, node.name, ctx
+
+visitors.SelfClass = (state, node) ->
+  state\write '@@'
+
+visitors.SelfClassName = (state, node, ctx) ->
+  state\write '@@'
+  visit state, node.name, ctx
+
+--[[ block and statement handling ]]
+visitors.Block = (state, node, ctx) ->
+  stmts = node.statementOrComments or {}
+  source_lines = ctx.source_lines
+
+  for i, stmt in ipairs stmts
+    src_line = stmt\g_src_line!
+    -- check if there's a blank line before this statement in the source
+    -- _only_ for statements after the first
+    -- _skip_ if statement has above comments (write_above handles blank lines for those)
+    has_above = ctx.comment_data and #(ctx.comment_data\get_comments stmt, 'above') > 0
+    if i > 1 and src_line and src_line > 1 and not has_above
+      prev_line_content = source_lines[src_line - 1]
+
+      -- only visit blank if:
+      -- 1. previous source line is blank
+      -- 2. we haven't just emitted a blank (check if last output line is empty)
+      if prev_line_content and prev_line_content\match '^%s*$'
+        last_output = state.output[#state.output]
+        unless last_output and last_output\match '^%s*$'
+          state\newline!
+
+    write_above state, ctx, stmt
+    state\write_indent!
+    visit state, stmt, ctx
+    write_eol_for_line state, ctx, src_line if src_line
+
+    -- add newline after statement if not the last one
+    -- only skip if current_line is already empty (fresh line after compound statement)
+    if i < #stmts
+      state\newline! if #state.current_line > 0
+
+visitors.Body = (state, node, ctx) ->
+  visit state, node.content, ctx
+
+visitors.Statement = (state, node, ctx) ->
+  visit state, node.content, ctx
+  if node.appendix
+    state\write ' '
+    visit state, node.appendix, ctx
+
+visitors.StatementAppendix = (state, node, ctx) ->
+  visit state, node.item, ctx
+
+visitors.File = (state, node, ctx) ->
+  visit state, node.block, ctx
+
+--[[ comprehension handling ]]
+
+visitors.Comprehension = (state, node, ctx) ->
+  -- Comprehension items can be NormalDef (presupplied values), CompFor, etc.
+  has_comp_for = false
+  for item in *node.items
+    if item\is types.CompFor
+      has_comp_for = true
+      break
+
+  if has_comp_for
+    -- real comprehension: [value for x in items]
+    state\write '['
+    for i, item in ipairs node.items
+      if item\is types.CompFor
+        state\write ' '
+      visit state, item, ctx
+    state\write ']'
+  else
+    -- presupplied array: ['a', 'b', 'c']
+    comp_line = node\g_src_line!
+    is_multiline = false
+    if #node.items > 0
+      for item in *node.items
+        item_line = item\g_src_line!
+        if item_line and comp_line and item_line != comp_line
+          is_multiline = true
+          break
+
+    state\write '['
+    if #node.items > 0
+      if is_multiline
+        eol_fn = (s, c, item) ->
+          write_eol_for_line s, c, item\g_src_line! if item\g_src_line!
+        write_packed_items state, node.items, ctx, eol_fn
+      else
+        for i, item in ipairs node.items
+          visit state, item, ctx
+          if i < #node.items
+            state\write ', '
+    state\write ']'
+
+visitors.TblComprehension = (state, node, ctx) ->
+  state\write '{'
+  visit state, node.key, ctx
+  if node.value
+    -- has separate value: use comma syntax (k, v)
+    state\write ', '
+    visit state, node.value, ctx
+  state\write ' '
+  visit state, node.forLoop, ctx
+  state\write '}'
+
+visitors.CompValue = (state, node, ctx) ->
+  visit state, node.value, ctx
+
+visitors.CompFor = (state, node, ctx) ->
+  -- items can be: `CompForNum`, `CompForEach`, or `Exp` (when clause)
+  for i, item in ipairs node.items
+    switch true
+      when item\is types.CompForNum
+        state\write 'for ' if i == 1
+        visit state, item, ctx
+      when item\is types.CompForEach
+        state\write 'for ' if i == 1
+        visit state, item, ctx
+      when item\is types.Exp
+        -- when clause
+        state\write ' when '
+        visit state, item, ctx
+
+visitors.CompForNum = (state, node, ctx) ->
+  visit state, node.varName, ctx
+  state\write ' = '
+  visit state, node.startValue, ctx
+  state\write ', '
+  visit state, node.stopValue, ctx
+  if node.stepValue
+    state\write ', '
+    visit state, node.stepValue, ctx
+
+visitors.CompForEach = (state, node, ctx) ->
+  visit state, node.nameList, ctx
+  state\write ' in '
+  visit state, node.loopValue, ctx
+
+visitors.StarExp = (state, node, ctx) ->
+  state\write '*'
+  visit state, node.value, ctx
+
+--[[ drawing the rest of the owl.. i mean visitors ]]
+
+visitors.Return = (state, node, ctx) ->
+  state\write 'return'
+  if node.valueList
+    state\write ' '
+    visit state, node.valueList, ctx
+
+visitors.Break = (state, node) ->
+  state\write 'break'
+
+visitors.Continue = (state, node) ->
+  state\write 'continue'
+
+visitors.BreakLoop = (state, node, ctx) ->
+  visit state, node.type, ctx
+  if node.value
+    state\write ' '
+    visit state, node.value, ctx
+
+visitors.Local = (state, node, ctx) ->
+  state\write 'local '
+  visit state, node.item, ctx
+
+visitors.LocalValues = (state, node, ctx) ->
+  visit state, node.nameList, ctx
+
+  if node.valueList
+    state\write ' = '
+    visit state, node.valueList, ctx
+
+visitors.LocalAttrib = (state, node, ctx) ->
+  visit state, node.attrib, ctx
+  state\write ' '
+
+  for i, var in ipairs node.leftList
+    visit state, var, ctx
+    state\write ', ' if i < #node.leftList
+
+  if node.assign
+    state\write ' '
+    visit state, node.assign, ctx
+
+visitors.ConstAttrib = (state, node) ->
+  state\write node.v
+
+visitors.CloseAttrib = (state, node) ->
+  state\write node.v
+
+visitors.PipeBody = (state, node, ctx) ->
+  single_indent = string.rep state.indent_char, state.indent_size
+  state\push!
+
+  for i, val in ipairs node.values
+    -- first item: Block already wrote base indent, add one more level
+    -- subsequent items: write full indent at pushed level
+    if i == 1
+      state\write single_indent
+    else
+      state\write_indent!
+
+    state\write '|> '
+    visit state, val, ctx
+    state\newline! if i < #node.values
+
+  state\pop!
+
+visitors.Global = (state, node, ctx) ->
+  state\write 'global '
+  visit state, node.item, ctx
+
+-- global * syntax
+visitors.GlobalOp = (state, node) ->
+  state\write node.v
+
+visitors.GlobalValues = (state, node, ctx) ->
+  visit state, node.nameList, ctx
+
+  if node.valueList
+    state\write ' = '
+    visit state, node.valueList, ctx
+
+visitors.Label = (state, node, ctx) ->
+  state\write '::'
+  visit state, node.label, ctx
+  state\write '::'
+
+visitors.Goto = (state, node, ctx) ->
+  state\write 'goto '
+  visit state, node.label, ctx
+
+visitors.Slice = (state, node, ctx) ->
+  state\write '['
+
+  -- startValue can be `Exp` or `DefaultValue` (empty)
+  if node.startValue and not node.startValue\is types.DefaultValue
+    visit state, node.startValue, ctx
+
+  state\write ','
+
+  -- stopValue
+  if node.stopValue and not node.stopValue\is types.DefaultValue
+    visit state, node.stopValue, ctx
+
+  -- stepValue (optional third param)
+  if node.stepValue and not node.stepValue\is types.DefaultValue
+    state\write ','
+    visit state, node.stepValue, ctx
+
+  state\write ']'
+
+visitors.SpreadListExp = (state, node, ctx) ->
+  -- ...items in assignment RHS
+  state\write '...'
+  visit state, node.exp, ctx
+
+visitors.ChainAssign = (state, node, ctx) ->
+  -- `a = b = c = 1`
+  -- TODO: would prefer to turn this into `a = 1\nb = a\nc = a`
+  for i, expr in ipairs node.exprs
+    visit state, expr, ctx
+    state\write ' = ' if i < #node.exprs
+
+  state\write ' '
+  visit state, node.assign, ctx
+
+visitors.Backcall = (state, node, ctx) ->
+  visit state, node.value, ctx
+
+-- fn <- value  (action in ExpListAssign)
+visitors.SubBackcall = (state, node, ctx) ->
+  visit state, node.arrow, ctx
+  state\write ' '
+  visit state, node.value, ctx
+
+visitors.FnArrow = (state, node) ->
+  state\write node.v
+
+visitors.FnArrowBack = (state, node) ->
+  state\write node.v
+
+visitors.Parens = (state, node, ctx) ->
+  state\write '('
+  visit state, node.expr, ctx
+  state\write ')'
+
+--[[ import/export handling ]]
+
+visitors.Import = (state, node, ctx) ->
+  -- check if content is `FromImport` (from 'mod' import x syntax)
+  if node.content?\is types.FromImport
+    visit state, node.content, ctx
+  else
+    state\write 'import '
+    visit state, node.content, ctx
+
+visitors.ImportAs = (state, node, ctx) ->
+  -- `import 'path' as name`
+  visit state, node.literal, ctx
+  if node.target
+    state\write ' as '
+    visit state, node.target, ctx
+
+visitors.ImportLiteral = (state, node, ctx) ->
+  -- ihe actual quoted path string
+  if node.inners and #node.inners > 0
+    state\write "'"
+    for i, inner in ipairs node.inners
+      state\write '.' if i > 1
+      state\write inner.v if inner.v
+    state\write "'"
+
+visitors.ImportFrom = (state, node, ctx) ->
+  -- `import x, y from 'mod'`
+  for i, name in ipairs node.names
+    visit state, name, ctx
+    state\write ', ' if i < #node.names
+  state\write ' from '
+  visit state, node.item, ctx
+
+visitors.Export = (state, node, ctx) ->
+  state\write 'export '
+
+  if node.def
+    state\write 'default '
+
+  visit state, node.target, ctx
+
+visitors.ExportDefault = (state, node) ->
+  -- Leaf node for 'default' in export default
+  state\write 'default'
+
+visitors.FromImport = (state, node, ctx) ->
+  -- from 'mod' import x, y
+  state\write 'from '
+  visit state, node.item, ctx
+  state\write ' import '
+  for i, name in ipairs node.names
+    visit state, name, ctx
+    state\write ', ' if i < #node.names
+
+visitors.ColonImportName = (state, node, ctx) ->
+  -- :x in imports (for importing methods)
+  state\write ':'
+  visit state, node.name, ctx
+
+--[[ macro handling - TODO: validate these, i probably f'd something up ]]
+visitors.Macro = (state, node, ctx) ->
+  state\write 'macro '
+  visit state, node.name, ctx
+  state\write ' = '
+  visit state, node.decl, ctx
+
+-- $macro! inline execution
+visitors.MacroInPlace = (state, node, ctx) ->
+  visit state, node.body, ctx
+
+visitors.MacroName = (state, node, ctx) ->
+  -- $name for macro calls
+  state\write '$'
+  visit state, node.name, ctx
+
+-- Macro literal: (args) -> body
+visitors.MacroLit = (state, node, ctx) ->
+  if node.argsDef
+    state\write '('
+    visit state, node.argsDef, ctx
+    state\write ') '
+
+  state\write '->'
+
+  -- body - check if it's a simple single-statement body for inline formatting
+  if node.body
+    content = node.body.content
+    is_inline = content and content\is types.Statement
+    if is_inline
+      state\write ' '
+      visit state, content, ctx
+    else
+      state\newline!
+      state\push!
+      visit state, node.body, ctx
+      state\pop!
+
+visitors.MacroFunc = (state, node, ctx) ->
+  -- $macro(...) call
+  visit state, node.name, ctx
+  visit state, node.invoke, ctx
+
+visitors.MacroNamePair = (state, node, ctx) ->
+  -- $key: $value in macro contexts
+  visit state, node.key, ctx
+  state\write ': '
+  visit state, node.value, ctx
+
+--[[ fk these need to be reordered ]]
+visitors.ExistentialOp = (state, node) ->
+  state\write '?'
+
+-- t[] = v as standalone statement
+visitors.ShortTabAppending = (state, node, ctx) ->
+  visit state, node.assign, ctx
+
+visitors.TableAppendingOp = (state, node) ->
+  state\write '[]'
+
+visitors.ReversedIndex = (state, node, ctx) ->
+  state\write '[#'
+  visit state, node.modifier, ctx if node.modifier
+  state\write ']'
+
+visitors.ImportLiteralInner = (state, node) ->
+  state\write node.v if node.v
+
+visitors.ImportTabLit = (state, node, ctx) ->
+  -- { x, y } in imports
+  state\write '{ '
+  for i, item in ipairs (node.items or {})
+    visit state, item, ctx
+    state\write ', ' if i < #(node.items or {})
+  state\write ' }'
+
+visitors.ImportAllMacro = (state, node) ->
+  state\write '$'
+
+visitors.ImportAllGlobal = (state, node) ->
+  state\write '*'
+
+visitors.ImportGlobal = (state, node, ctx) ->
+  -- global x or similar
+  visit state, node.name, ctx if node.name
+
+visitors.IfType = (state, node) ->
+  state\write node.v if node.v
+
+visitors.WhileType = (state, node) ->
+  state\write node.v if node.v
+
+visitors.In = (state, node) ->
+  state\write 'in'
+
+visitors.NotIn = (state, node) ->
+  state\write 'not in'
+
+visitors.PlainItem = (state, node, ctx) ->
+  visit state, node.item, ctx if node.item
+
+visitors.UnaryValue = (state, node, ctx) ->
+  visit state, node.value, ctx if node.value
+
+visitors.ExpListLow = (state, node, ctx) ->
+  -- same as ExpList but lower precedence context
+  for i, exp in ipairs node.exprs
+    visit state, exp, ctx
+    state\write ', ' if i < #node.exprs
+
+visitors.Assignment = (state, node, ctx) ->
+  -- full assignment statement  
+  visit state, node.expList, ctx if node.expList
+  visit state, node.assign, ctx
+
+visitors.FnArgsDef = (state, node, ctx) ->
+  -- function args definition wrapper
+  visit state, node.defList, ctx if node.defList
+  visit state, node.shadowOption, ctx if node.shadowOption
+
+visitors.OuterVarShadow = (state, node, ctx) ->
+  -- using (varlist) for variable shadowing
+  state\write 'using '
+  if node.varList
+    state\write '('
+    visit state, node.varList, ctx
+    state\write ')'
+  else
+    state\write 'nil'
+
+visitors.LocalFlag = (state, node) ->
+  state\write node.v if node.v
+
+-- lua strings (raw literals)
+visitors.LuaStringOpen = (state, node) ->
+  state\write node.v if node.v
+
+visitors.LuaStringContent = (state, node) ->
+  state\write node.v if node.v
+
+visitors.LuaStringClose = (state, node) ->
+  state\write node.v if node.v
+
+visitors.LuaKeyword = (state, node) ->
+  state\write node.v if node.v
+
+-- YAML literals
+-- TODO: validate this, i don't use this feature (write some tests)
+visitors.YAMLLine = (state, node, ctx) ->
+  visit state, node.content, ctx if node.content
+
+visitors.YAMLLineContent = (state, node) ->
+  state\write node.v if node.v
+
+visitors.YAMLLineInner = (state, node) ->
+  state\write node.v if node.v
+
+visitors.YAMLIndent = (state, node) ->
+  state\write node.v if node.v
+
+visitors.YAMLMultiline = (state, node, ctx) ->
+  for i, line in ipairs (node.lines or {})
+    visit state, line, ctx
+    state\newline! if i < #(node.lines or {})
+
+
+
+visitors.StatementSep = (state, node) ->
+  state\write ';'
+
+-- no output needed
+visitors.BlockEnd = (state, node) ->
+visitors.FmtWhitespace = (state, node) ->
+-- not sure what this is for tbh but it's in the ast
+visitors.EmptyLine = (state, node) ->
+  state\newline!
+
+--[[ comment types, shouldn't be necessary, but here for completeness ]]
+visitors.YueComment = (state, node) ->
+  state\write node.v if node.v
+
+visitors.YueLineComment = (state, node) ->
+  state\write node.v
+
+visitors.YueMultilineComment = (state, node) ->
+  state\write node.v
+
+export default visit

@@ -1,7 +1,4 @@
-import 'yuecheck.macros' as { $ }
-
 import 'lpegrex' as lp
-import 'inspect'
 
 import 'yuecheck.types'
 import 'yuecheck.util'
@@ -39,15 +36,15 @@ matcher = (src, name) ->
   unless ast
     ln, col, srcline = lp.calcline src, errpos
     colhelp = "#{ string.rep ' ', col - 1 }^"
-    msg = errlabel
-    -- TODO: pass this up
-    error "syntax error: #{ name }:#{ ln }:#{ col }: #{ msg }\n#{ srcline }\n#{ colhelp }"
+    msg = "syntax error: #{ name }:#{ ln }:#{ col }: #{ errlabel }\n#{ srcline }\n#{ colhelp }"
+    return nil, msg
   ast
 
 to_ast = (src) ->
-  ast, errlabel, errpos = matcher src, 'src'
+  ast, err = matcher src, 'src'
   unless ast
-    return { errlabel, errpos }
+    -- Return empty comments structure with error info
+    return { indices: {}, _error: err }
 
   comments = { indices: {} }
   for v in *ast
@@ -62,7 +59,7 @@ to_ast = (src) ->
         t = types.YueLineComment util.stripnl content
       else
         -- should never happen unless this isn't kept up-to-date with grammar
-        error "unexpected comment type: #{ v.tag }"
+        continue
 
     t\set_source line, col
     unless comments[line]

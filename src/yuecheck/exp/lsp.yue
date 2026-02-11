@@ -4,7 +4,6 @@ import 'inspect'
 import 'json'
 import 'yue'
 
-import 'yuecheck.ast_helpers' as asthelp
 import 'yuecheck.linter'
 
 import 'yuecheck.exp.conn'

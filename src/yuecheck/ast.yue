@@ -1,0 +1,426 @@
+-- AST utilities for yuecheck
+-- Provides AST building, traversal helpers, and extraction utilities
+
+import 'yue'
+
+import 'yuecheck.types'
+import 'yuecheck.util'
+
+-- Build internal AST representation from yue.to_ast output
+build = (ast, parent = nil) ->
+  -- self = { 1, 2, 3 }
+  -- 4+ beyond = child nodes
+  { ntype, ln, col } = ast
+
+  -- process children first
+  arg = {}
+  if #ast > 3
+    if (type ast[4]) == 'table'
+      for v in *ast[4,]
+        unless v
+          break
+        arg[] = build v, { ntype, ast }
+    elseif ntype == 'Invoke' -- 4 is !
+      n = types.SingleString ast[4]
+      n\set_source ln, col
+      arg[] = n
+    elseif ntype == 'ReversedIndex' and ast[4] == '[#]'
+      n = types.ReversedIndex!
+      n\set_source ln, col
+      arg[] = n
+    elseif ntype == 'VarArgDef' and ast[4] == '...'
+      n = types.VarArgDef types.Variable types.Name '...'
+      n\set_source ln, col
+      arg[] = n
+    else
+      -- Handle various AST simplifications from yue.to_ast
+      if ntype == 'TableLit' and string.sub(ast[4], 1, 1) == '{'
+        n = types.SingleString ast[4]
+        n\set_source ln, col
+        arg[] = n
+      elseif ast[4] == '' and ntype == 'FnArgDefList'
+        arg[] = types.FnArgDef types.Variable types.Name ''
+      elseif ntype == 'Return' and ast[4] == 'return'
+        _ = nil -- explicit return keyword, no value
+      elseif ast[4] == '' and ntype == 'DefaultValue'
+        arg[] = types.DefaultValue ''
+      elseif ntype == 'DoubleString'
+        arg[] = types.DoubleString { types.DoubleStringContent types.DoubleStringInner '' }
+      elseif ntype == 'Block' and ast[4] == ''
+        _ = nil -- empty files; just comments
+      elseif ntype == 'Comprehension' and ast[4] == '[]'
+        _ = nil -- empty comprehension
+      elseif ntype == 'ReversedIndex' and ast[4] == '[#]'
+        arg[] = types.ReversedIndex!
+      else
+        arg[] = ast[4]
+
+  node = types[ntype]!
+  node\from_table arg
+  node\set_source ln, col
+  node.typ = ntype
+  node
+
+-- Parse source string and return internal AST
+-- Returns: ast_node or nil, error_message
+parse = (src) ->
+  raw_ast, err = yue.to_ast src, 0
+  unless raw_ast
+    return nil, err
+
+  build raw_ast
+
+-- -----------------------------------------------------------------------------
+-- Predicate helpers (is.*)
+-- -----------------------------------------------------------------------------
+is = {}
+
+-- Check if node is a function/method call
+is.chainvalue_call = (node) ->
+  unless node and node.is and node\is types.ChainValue
+    return false
+
+  unless node.items and #node.items > 0
+    return false
+
+  last = node.items[#node.items]
+  unless last
+    return false
+  unless ((type last) == 'table') and last.is
+    return false
+  (last\is types.Invoke) or (last\is types.InvokeArgs)
+
+-- Check if node matches any type in set
+is.any_of = (node, type_set = {}) ->
+  return false unless node and node.is
+  for t in *type_set
+    return true if node\is t
+  false
+
+-- -----------------------------------------------------------------------------
+-- Extraction helpers (extract.*)
+-- -----------------------------------------------------------------------------
+extract = {}
+
+-- Extract string value from a String node
+extract.string = (node) ->
+  unless node and node\is types.String
+    return nil
+
+  v = nil
+  switch true
+    when node == nil or node.is == nil or node.str == nil or node.str.is == nil
+      return nil
+    when node.str\is types.DoubleString
+      segs = {}
+      for seg in *node.str.segments
+        segs[] = seg.content.v
+      v = table.concat segs, ''
+    when node.str\is types.SingleString
+      v = node.str.v
+    when node.str\is types.LuaString
+      v = node.str.content.v
+  v
+
+-- Extract items from an expression (for assignments)
+extract.items = (node) ->
+  vars = {}
+  for pipes in *node.pipeExprs
+    for i, expos in ipairs pipes.expos
+      items = expos.item?.items ?? {}
+      var = {}
+      for item in *items
+        v = item.item ?? item
+        continue unless v
+        var[] = v
+
+      vars[] = var
+  vars
+
+-- Extract assignments from ExpListAssign node
+extract.assignments = (node) ->
+  unless node and node\is types.ExpListAssign
+    return nil
+
+  unless node.action
+    return nil
+
+  set = {}
+
+  unless node.action.values
+    return nil
+
+  for i, value in ipairs node.action.values
+    unless value and value\is types.Exp
+      continue
+
+    unless set[i]
+      set[i] =
+        items: {}
+        values: {}
+
+    for ii, pipe in ipairs value.pipeExprs
+      for iii, expo in ipairs pipe.expos
+        set[i].values[] = expo.item
+
+  for i, exprs in ipairs node.expList.exprs
+    unless set[i]
+      set[i] =
+        items: {}
+        values: {}
+
+    set[i].items = extract.items exprs
+
+  set
+
+-- Extract name list from NameList node
+extract.name_list = (node) ->
+  unless node and node.is
+    return {}
+  unless node\is types.NameList
+    return {}
+
+  [n.name.v for n in *node.names]
+
+-- Extract simple value from an Exp node
+-- Returns the raw value (string, number, etc) or nil if complex
+extract.simple_value = (node) ->
+  return nil unless node
+  return nil unless node.is and node\is types.Exp
+
+  item = node.pipeExprs?[1]?.expos?[1]?.item
+  unless item
+    return nil
+
+  v = nil
+  if item\is types.SimpleValue
+    v = item.value
+  elseif item\is types.String
+    v = item.str
+  elseif item\is types.ChainValue
+    unless item.items and #item.items == 1
+      return nil -- complex ChainValue
+    vv = item.items[1]
+    if vv\is types.SimpleValue
+      v = vv.value
+    elseif vv\is types.String
+      v = vv.str
+    else
+      return nil
+  else
+    return nil
+
+  -- Only handle simple types
+  unless is.any_of v, {
+    types.ConstValue
+    types.Num
+    types.DoubleString
+    types.SingleString
+  }
+    return nil
+
+  ret = v.v
+  if v\is types.DoubleString
+    ret = {}
+    for seg in *v.segments
+      ret[] = seg.content.v
+    ret = "\"#{ table.concat ret, '' }\""
+
+  ret or false
+
+-- -----------------------------------------------------------------------------
+-- Expression accessors (extract.exp_*)
+-- These simplify common patterns for accessing Exp node contents
+-- -----------------------------------------------------------------------------
+
+-- Get the first value item from an Exp node
+-- Equivalent to: exp.pipeExprs?[1]?.expos?[1]?.item
+extract.exp_first_value = (exp) ->
+  return nil unless exp
+  exp\get 'pipeExprs', 1, 'expos', 1, 'item'
+
+-- Get the raw value (v field) from the first simple value in an Exp
+-- Equivalent to: exp.pipeExprs?[1]?.expos?[1]?.item?.value?.v
+extract.exp_value = (exp) ->
+  return nil unless exp
+  exp\get 'pipeExprs', 1, 'expos', 1, 'item', 'value', 'v'
+
+-- Get the operator string from a binary expression
+-- Equivalent to: exp.opValues?[1]?.op?.v
+extract.exp_operator = (exp) ->
+  return nil unless exp
+  exp\get 'opValues', 1, 'op', 'v'
+
+-- Get the right-hand side value of a binary expression
+-- Equivalent to: exp.opValues?[1]?.pipeExprs?[1]?.expos?[1]?.item?.value?.v
+extract.exp_rhs_value = (exp) ->
+  return nil unless exp
+  exp\get 'opValues', 1, 'pipeExprs', 1, 'expos', 1, 'item', 'value', 'v'
+
+-- Get the first unary operator from an Exp (e.g., 'not', '-')
+-- Equivalent to: exp.pipeExprs?[1]?.ops?[1]?.v
+extract.exp_unary_op = (exp) ->
+  return nil unless exp
+  exp\get 'pipeExprs', 1, 'ops', 1, 'v'
+
+-- -----------------------------------------------------------------------------
+-- ChainValue accessors (extract.chainvalue_*)
+-- -----------------------------------------------------------------------------
+
+-- Get the base name from a ChainValue (first item's variable name)
+-- Equivalent to: cv.items?[1]?.item?.name?.v
+extract.chainvalue_base = (cv) ->
+  return nil unless cv
+  cv\get 'items', 1, 'item', 'name', 'v'
+
+-- Get the base item from a ChainValue
+-- Equivalent to: cv.items?[1]?.item
+extract.chainvalue_first_item = (cv) ->
+  return nil unless cv
+  cv\get 'items', 1, 'item'
+
+-- -----------------------------------------------------------------------------
+-- If/condition accessors (extract.if_*)
+-- -----------------------------------------------------------------------------
+
+-- Get the condition expression from an If node's first branch
+-- Equivalent to: if_node.nodes?[1]?.condition
+extract.if_condition = (if_node) ->
+  return nil unless if_node
+  if_node\get 'nodes', 1, 'condition'
+
+-- Get the first value from an If node's condition
+-- Equivalent to: if_node.nodes?[1]?.condition?.pipeExprs?[1]?.expos?[1]?.item
+extract.if_condition_value = (if_node) ->
+  return nil unless if_node
+  if_node\get 'nodes', 1, 'condition', 'pipeExprs', 1, 'expos', 1, 'item'
+
+-- -----------------------------------------------------------------------------
+-- Simplification helpers (simplify.*)
+-- -----------------------------------------------------------------------------
+simplify = {}
+
+-- Simplify assignment node to { name, path, value } format
+simplify.assignment = (node) ->
+  unless node
+    return nil
+
+  assigns = extract.assignments node
+  unless assigns
+    return nil
+
+  name = (nodes) ->
+    r = {}
+    for set in *nodes
+      for v in *set
+        switch true
+          when v\is types.Variable
+            r[] = v.name.v
+          when v\is types.DotChainItem
+            r[] = v.name.v
+          when v\is types.Exp
+            for p in *v.pipeExprs
+              for ex in *p.expos
+                if ex.items
+                  for item in *ex.items
+                    r[] = extract.string item
+                else
+                  if ex.item and ex.item\is types.String
+                    r[] = extract.string ex.item
+                  elseif ex.item and ex.item\is types.ChainValue
+                    if ex.item.items[1].item?.name?.v?
+                      r[] = "$VAR{#{ ex.item.items[1].item.name.v }}"
+                    elseif ex.item.items[1]\is types.String
+                      r[] = extract.string ex.item.items[1]
+                    else
+                      continue -- skip unknown
+                  else
+                    continue -- skip unknown
+          else
+            continue -- skip unknown
+    (table.concat r, '.'), r
+
+  value = (values) ->
+    unless values[1]
+      return nil
+
+    v = values[1]
+
+    r = switch true
+      when v == nil or v.is == nil
+        nil
+      when v\is types.String
+        { type: 'string', value: util.stripq extract.string v }
+      when (v\is types.SimpleValue) and v.value\is types.Num
+        { type: 'number', value: v.value.v }
+      when (v\is types.SimpleValue) and v.value\is types.ConstValue
+        { type: 'const', value: util.stripq v.value.v }
+      when (v\is types.SimpleValue) and v.value\is types.FunLit
+        { type: 'function', value: nil }
+      when v\is types.ChainValue
+        { type: 'chainvalue', value: v.items[1].item?.name?.v ?? nil }
+      when v\is types.Num
+        { type: 'number', value: v.v }
+      else
+        { type: 'unknown', value: v }
+    r
+
+  ret = {}
+  for assign in *assigns
+    unless assign.values
+      continue
+
+    fqp, path = name assign.items
+    val = value assign.values
+
+    unless val
+      continue
+
+    ret[] =
+      name: fqp
+      path: path
+      value: val
+  ret
+
+-- extract file-level symbols (vars/macros)
+extract.file_symbols = (node) ->
+  unless node\is types.File
+    return {}
+
+  symbols = {}
+
+  statements = node.block.statements
+  for v in *statements
+    sc = v.content
+    unless sc and ((type sc) == 'table') and sc.is
+      continue
+
+    if sc\is types.Global
+      nl = extract.name_list v.content.item.nameList
+      for n in *nl
+        symbols[] = { type: 'variable', value: n }
+    elseif sc\is types.Local
+      item = sc.item
+      if item\is types.LocalValues
+        nl = extract.name_list item.nameList
+        for n in *nl
+          symbols[] = { type: 'variable', value: n }
+      else
+        symbols[] = { type: 'variable', value: item.v }
+    elseif sc\is types.Macro
+      symbols[] = { type: 'function', value: sc.name.v }
+    elseif sc\is types.ExpListAssign
+      assignments = simplify.assignment sc
+      assignments or= {}
+      for a in *assignments
+        symbols[] = { type: (a.value.type ?? 'unknown'), value: a.name }
+
+  symbols
+
+export default {
+  :build
+  :parse
+  :is
+  :extract
+  :simplify
+}

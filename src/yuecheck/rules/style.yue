@@ -1,0 +1,374 @@
+import 'yuecheck.types'
+import 'yuecheck.util'
+
+-- style_comment_space
+-- warns about comments that have no leading space after the `--`
+--
+-- example:
+--[[
+--bad
+]]
+style_comment_space =
+  type: 'WARN'
+  on:
+    * types.YueLineComment
+    * types.YueMultilineComment
+  check: (node) ->
+    if (node\is types.YueLineComment) and ((node.v\match '^%-%- ') or (node.v\match '^%-%-$')) -- yuecheck:ignore
+      return
+    elseif (node\is types.YueMultilineComment) and (node.v\match '%-%-%[%[%s+.+%s+%]%]')
+      return
+
+    typ = '???'
+    if node\is types.YueLineComment
+      typ = 'single-line'
+    else
+      typ = 'multi-line'
+    {
+      type: 'WARN'
+      message: "#{ typ } comment should have space between -- and content"
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- style_zero_index
+-- warns when a table is accessed by 0 index; lua tables start at 1 and this
+-- is likely an error
+--
+-- example:
+--[[
+print x[0]
+]]
+style_zero_index =
+  type: 'WARN'
+  on:
+    * types.Value
+  check: (node) ->
+    unless node.item\is types.ChainValue
+      return nil
+
+    cv = node.item.items
+    unless cv[1]?.item? and cv[1].item\is types.Variable
+      return nil
+
+    unless cv[2]?\is types.Exp
+      return nil
+
+    unless cv[2].pipeExprs?[1]?.expos?[1]?\is types.Value
+      return nil
+
+    v = cv[2].pipeExprs?[1]?.expos?[1]?.item.value
+    unless v and v\is types.Num
+      return nil
+
+    unless v.v == '0'
+      return nil
+
+    {
+      type: 'WARN'
+      message: 'array indices start at 1, likely error'
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- style_import_as_ident
+-- suggests removing 'as name' from imports when unnecessary
+--
+-- example:
+--[[
+import 'json' as json
+
+->
+
+import 'json'
+]]
+style_import_as_ident =
+  type: 'WARN'
+  on:
+    * types.ImportAs
+  check: (node) ->
+    unless node.target
+      return nil
+
+    unless node.target\is types.Variable
+      return nil
+
+    -- eg busted.runner as busted not bad
+    unless #node.literal.inners == 1 and node.target.name.v == node.literal.inners[1].v
+      return nil
+
+    {
+      type: 'WARN'
+      message: 'import statement and variable use same name'
+      line: node\g_src_line!
+      -- this is at least 8 chars in.
+      -- should this point to the target name?
+      -- or beginning of line?
+      col: node\g_src_col!
+    }
+
+-- style_unnecessary_doublestring
+-- suggests using single-quoted strings when double-quoted is unneeded
+-- this skips doubles with interps or escape sequences
+--
+-- example:
+--[[
+x = "abcd"
+
+->
+
+x = 'abcd'
+
+-- where these are OK
+x = "#{ interp }"
+x = "'a'"
+]]
+style_unnecessary_doublestring =
+  type: 'WARN'
+  on:
+    * types.DoubleString
+  check: (node) ->
+    unless #node.segments > 0
+      return
+
+    -- if any segment is an exp, it's an interp, eg `x = "#{ y }"`
+    -- given that interps calls `tostring`, i wouldn't say that a single
+    -- exp is a smell, either.
+    for n in *node.segments
+      if n.content\is types.Exp
+        return
+
+    -- could build list of valid escapes, is that necessary?
+    if (node.segments[1].content.v\match "\\.+") or
+       (node.segments[1].content.v\match "'") -- contains a singlequote, so it's OK
+      return
+
+    {
+      type: 'WARN'
+      message: 'double-quoted string where single-quoted would suffice'
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- style_conditionals
+-- suggests using alternative If when `not` operand is applied
+--
+-- example:
+--[[
+if not x
+  print 1
+
+unless not x
+  print 1
+
+->
+
+unless x
+  print 1
+
+if x
+  print 1
+]]
+style_conditionals =
+  type: 'WARN'
+  on:
+    * types.If
+  check: (node) ->
+    unless node.nodes[1]?.condition?.pipeExprs?[1]?.ops?[1]?.v == 'not'
+        return
+
+    -- ignore multiple exprs, can likely add them tho
+    unless #node.nodes[1].condition.opValues == 0
+      return
+
+    iftyp = node.type.v
+
+    name = ''
+    vnode = node.nodes[1]?.condition?.pipeExprs?[1].expos?[1]?.item?.items?[1]?.item?.name
+    if vnode\is types.SelfName
+      name = vnode.name.v
+    else
+      name = vnode.v
+    name = util.stripq name
+
+    message = switch iftyp
+      when 'if'
+        "`if not #{ name }` could be `unless #{ name }`"
+      when 'unless'
+        "`unless not #{ name }` could be `if #{ name }`"
+
+    {
+      type: 'WARN'
+      :message
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- style_simplify_if_to_switch
+-- suggests using `switch` when there's an if-elseif-*-else chain comparing only a single value
+--
+-- example:
+--[[
+if x == 1 or x == 2
+  print 1
+elseif x == 3
+  print 3
+elseif x == 4
+  print 4
+else
+  print "idk"
+
+->
+
+switch x
+  when 1, 2
+    print 1
+  when 3
+    print 3
+  when 4
+    print 4
+  else
+    print "idk"
+]]
+style_simplify_if_to_switch =
+  type: 'WARN'
+  on:
+    * types.If
+  check: (node) ->
+    typ = node.type.v -- `if`, `unless`
+
+    -- N nodes, {[1],[2] = ifcond, (block,statement)
+    nodes = node.nodes
+    sets = {}
+    variables = {}
+
+    nifs = 0
+    names = {}
+    collector = () ->
+      t = {}
+      names[] = t
+      (node) ->
+        if node\is types.Variable
+          t[node.name.v] = true
+    walker = (node) ->
+      if node\is types.IfCond
+        nifs += 1
+        node\walk collector!
+    n\walk walker for n in *nodes
+
+    unless #names > 1 and nifs > 3
+      return
+
+    _len_map = (t) ->
+      i = 0
+      for _, _ in pairs t
+        i += 1
+      i
+    _k = (t) ->
+      r = {}
+      for k, _ in pairs t
+        r[] = k
+      r
+
+    -- take first set
+    n = names[1]
+    has = true -- assume yes by default for shits and giggles
+    for i = 2, #names
+      unless (_len_map names[i]) == (_len_map n)
+        -- their lengths don't match, meaning they can't have the same vars
+        return
+
+      -- ensure all keys are present
+      for k, _ in pairs n
+        unless names[i][k]
+          has = false
+          break
+
+    unless has
+      return
+
+    vars = _k n
+    table.sort vars
+    -- sort for stable testing
+    nstr = table.concat vars, ', '
+    {
+      type: 'WARN'
+      message: "simple conditional chain for variables { #{ nstr } } could be simplified to switch"
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- style_discourage_require
+-- suggests using import instead of require
+style_discourage_require =
+  name: 'style_discourage_require'
+  type: 'WARN'
+  on:
+    * types.Callable
+  check: (node) ->
+    unless node.item?.name? and node.item.name.v == 'require'
+      return
+
+    {
+      type: 'WARN'
+      message: 'use `import` instead of `require`'
+      line: node\g_src_line!
+      col: node\g_src_col!
+    }
+
+-- style_discourage_unnecessary_sb
+-- suggests using key: instead of ['key']
+style_discourage_unnecessary_sb =
+  name: 'style_discourage_unnecessary_sb'
+  type: 'WARN'
+  on:
+    * types.TableLit
+  check: (node) ->
+    -- if values[N] == NormalPairDef, and
+    -- v.pair.key? is an expression resulting in a single SingleString,
+    -- complain. (it's because 'a' in ['a']: v is an expr)
+    -- when it's a literal, eg `x = { b: 1 }`, the NormalPair
+    -- only contains a KeyName->Name.
+    results = {}
+    for v in *node.values
+      if v\is types.NormalPairDef
+        -- check all keys
+        if v.pair.key\is types.Exp
+          pe = v.pair.key.pipeExprs
+          continue if #v.pair.key.opValues > 0
+          -- check all; if we encounter non-strings, we're fineish
+          for vv in *pe
+            continue if vv.opValues
+            if vv.expos[1]\is types.Value
+              item = vv.expos[1].item
+
+              -- TODO: see if this is an AST/parser change or not..
+              if (item\is types.ChainValue) and (item.items[1]\is types.String)
+                item = item.items[1]
+
+              if item\is types.String
+                if item.str\is types.SingleString
+                  k = util.stripq item.str.v
+                  -- skip 'keys-like-this' (telescope)
+                  if k\match '%w+%-%w'
+                    continue
+
+                  results[] = {
+                    type: 'WARN'
+                    message: "use `#{ k }:` instead of `['#{ k }']`"
+                    line: item.str\g_src_line!
+                    col: item.str\g_src_col!
+                  }
+
+    #results > 0 and results or nil
+
+export default {
+  :style_comment_space
+  :style_zero_index
+  :style_import_as_ident
+  :style_unnecessary_doublestring
+  :style_conditionals
+  :style_simplify_if_to_switch
+  :style_discourage_require
+  :style_discourage_unnecessary_sb
+}

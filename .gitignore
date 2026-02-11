@@ -1,1 +1,4 @@
 /gen
+/src/yuecheck/transpiler*
+/bin/yue2go
+/spec/transpiler.yue
