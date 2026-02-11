@@ -1,0 +1,5 @@
+-- js-like export syntax; regression test
+-- input
+export 🌛 = "Script of Moon"
+-- expect
+export 🌛 = 'Script of Moon'

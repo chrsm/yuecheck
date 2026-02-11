@@ -1,0 +1,21 @@
+-- object literals; regression test
+-- input
+inventory =
+  equipment:
+    - "sword"
+    - "shield"
+  items:
+    - name: "potion"
+      count: 10
+    - name: "bread"
+      count: 3
+-- expect
+inventory =
+  equipment:
+    * 'sword'
+    * 'shield'
+  items:
+    * name: 'potion'
+      count: 10
+    * name: 'bread'
+      count: 3

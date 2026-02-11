@@ -873,6 +873,9 @@ visitors.TableBlock = (state, node, ctx) ->
 
 visitors.TableBlockIndent = (state, node, ctx) ->
   for i, val in ipairs node.values
+    if i > 1
+      state\write_indent!
+      state\write '  '
     visit state, val, ctx
     state\newline! if i < #node.values
 
@@ -1511,6 +1514,10 @@ visitors.Export = (state, node, ctx) ->
     state\write 'default '
 
   visit state, node.target, ctx
+
+  if node.assign
+    state\write ' '
+    visit state, node.assign, ctx
 
 visitors.ExportDefault = (state, node) ->
   -- Leaf node for 'default' in export default

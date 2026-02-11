@@ -3236,25 +3236,25 @@ class BreakLoop extends Node
   @yue_name: 'BreakLoop'
   
   -- @type: _sel_t(true,Break,Continue)
-  -- @value(false): ast_nodes.Exp
-  new: (type = nil, value = nil) =>
+  -- @valueList(false): ast_nodes.ExpList
+  new: (type = nil, valueList = nil) =>
     @type = type
-    @value = value
+    @valueList = valueList
 
   from_table: (tbl) =>
     for i, v in ipairs tbl
       if (not @type) and _in v\g_yue_name!, {'Break','Continue'}
         @type = v
         continue
-      if (not @value) and v\g_yue_name! == 'Exp'
-        @value = v
+      if (not @valueList) and v\g_yue_name! == 'ExpList'
+        @valueList = v
         continue
       _ = v
     nil
 
   walk: (visitor) =>
     @type\walk visitor
-    @value\walk visitor if @value
+    @valueList\walk visitor if @valueList
     visitor @
 ast_nodes.BreakLoop = BreakLoop
 
