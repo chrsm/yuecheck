@@ -1,0 +1,7 @@
+-- regression test for ifassign
+-- input
+if p := var.p
+  print p
+-- expect
+if p := var.p
+  print p

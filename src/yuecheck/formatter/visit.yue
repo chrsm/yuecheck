@@ -955,7 +955,7 @@ visitors.If = (state, node, ctx) ->
       else
         state\write_indent!
         state\write 'elseif '
-      visit state, item.condition, ctx
+      visit state, item, ctx
 
       -- visit EOL comment for this condition line
       write_eol_for_line state, ctx, item\g_src_line!
@@ -982,6 +982,9 @@ visitors.If = (state, node, ctx) ->
 
 visitors.IfCond = (state, node, ctx) ->
   visit state, node.condition, ctx
+  if node.assignment
+    state\write ' :'
+    visit state, node.assignment, ctx
 
 visitors.Unless = (state, node, ctx) ->
   state\write 'unless '

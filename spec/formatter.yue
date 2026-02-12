@@ -17,16 +17,19 @@ fget = (path) ->
   content
 
 parse_td = (src) ->
-  ipos = src\find '-- input'
-  epos = src\find '-- expect'
+  ipos = src\find '%-%- input'
+  epos = src\find '%-%- expect'
   unless epos and ipos
     error 'cannot find input/expect markers in testdata'
 
   -- `-- input` / `-- expect` len
-  input = src\sub ipos + 9, epos
-  expect = src\sub epos + 9
+  input = src\sub ipos + 9, epos-1
+  expect = src\sub epos + 10
 
-  input, output
+  input = input\gsub '%s+$', ''
+  expect = expect\gsub '%s+$', ''
+
+  input, expect
 
 describe 'formatter', ->
   describe 'basic formatting', ->
@@ -344,6 +347,12 @@ describe 'formatter', ->
 
     it 'should allow export of a string (and allow utf8)', ->
       src, expect = parse_td fget 'fmt_export_string'
+
+      r = fmt.format src
+      assert.same expect, r
+
+    it 'should handle ifassign', ->
+      src, expect = parse_td fget 'fmt_ifassign'
 
       r = fmt.format src
       assert.same expect, r
