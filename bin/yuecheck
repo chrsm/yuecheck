@@ -51,21 +51,55 @@ find_files = (path, ext, exclude = {}) ->
 
 -- find config
 origdir = lfs.currentdir!
-found = false
-while not found
+rootdir = false
+while not rootdir
   cwd = lfs.currentdir!
   if cwd == '/'
     break
 
   for f in lfs.dir cwd
     if f == '.git'
-      found = true
+      rootdir = cwd
       break
 
-  unless found
+  unless rootdir
     lfs.chdir "#{ cwd }/.."
 
-cfg = if lfs.attributes '.yuecheck', 'mode'
+-- `~/.yuecheck-allowed` should be a list of exact paths to repositories, such
+-- that `/path/.yuecheck` is valid.
+repo_allowed = false
+do
+  allowed_paths = {}
+  path = "#{ os.getenv 'HOME' }/.yuecheck_allowed"
+  if lfs.attributes path, 'mode'
+    try
+      allowed_paths = yue.dofile path
+    catch err
+      -- stop here; they have _something_, but it's invalid
+      error "$HOME/.yuecheck_allowed error: #{ err }"
+  else
+    print 'No $HOME/.yuecheck_allowed exists, would you like to create one? [Y/n]'
+    resp = io.read!
+    if resp == '' or resp == 'y' or resp == 'Y'
+      fp = io.open path, 'w'
+      fp\write "allowed_paths = {}\n\n-- do not edit --\nexport default allowed_paths"
+      fp\close!
+
+  unless rootdir in allowed_paths
+    print "This repository is not trusted."
+    print "The repository's `.yuecheck` file will be disabled unless this repository is added to $HOME/.yuecheck_allowed."
+
+    print 'Would you like to allow it for this run? [y/N]'
+    resp = io.read!
+    if resp == '' or resp == 'N' or resp == 'n'
+      print 'Using user or default configuration'
+    elseif resp == 'y' or resp == 'Y'
+      print "Allowing #{ rootdir } for this run. To remove this message, add this path to `~/.yuecheck_allowed`."
+      repo_allowed = true
+  else
+    repo_allowed = true
+
+cfg = if repo_allowed and lfs.attributes '.yuecheck', 'mode'
   yue.dofile '.yuecheck'
 elseif lfs.attributes ("#{ os.getenv 'HOME' }/.yuecheck"), 'mode'
   yue.dofile "#{ os.getenv 'HOME' }/.yuecheck"
@@ -105,7 +139,7 @@ unless args.ignore_config
     yuecheck.linter.enabled_rules = cfg.enabled_rules
 
   if cfg?.enable_compilation
-    yuecheck.linter.enable_compilation = cfg.enable_compilation
+    yuecheck.linter.enable_compilation = cfg.enable_compilation and repo_allowed
 
   for k, v in pairs (cfg?.rules ?? {})
     yuecheck.rules[k].config = v
