@@ -1,0 +1,32 @@
+name: build-test
+
+on:
+  push:
+    branches: [ "mother" ]
+  pull_request:
+    branches: [ "mother" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: update apt
+      run: sudo apt-get update -y
+    - name: install deps
+      run: sudo apt-get install -y wget lua5.4 liblua5.4-dev unzip make git cmake g++ libssl-dev
+    - name: install luarocks
+      run: |
+        wget -O /tmp/luarocks.tar.gz https://luarocks.org/releases/luarocks-3.13.0.tar.gz && \
+        cd /tmp && \
+        tar xvfz luarocks.tar.gz && \
+        cd luarocks-3.13.0 && \
+        ./configure && \
+        sudo make && \
+        sudo make install
+    - name: get YueScript
+      run: sudo luarocks install yuescript
+    - name: install yuecheck
+      run: sudo make rock-actions
+    - name: run tests
+      run: make test

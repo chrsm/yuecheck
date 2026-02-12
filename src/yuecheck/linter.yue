@@ -54,7 +54,8 @@ linter.lint_string = (src) ->
 
     err = err\gsub "\n", ' '
     line = err\match '^(%d+):'
-    message = (err\match ': (.+)^$')\gsub '^%s*(.-)%s*$', '%1'
+    part = err\match ': (.+)^$'
+    message = (part ?? err)\gsub '^%s*(.-)%s*$', '%1'
     return {{ type: 'ERROR', :line, :col, :message }}
 
   violations = {}

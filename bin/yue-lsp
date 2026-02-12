@@ -1,10 +1,12 @@
 #!/usr/bin/env -S yue -e
 import 'lfs'
 import 'argparse'
-import 'json'
+import 'dkjson' as json
 
 import 'yuecheck.exp'
 import 'yuecheck'
+
+os.exit 1
 
 argp = argparse!
   name: 'yue-lsp'

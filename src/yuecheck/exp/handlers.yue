@@ -1,7 +1,7 @@
 import 'yuecheck.macros' as { $ }
 
 import 'inspect'
-import 'json'
+import 'dkjson' as json
 
 import 'yuecheck.ast' as ast
 import 'yuecheck.linter'

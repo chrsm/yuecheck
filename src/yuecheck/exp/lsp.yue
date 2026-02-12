@@ -1,7 +1,7 @@
 import 'yuecheck.macros' as { $ }
 
 import 'inspect'
-import 'json'
+import 'dkjson' as json
 import 'yue'
 
 import 'yuecheck.linter'
@@ -9,6 +9,8 @@ import 'yuecheck.linter'
 import 'yuecheck.exp.conn'
 import 'yuecheck.exp.server'
 import 'yuecheck.exp.handlers'
+
+os.exit 1
 
 --[[
 experimental, WIP attempt at an LSP server for yue

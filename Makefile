@@ -25,6 +25,8 @@ $(HOME)/.luarocks/share/lua/5.4/?.lua
 $(HOME)/.luarocks/share/lua/5.4/?/init.lua
 /usr/share/lua/5.4/?.lua
 /usr/share/lua/5.4/?/init.lua
+/usr/local/share/lua/5.4/?.lua
+/usr/local/share/lua/5.4/?/init.lua
 endef
 # </hack>
 YCT_LPATH=$(subst $(nl),;,${lrtestpath})
@@ -87,7 +89,10 @@ uninstall:
 .PHONY: rock
 ## build and install rock locally
 rock:
-	luarocks --local --verbose make
+	luarocks --local make
+rock-actions:
+	@# not documenting this, because it's only for actions that run as root
+	luarocks make
 
 .PHONY: help
 ## list available commands

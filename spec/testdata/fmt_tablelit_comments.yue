@@ -1,0 +1,29 @@
+-- input
+reserved_keywords = {
+  -- lua keywords
+  'and', 'break', 'do', 'else', 'elseif',
+  'end', 'false', 'for', 'function', 'goto',
+  'if', 'in', 'local', 'nil', 'not',
+  'or', 'repeat', 'return', 'then', 'true',
+  'until', 'while',
+
+  -- yue keywords
+  'as', 'class', 'continue', 'export', 'extends',
+  'from', 'global', 'import', 'macro', 'switch',
+  'try', 'unless', 'using', 'when', 'with',
+}
+
+-- expect
+reserved_keywords = {
+  -- lua keywords
+  'and', 'break', 'do', 'else', 'elseif',
+  'end', 'false', 'for', 'function', 'goto',
+  'if', 'in', 'local', 'nil', 'not',
+  'or', 'repeat', 'return', 'then', 'true',
+  'until', 'while',
+
+  -- yue keywords
+  'as', 'class', 'continue', 'export', 'extends',
+  'from', 'global', 'import', 'macro', 'switch',
+  'try', 'unless', 'using', 'when', 'with',
+}

@@ -1,6 +1,5 @@
 -- AST utilities for yuecheck
--- Provides AST building, traversal helpers, and extraction utilities
-
+-- provides AST building, traversal helpers, and extraction utilities
 import 'yue'
 
 import 'yuecheck.types'

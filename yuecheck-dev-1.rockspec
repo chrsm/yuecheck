@@ -19,19 +19,20 @@ dependencies = {
   'lpegrex >= 0.2.2-1',
   'argparse >= 0.7.1',
   'inspect >= 3.1.3',
-  'luajson >= 1.3.4',
+  'dkjson >= 2.8-2',
   'http >= 0.4-0',
+  'busted >= 2.3.0-1',
 }
 
 build = {
   type = 'make',
   build_target = 'build',
   build_variables = {
-    LUA             = '$(LUA)',
-    LUA_BINDIR      = '$(BINDIR)',
-    LUA_DIR         = '$(LUADIR)',
-    LUA_INCDIR      = '$(LUA_INCDIR)',
-    LUA_LIBDIR      = '$(LIBDIR)',
+    LUA        = '$(LUA)',
+    LUA_BINDIR = '$(BINDIR)',
+    LUA_DIR    = '$(LUADIR)',
+    LUA_INCDIR = '$(LUA_INCDIR)',
+    LUA_LIBDIR = '$(LIBDIR)',
   },
   install_variables = {
     INST_PREFIX  = '$(PREFIX)',

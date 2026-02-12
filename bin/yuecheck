@@ -2,8 +2,7 @@
 import 'yue'
 import 'lfs'
 import 'argparse'
-
-import 'json'
+import 'dkjson' as json
 import 'inspect'
 
 import 'yuecheck'

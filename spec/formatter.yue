@@ -357,3 +357,9 @@ describe 'formatter', ->
       r = fmt.format src
       assert.same expect, r
 
+    it 'should not lose comments in a table lit', ->
+      src, expect = parse_td fget 'fmt_tablelit_comments'
+
+      r = fmt.format src
+      assert.same expect, r
+

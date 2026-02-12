@@ -269,6 +269,21 @@ write_packed_items = (state, items, ctx, eol_fn) ->
     is_pair = is_pair_type item
     prev_was_pair = i > 1 and is_pair_type items[i - 1]
 
+    -- check for above comments on this item
+    has_above = ctx?.comment_data and #(ctx.comment_data\get_comments item, 'above') > 0
+
+    -- emit above comments first (forces a new line)
+    if has_above
+      -- ensure we're on a new line
+      if state\current_line_len! > indent_len
+        if eol_fn and i > 1
+          eol_fn state, ctx, items[i - 1]
+        state\newline!
+      if state\current_line_len! == 0
+        state\write_indent!
+      write_above state, ctx, item
+      need_space = false
+
     -- multi-line items always get their own line
     if is_multiline
       if state\current_line_len! > indent_len
@@ -315,8 +330,9 @@ write_packed_items = (state, items, ctx, eol_fn) ->
           force_newline = true
 
     -- check for blank line gap in source between consecutive items
+    -- skip if above comments already handled the gap
     has_blank_before = false
-    if i > 1 and ctx and ctx.source_lines
+    if not has_above and i > 1 and ctx and ctx.source_lines
       prev_line = items[i - 1]\g_src_line!
       cur_line = item\g_src_line!
       if prev_line and cur_line and cur_line > prev_line + 1
@@ -332,7 +348,6 @@ write_packed_items = (state, items, ctx, eol_fn) ->
       need_space = false
 
     cur_len = state\current_line_len!
-
     if force_newline and cur_len > indent_len
       if eol_fn and i > 1
         eol_fn state, ctx, items[i - 1]

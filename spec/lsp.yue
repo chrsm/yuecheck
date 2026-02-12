@@ -1,6 +1,4 @@
 -- yuecheck:ignore=stdlib_usage,style_comment_space
-import 'inspect'
-import 'json'
 import 'yue'
 import 'busted.runner' as busted
 busted!
