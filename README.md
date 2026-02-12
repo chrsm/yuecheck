@@ -21,15 +21,8 @@ issue.
 
 Current TODOs:
 
-- [ ] Only use repo `.yuecheck` if trusted (due to macro code execution)
 - [ ] General cleanup. Rules are ugly for implementation
   * [x] categorized, but still more to do
-- [x] Configuration-driven format rules (WONTFIX)
-  * This may require just writing the whole file from AST each time.
-  * For the record I have taken a pass at this but got frustrated by comment
-    placement. I will probably come back to it.
-  * There is `yue.format`, too, but since it is based on the AST it does not
-    preserve all comments.
 - [ ] More fleshed out LSP implementation. Unlikely this will be very advanced,
   and less likely will it work with non-Yue code. Possibly could redirect to
   luals.
@@ -470,6 +463,10 @@ for idx in *comments.indices
 
 
 # changelog
+
+2026-02
+  * implemented `yuefmt`, a tool for formatting yue code
+  * WONTFIX'd .yuecheck comp protection; so little use of yue that this seems unnecessary and annoying
 
 2026-01
   * updated to YueScript 0.32.4; possible breaking changes
