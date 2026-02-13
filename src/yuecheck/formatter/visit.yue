@@ -145,6 +145,30 @@ write_comment = (state, comment) ->
 
   state\write comment.v
 
+-- write inline block comments that appear before a node on its source line
+-- these get misassociated as 'above' for the next node by the comment system
+write_preceding_inline_comments = (state, ctx, node) ->
+  return unless ctx?.comment_data
+  node_line = node\g_src_line!
+  node_col = node\g_src_col!
+  return unless node_line and node_col
+
+  for comment, assoc in pairs ctx.comment_data.associations
+    if comment\g_src_line! == node_line and comment\g_src_col! < node_col
+      state\write comment.v
+      state\write ' '
+      -- mark as emitted so other handlers skip it
+      comment._emitted = true
+
+  -- also check orphans
+  if ctx.comment_data.orphans
+    for comment in *ctx.comment_data.orphans
+      if comment\g_src_line! == node_line and comment\g_src_col! < node_col
+        unless comment._emitted
+          state\write comment.v
+          state\write ' '
+          comment._emitted = true
+
 write_trailing = (state, ctx, node) ->
   return unless ctx?.comment_data
 
@@ -176,7 +200,7 @@ write_eol_for_line = (state, ctx, line) ->
 
   -- check all associations for `end_of_line` comments on this line
   for comment, assoc in pairs ctx.comment_data.associations
-    if assoc.type == 'end_of_line' and comment\g_src_line! == line
+    if assoc.type == 'end_of_line' and comment\g_src_line! == line and not comment._emitted
       state\write ' '
       write_comment state, comment
 
@@ -189,8 +213,13 @@ write_above = (state, ctx, node) ->
   unless #comments > 0
     return
 
+  -- filter out already-emitted comments
+  active = [c for c in *comments when not c._emitted]
+  unless #active > 0
+    return
+
   -- blank line before the first above comment?
-  first_comment_line = comments[1]\g_src_line!
+  first_comment_line = active[1]\g_src_line!
   if first_comment_line and first_comment_line > 1
     source_lines = ctx.source_lines
     if source_lines
@@ -202,13 +231,13 @@ write_above = (state, ctx, node) ->
         unless last_output and last_output\match '^%s*$'
           state\newline!
 
-  for c in *comments
+  for c in *active
     state\write_indent!
     write_comment state, c
     state\newline!
 
   -- blank line between the last comment and the node?
-  last_comment_line = comments[#]\g_src_line!
+  last_comment_line = active[#active]\g_src_line!
   node_line = node\g_src_line!
   if last_comment_line and node_line and node_line > last_comment_line + 1
     source_lines = ctx.source_lines
@@ -497,9 +526,39 @@ visitors.Value = (state, node, ctx) ->
 visitors.SimpleValue = (state, node, ctx) ->
   visit state, node.value, ctx
 
+-- check if an Invoke has a single string/table arg that doesn't need parens
+-- in Yuescript, `f""`, `f''`, `f{}` are valid without parens
+is_single_noparen_arg = (item) ->
+  return false unless item.args and #item.args == 1
+  arg = item.args[1]
+  arg\is_any types.DoubleString, types.SingleString, types.TableLit
+
 --[[ chain value: ugly as hell, sorry ]]
 visitors.ChainValue = (state, node, ctx) ->
-  for i, item in ipairs node.items
+  items = node.items
+  -- detect multiline chains: chain items on different source lines
+  first_line = items[1] and items[1]\g_src_line!
+  is_multiline_chain = false
+  if first_line
+    for i = 2, #items
+      item_line = items[i]\g_src_line!
+      if item_line and item_line != first_line
+        -- only count DotChainItem/ColonChainItem as multiline triggers
+        if items[i]\is_any types.DotChainItem, types.ColonChainItem
+          is_multiline_chain = true
+          break
+
+  for i, item in ipairs items
+    -- multiline chain: newline + indent before DotChainItem/ColonChainItem on different lines
+    if is_multiline_chain and i > 1
+      if item\is_any types.DotChainItem, types.ColonChainItem
+        item_line = item\g_src_line!
+        prev_line = items[i - 1]\g_src_line!
+        if item_line and prev_line and item_line != prev_line
+          state\newline!
+          state\write_indent!
+          state\write '  '
+
     switch true
       when item\is types.Callable
         visit state, item, ctx
@@ -507,7 +566,7 @@ visitors.ChainValue = (state, node, ctx) ->
         state\write '.'
         visit state, item.name, ctx
       when item\is types.ColonChainItem
-        state\write state\chain_style!
+        state\write state\chain!
         visit state, item.name, ctx
       when item\is types.Invoke
         -- empty call `!` shows up as single arg with value '!'
@@ -518,11 +577,33 @@ visitors.ChainValue = (state, node, ctx) ->
             is_empty_call = true
         if is_empty_call
           state\write '!'
+        elseif is_single_noparen_arg item
+          visit state, item.args[1], ctx
         elseif item.args and #item.args > 0
+          -- check if args span multiple source lines (multiline invoke)
+          invoke_first_line = item.args[1]\g_src_line!
+          invoke_last_line = item.args[#item.args]\g_src_line!
+          is_multiline_invoke = invoke_first_line and invoke_last_line and
+            invoke_last_line != invoke_first_line
+
           state\write '('
-          for j, arg in ipairs item.args
-            visit state, arg, ctx
-            state\write ', ' if j < #item.args
+          if is_multiline_invoke
+            state\push!
+            for j, arg in ipairs item.args
+              state\newline!
+              state\write_indent!
+              -- emit trailing comments that appear before this arg on its line
+              write_preceding_inline_comments state, ctx, arg
+              visit state, arg, ctx
+              write_eol_for_line state, ctx, arg\g_src_line!
+              state\write ',' if j < #item.args
+            state\newline!
+            state\pop!
+            state\write_indent!
+          else
+            for j, arg in ipairs item.args
+              visit state, arg, ctx
+              state\write ', ' if j < #item.args
           state\write ')'
         else
           state\write '!'
@@ -559,6 +640,11 @@ visitors.Invoke = (state, node, ctx) ->
       state\write '!'
       return
 
+  -- single string/table arg: no parens needed (f'', f"", f{})
+  if is_single_noparen_arg node
+    visit state, node.args[1], ctx
+    return
+
   if node.args and #node.args > 0
     state\write '('
     for i, arg in ipairs node.args
@@ -583,9 +669,29 @@ visitors.InvokeArgs = (state, node, ctx) ->
 
   -- space-separated args (no parens in original)
   if node.args
-    for i, arg in ipairs node.args
-      visit state, arg, ctx
-      state\write ', ' if i < #node.args
+    -- detect multiline: args on different source lines
+    first_line = node.args[1]\g_src_line!
+    last_line = node.args[#node.args]\g_src_line!
+    is_multiline = first_line and last_line and last_line != first_line
+
+    if is_multiline
+      -- first arg inline, rest indented on new lines
+      state\push!
+      for i, arg in ipairs node.args
+        if i > 1
+          state\write ','
+          state\newline!
+          state\write_indent!
+        visit state, arg, ctx
+
+        if orig := arg\g_src_line!
+          write_eol_for_line state, ctx, orig
+
+      state\pop!
+    else
+      for i, arg in ipairs node.args
+        visit state, arg, ctx
+        state\write ', ' if i < #node.args
 
 visitors.DotChainItem = (state, node, ctx) ->
   state\write '.'
@@ -952,6 +1058,7 @@ visitors.WhileLine = (state, node, ctx) ->
 visitors.If = (state, node, ctx) ->
   -- nodes contains alternating IfCond and Block/Statement items
   -- pattern: IfCond, Block, [IfCond, Block, ...], [Block (else)]
+  -- inline ternary: IfCond, Statement, [Statement (else)]
   nodes = node.nodes or {}
 
   -- check if this is 'unless' vs 'if'
@@ -972,19 +1079,39 @@ visitors.If = (state, node, ctx) ->
         state\write 'elseif '
       visit state, item, ctx
 
-      -- visit EOL comment for this condition line
-      write_eol_for_line state, ctx, item\g_src_line!
-      state\newline!
+      -- check for inline ternary: next node is Statement on same source line
+      cond_line = item\g_src_line!
+      next_node = i + 1 <= #nodes and nodes[i + 1] or nil
+      is_inline = next_node and (next_node\is types.Statement) and
+        next_node\g_src_line! == cond_line
 
-      -- body
-      i += 1
-      if i <= #nodes
-        state\push!
+      if is_inline
+        -- inline: if cond then expr [else expr]
+        state\write ' then '
+        i += 1
         visit state, nodes[i], ctx
-        state\pop!
 
-        -- add newline after body if there's more (elseif/else) coming
-        state\newline! if i < #nodes
+        -- check for else branch (another Statement on same line)
+        if i + 1 <= #nodes
+          else_node = nodes[i + 1]
+          if else_node\is(types.Statement) and else_node\g_src_line! == cond_line
+            state\write ' else '
+            i += 1
+            visit state, nodes[i], ctx
+      else
+        -- multi-line block form
+        write_eol_for_line state, ctx, cond_line
+        state\newline!
+
+        -- body
+        i += 1
+        if i <= #nodes
+          state\push!
+          visit state, nodes[i], ctx
+          state\pop!
+
+          -- add newline after body if there's more (elseif/else) coming
+          state\newline! if i < #nodes
     elseif item\is types.Block or item\is types.Statement
       -- this is an else block (no condition before it)
       state\write_indent!
@@ -1124,8 +1251,16 @@ visitors.Repeat = (state, node, ctx) ->
 
 visitors.Do = (state, node, ctx) ->
   state\write 'do'
-  state\newline!
 
+  -- inline do: body content on same line as `do` keyword
+  do_line = node\g_src_line!
+  content_line = node.body and node.body.content and node.body.content\g_src_line!
+  if content_line and do_line and content_line == do_line
+    state\write ' '
+    visit state, node.body, ctx
+    return
+
+  state\newline!
   state\push!
   visit state, node.body, ctx
   state\pop!
@@ -1213,12 +1348,33 @@ visitors.Block = (state, node, ctx) ->
   stmts = node.statementOrComments or {}
   source_lines = ctx.source_lines
 
+  -- empty block: check for comment-only lines in source at block's position
+  if #stmts == 0 and source_lines
+    block_line = node\g_src_line!
+    if block_line
+      src = source_lines[block_line]
+      if src and src\match '^%s*%-%-'
+        state\write_indent!
+        state\write src\match '^%s*(%-%-.*)'
+        -- mark any comments on this line as emitted
+        if ctx.comment_data
+          for comment, assoc in pairs ctx.comment_data.associations
+            if comment\g_src_line! == block_line
+              comment._emitted = true
+    return
+
   for i, stmt in ipairs stmts
     src_line = stmt\g_src_line!
     -- check if there's a blank line before this statement in the source
     -- _only_ for statements after the first
     -- _skip_ if statement has above comments (write_above handles blank lines for those)
-    has_above = ctx.comment_data and #(ctx.comment_data\get_comments stmt, 'above') > 0
+    has_above = false
+    if ctx.comment_data
+      above_comments = ctx.comment_data\get_comments stmt, 'above'
+      for c in *above_comments
+        unless c._emitted
+          has_above = true
+          break
     if i > 1 and src_line and src_line > 1 and not has_above
       prev_line_content = source_lines[src_line - 1]
 
@@ -1472,6 +1628,12 @@ visitors.ChainAssign = (state, node, ctx) ->
   visit state, node.assign, ctx
 
 visitors.Backcall = (state, node, ctx) ->
+  if node.argsDef
+    state\write '('
+    visit state, node.argsDef, ctx
+    state\write ') '
+  visit state, node.arrow, ctx
+  state\write ' '
   visit state, node.value, ctx
 
 -- fn <- value  (action in ExpListAssign)

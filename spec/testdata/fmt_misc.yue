@@ -1,0 +1,89 @@
+-- input
+do return 5 + () -> 4 + 2
+
+_ = f""[a]
+_ = f""\b!
+_ = f"".c!
+_ = f{}[a]
+_ = f{}\b!
+_ = f{}.c!
+
+x
+  .while
+  .true = "hello"
+
+with obj
+  invoke(
+    --[[arg1]] \func!,
+    --[[arg2]] 123,
+    --[[arg3]] "abc"
+  )
+
+ajax url,
+  (data) ->
+    process data,
+  (error) ->
+    print error
+
+do
+  if cond
+    --
+  else
+    --
+
+  switch cond
+    when 1
+      --
+    when 2
+      --
+    else
+      --
+
+  f1 = -> --
+  f2 = ->
+    --
+
+-- expect
+do return 5 + () -> 4 + 2
+
+_ = f''[a]
+_ = f''\b!
+_ = f''.c!
+_ = f{}[a]
+_ = f{}\b!
+_ = f{}.c!
+
+x
+  .while
+  .true = 'hello'
+
+with obj
+  invoke(
+    --[[arg1]] \func!,
+    --[[arg2]] 123,
+    --[[arg3]] 'abc'
+  )
+
+ajax url,
+  (data) ->
+    process data,
+  (error) ->
+    print error
+
+do
+  if cond
+    --
+  else
+    --
+
+  switch cond
+    when 1
+      --
+    when 2
+      --
+    else
+      --
+
+  f1 = -> --
+  f2 = ->
+    --

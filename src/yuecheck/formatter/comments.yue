@@ -28,13 +28,6 @@ class CommentData
           result[] = c
 
       result
-  has_comment_at: (line, col) =>
-    for comment, assoc in pairs @associations
-      if comment\g_src_line! == line
-        ccol = comment\g_src_col!
-        if ccol >= col - 1 and ccol <= col + 1
-          return true, comment
-    false, nil
 
 -- priority for node types; higher = more specific, prefer for trailing comments
 -- leaf nodes should be preferred over containers

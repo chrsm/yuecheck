@@ -1,4 +1,5 @@
 -- yuecheck:ignore=stdlib_usage,style_comment_space
+import 'lfs'
 import 'busted.runner' as busted
 busted!
 
@@ -9,6 +10,27 @@ import 'yuecheck.formatter' as fmt
   some of them do check oddities/spacing, but the most important part is that what comes out
   is as expected.
 ]]
+find_yue_files = (path, ext) ->
+  unless (lfs.attributes path, 'mode') == 'directory'
+    return nil, error "(#{ path }, #{ ext }) is not a directory"
+
+  if (path\sub #path, #path) == '/'
+    path = path\sub 1, #path - 1
+
+  files = {}
+  for ent in lfs.dir path
+    continue if ent in { '.', '..' }
+
+    p = "#{ path }/#{ ent }"
+    if (lfs.attributes p, 'mode') == 'directory'
+      -- skip common dirs
+      if p\match '%.git$'
+        continue
+      files = { ...files, ...(find_yue_files p, ext)}
+    elseif p\match "%.#{ ext }$"
+      files[] = p
+  files
+
 fget = (path) ->
   fp, err = io.open "../spec/testdata/#{ path }.yue", 'r'
   error err if err
@@ -362,4 +384,50 @@ describe 'formatter', ->
 
       r = fmt.format src
       assert.same expect, r
+
+    it 'should handle outer var shadow', ->
+      src, expect = parse_td fget 'fmt_outervarshadow'
+
+      r = fmt.format src
+      assert.same expect, r
+
+    it 'should handle if-assign with if returns', ->
+      src, expect = parse_td fget 'fmt_ifif'
+
+      r = fmt.format src
+      assert.same expect, r
+
+    it "should work with some samples from yuescript repo's spec/inputs/syntax.yue", ->
+      src, expect = parse_td fget 'fmt_misc'
+
+      r = fmt.format src
+      assert.same expect, r
+
+    it 'should not lose a comment on a class method', ->
+      src, expect = parse_td fget 'fmt_classmethod_comment'
+
+      r = fmt.format src
+      assert.same expect, r
+
+  -- skip these for now, testing on case-by-case basis
+  describe 'yuescript repo inputs', ->
+    pending 'not done here'
+    inputs = find_yue_files '../spec/yuespec', 'yue'
+
+    unless os.getenv 'YUESCRIPT_SPECS'
+      return
+
+    for f in *inputs
+      it "should handle #{ f }", ->
+        content = if fp := io.open f, 'r'
+          fp, err = io.open f, 'r'
+          error err if err
+          content = fp\read 'a*'
+          fp\close!
+          content
+        else
+          error "could not open #{ f }"
+        
+        r = fmt.format content
+        assert.true r != nil
 

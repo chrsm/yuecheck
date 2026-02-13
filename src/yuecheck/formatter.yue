@@ -150,6 +150,8 @@ format = (src, opts = {}) ->
   -- push this into State instead
   if comment_data.orphans and #comment_data.orphans > 0
     for comment in *comment_data.orphans
+      continue if comment._emitted
+
       -- flush current line if needed
       fstate\newline! if #fstate.current_line > 0
 

@@ -30,7 +30,8 @@ class    state
       @_indent .. str
     else
       @_indent
--- output
+
+-- expect 
 x = (a = {}, b = true, c = Exp!) ->
   nil
 
@@ -47,10 +48,12 @@ class state
 
   push: (n = 1) =>
     @scope += 1
-    @_indent = string.rep ' ', @scope * @nindent
+    @_indent = string.rep ' ', 
+      @scope * @nindent  -- hmm
   pop: (n = 1) =>
     @scope -= 1
-    @_indent = string.rep ' ', @scope * @nindent
+    @_indent = string.rep ' ',
+      @scope * @nindent
 
   indent: (str) =>
     if str and #str > 0

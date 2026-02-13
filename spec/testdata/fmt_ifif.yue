@@ -1,0 +1,12 @@
+-- input
+a, b = if hello
+  if yeah then "one", "two" else "mmhh", nil
+else
+  print "the other"
+  "nothing", "yeah"
+-- expect
+a, b = if hello
+  if yeah then 'one', 'two' else 'mmhh', nil
+else
+  print 'the other'
+  'nothing', 'yeah'

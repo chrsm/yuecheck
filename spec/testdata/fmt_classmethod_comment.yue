@@ -1,0 +1,21 @@
+-- input
+class    x
+  -- comment1
+  _val:     ''
+  
+  -- fncomment
+  fn: ( n = 1 ) =>
+    n  -=  1
+    @_val = string.rep ' ',
+      n* 1 -- comment2
+
+-- expect
+class x
+  -- comment1
+  _val: ''
+
+  -- fncomment
+  fn: (n = 1) =>
+    n -= 1
+    @_val = string.rep ' ',
+      n * 1 -- comment2

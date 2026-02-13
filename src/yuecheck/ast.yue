@@ -1,6 +1,7 @@
 -- AST utilities for yuecheck
 -- provides AST building, traversal helpers, and extraction utilities
 import 'yue'
+import 'dkjson' as json
 
 import 'yuecheck.types'
 import 'yuecheck.util'
@@ -51,10 +52,14 @@ build = (ast, parent = nil) ->
         _ = nil -- empty comprehension
       elseif ntype == 'ReversedIndex' and ast[4] == '[#]'
         arg[] = types.ReversedIndex!
+      elseif ntype == 'OuterVarShadow' and ast[4] == 'using nil'
+        -- leave node empty; formatter writes 'using nil' when varList is nil
+        _ = nil
       else
         arg[] = ast[4]
 
   node = types[ntype]!
+  -- print ntype, json.encode arg
   node\from_table arg
   node\set_source ln, col
   node.typ = ntype
