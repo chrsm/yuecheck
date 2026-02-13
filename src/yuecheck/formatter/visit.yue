@@ -83,7 +83,7 @@ extract_simple_string = (exp_node) ->
 
     str_node = items[1]
     unless str_node\is types.String
-      return nil 
+      return nil
 
     str_content = str_node.str
     unless str_content
@@ -106,7 +106,6 @@ extract_simple_string = (exp_node) ->
           return nil
 
         return inner_str.v
-
       when str_content\is types.SingleString
         return str_content.v
 
@@ -583,8 +582,7 @@ visitors.ChainValue = (state, node, ctx) ->
           -- check if args span multiple source lines (multiline invoke)
           invoke_first_line = item.args[1]\g_src_line!
           invoke_last_line = item.args[#item.args]\g_src_line!
-          is_multiline_invoke = invoke_first_line and invoke_last_line and
-            invoke_last_line != invoke_first_line
+          is_multiline_invoke = invoke_first_line and invoke_last_line and invoke_last_line != invoke_first_line
 
           state\write '('
           if is_multiline_invoke
@@ -625,7 +623,7 @@ visitors.ChainValue = (state, node, ctx) ->
         state\write '[]'
       when item\is types.ReversedIndex
         state\write '[#]'
-      else 
+      else
         visit state, item, ctx
 
 visitors.Callable = (state, node, ctx) ->
@@ -898,6 +896,13 @@ visitors.TableLit = (state, node, ctx) ->
   state\write '{'
   if node.values and #node.values > 0
     if is_multiline
+      -- emit EOL comment on the opening `{` line before items, eg
+      --[[
+        x =
+          * { -- comment
+          }
+      ]]
+      write_eol_for_line state, ctx, table_line if table_line
       eol_fn = (s, c, val) ->
         val_line = val\g_src_line!
         write_eol_for_line s, c, val_line if val_line
@@ -982,12 +987,24 @@ visitors.TableBlock = (state, node, ctx) ->
   state\push!
 
   for i, val in ipairs node.values
+    -- comments above an entry, eg:
+    --[[
+      x =
+        -- comment
+        * a
+    ]]
+    write_above state, ctx, val
     state\write_indent!
 
     unless val\is types.NormalPair
       state\write '* '
 
     visit state, val, ctx
+
+    -- trailing comments
+    if src_line := val\g_src_line!
+      write_eol_for_line state, ctx, src_line
+
     state\newline! if i < #node.values
 
   state\pop!
@@ -1082,8 +1099,7 @@ visitors.If = (state, node, ctx) ->
       -- check for inline ternary: next node is Statement on same source line
       cond_line = item\g_src_line!
       next_node = i + 1 <= #nodes and nodes[i + 1] or nil
-      is_inline = next_node and (next_node\is types.Statement) and
-        next_node\g_src_line! == cond_line
+      is_inline = next_node and (next_node\is types.Statement) and next_node\g_src_line! == cond_line
 
       if is_inline
         -- inline: if cond then expr [else expr]
@@ -1828,7 +1844,7 @@ visitors.ExpListLow = (state, node, ctx) ->
     state\write ', ' if i < #node.exprs
 
 visitors.Assignment = (state, node, ctx) ->
-  -- full assignment statement  
+  -- full assignment statement
   visit state, node.expList, ctx if node.expList
   visit state, node.assign, ctx
 
@@ -1881,8 +1897,6 @@ visitors.YAMLMultiline = (state, node, ctx) ->
   for i, line in ipairs (node.lines or {})
     visit state, line, ctx
     state\newline! if i < #(node.lines or {})
-
-
 
 visitors.StatementSep = (state, node) ->
   state\write ';'

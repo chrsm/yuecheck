@@ -1,0 +1,25 @@
+-- input
+x =
+  * { -- comment
+    'item'
+    key: 'value'
+  }
+
+  -- note taking
+  * {
+    'item2'
+    key: 'value'
+  }
+
+-- expect
+x =
+  * { -- comment
+    'item',
+    key: 'value'
+  }
+
+  -- note taking
+  * {
+    'item2',
+    key: 'value'
+  }

@@ -409,6 +409,12 @@ describe 'formatter', ->
       r = fmt.format src
       assert.same expect, r
 
+    it 'should handle table list comments', ->
+      src, expect = parse_td fget 'fmt_tablelist_comments'
+
+      r = fmt.format src
+      assert.same expect, r
+
   -- skip these for now, testing on case-by-case basis
   describe 'yuescript repo inputs', ->
     pending 'not done here'
