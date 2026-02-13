@@ -26,7 +26,7 @@ find_yue_files = (path, ext) ->
       -- skip common dirs
       if p\match '%.git$'
         continue
-      files = { ...files, ...(find_yue_files p, ext)}
+      files = { ...files, ...(find_yue_files p, ext) }
     elseif p\match "%.#{ ext }$"
       files[] = p
   files
@@ -45,7 +45,7 @@ parse_td = (src) ->
     error 'cannot find input/expect markers in testdata'
 
   -- `-- input` / `-- expect` len
-  input = src\sub ipos + 9, epos-1
+  input = src\sub ipos + 9, epos - 1
   expect = src\sub epos + 10
 
   input = input\gsub '%s+$', ''
@@ -417,11 +417,11 @@ describe 'formatter', ->
 
   -- skip these for now, testing on case-by-case basis
   describe 'yuescript repo inputs', ->
-    pending 'not done here'
-    inputs = find_yue_files '../spec/yuespec', 'yue'
-
     unless os.getenv 'YUESCRIPT_SPECS'
+      pending 'not done here'
       return
+
+    inputs = find_yue_files '../spec/yuespec', 'yue'
 
     for f in *inputs
       it "should handle #{ f }", ->
@@ -433,7 +433,6 @@ describe 'formatter', ->
           content
         else
           error "could not open #{ f }"
-        
+
         r = fmt.format content
         assert.true r != nil
-
