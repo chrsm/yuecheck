@@ -415,6 +415,12 @@ describe 'formatter', ->
       r = fmt.format src
       assert.same expect, r
 
+    it 'should not dedent parens in a const line', ->
+      src, expect = parse_td fget 'fmt_paren_line'
+
+      r = fmt.format src
+      assert.same expect, r
+
   -- skip these for now, testing on case-by-case basis
   describe 'yuescript repo inputs', ->
     unless os.getenv 'YUESCRIPT_SPECS'

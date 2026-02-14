@@ -1666,7 +1666,12 @@ visitors.FnArrowBack = (state, node) ->
 
 visitors.Parens = (state, node, ctx) ->
   state\write '('
+  saved_output_len = #state.output
   visit state, node.expr, ctx
+  -- if content was multiline, indent the closing paren
+  if #state.output > saved_output_len
+    state\newline! if #state.current_line > 0
+    state\write_indent!
   state\write ')'
 
 --[[ import/export handling ]]

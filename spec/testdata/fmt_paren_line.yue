@@ -1,0 +1,10 @@
+-- input
+do
+  const c = (switch x
+    when 'abc' then 998) if true
+
+-- expect
+do
+  const c = (switch x
+    when 'abc' then 998
+  ) if true
