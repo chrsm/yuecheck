@@ -1,6 +1,6 @@
-import 'yuecheck.types'
 import 'yuecheck.rule'
 import 'yuecheck.stdlib_defs'
+import 'yuecheck.types'
 
 -- stdlib_usage
 -- validates stdlib function calls have correct arguments
@@ -11,9 +11,9 @@ stdlib_usage = rule.FuncRule
     definitions: stdlib_defs
   on: { types.ChainValue }
   fns: [
-    'os%.', 'math%.', 'table%.', 'string%.',
-    'package%.', 'io%.', 'debug%.', 'coroutine%.',
-    '.'
+    '^os%.', '^math%.', '^table%.', '^string%.',
+    '^package%.', '^io%.', '^debug%.', '^coroutine%.',
+    '.',
   ]
   checker: (path, args, varnames, node) =>
     pkg = path[1]
@@ -60,7 +60,7 @@ stdlib_usage = rule.FuncRule
 
     if reqn == 0 and #args == 0 -- no args needed or passed
       return
-    elseif reqn == #args or (#args >= reqn and #args <= reqn+optn)
+    elseif reqn == #args or (#args >= reqn and #args <= reqn + optn)
       return
     elseif reqn < #args and #args <= optn
       return
@@ -89,9 +89,7 @@ stdlib_usage = rule.FuncRule
     else
       "#{ pkg }.#{ fn }"
 
-    typ = if (reqn > 0 and #args < reqn+optn) or -- not enough [req,opt]()
-             (reqn > 0 and #args > reqn+optn) or -- too many   [req,opt,opt](1,2,3,4)
-             (reqn == 0 and #args > reqn+optn)   -- too many   [opt](1,2,3)
+    typ = if (reqn > 0 and #args < reqn + optn) or (reqn > 0 and #args > reqn + optn) or (reqn == 0 and #args > reqn + optn) -- not enough [req,opt]()
       'ERROR'
     else
       'WARN'
@@ -124,8 +122,8 @@ stdlib_match = rule.FuncRule
   name: 'stdlib_match'
   description: ''
   type: 'error'
-  on: [ types.ExpListAssign, types.ChainValue ]
-  fns: ['string%.match', 'string%.gmatch', 'string%.find', 'string%.gsub']
+  on: [types.ExpListAssign, types.ChainValue]
+  fns: ['^string%.match$', '^string%.gmatch$', '^string%.find$', '^string%.gsub$']
   checker: (path, args, varnames, node) =>
     -- argv
     --   * [1] is the string we're operating on
@@ -144,13 +142,15 @@ stdlib_match = rule.FuncRule
     -- try to validate the pattern
     success, errmsg = try
       -- skip '|"
-      ('')\match pat\sub 2, #pat-1
+      ('')\match pat\sub 2, #pat - 1
 
     unless success
       -- gsub to strip ourselves
       issues[] = @report 'ERROR',
         "invalid pattern #{ pat }: #{ errmsg\gsub '[^%]]+%]:%d+: ', '' }",
         patn
+
+      return issues
 
     -- these could be combined, eg
     -- %[[^%]]%], then string.find 'a-z', 'A-Z', '0-9' and return as one hint
