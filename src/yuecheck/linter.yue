@@ -9,11 +9,11 @@ import 'yuecheck.types'
 import 'yuecheck.internal.fs'
 import 'yuecheck.internal.sys'
 
-ruleset = { k, v for k, v in pairs rules }
+ruleset = {k, v for k, v in pairs rules}
 
 linter =
   enable_compilation: false
-  enabled_rules: { k,true for k,_ in pairs rules }
+  enabled_rules: {k, true for k, _ in pairs rules}
 
 linter.define_rule = (t) ->
   unless t and type(t) == 'table'
@@ -47,14 +47,14 @@ linter.lint_string = (src) ->
   if err
     col = 0
     cpos = err\match '(%s+%^)$'
-    if cpos and (cpos\sub 1, 1) == "\n"
+    if cpos and (cpos\sub 1, 1) == '\n'
       col = #cpos - 2
 
-    err = err\gsub "\n", ' '
+    err = err\gsub '\n', ' '
     line = err\match '^(%d+):'
     part = err\match ': (.+)^$'
     message = (part ?? err)\gsub '^%s*(.-)%s*$', '%1'
-    return {{ type: 'ERROR', :line, :col, :message }}
+    return { { type: 'ERROR', :line, :col, :message } }
 
   violations = {}
 
@@ -82,10 +82,10 @@ linter.lint_string = (src) ->
       tmp = fs.read_file tmpname
       col = 0
       cpos = tmp\match '(%s+%^)$'
-      if cpos and (cpos\sub 1, 1) == "\n"
+      if cpos and (cpos\sub 1, 1) == '\n'
         col = #cpos - 2
 
-      err = tmp\gsub "\n", ' '
+      err = tmp\gsub '\n', ' '
       line = tmp\match '^(%d+):'
       message = (tmp\match ': (.+)^')\gsub '^%s*(.-)%s*$', '%1'
       violations[] = { type: 'ERROR', :message, :line, :col }

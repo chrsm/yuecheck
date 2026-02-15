@@ -1,6 +1,6 @@
 import 'yuecheck.ast' as ast
-import 'yuecheck.types'
 import 'yuecheck.rules.helpers' as helpers
+import 'yuecheck.types'
 
 -- cond_identical_exprs
 -- warns if both lhs and rhs comparisons are the same
@@ -167,7 +167,6 @@ unreachable =
     -- if there's a `break` right at the end (and it's not scoped),
     -- anything after it is unreachable
     -- (if there's nothing after it, it's just a code smell)
-
     -- repeat loop
     unless node\is types.Repeat
       return nil

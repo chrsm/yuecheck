@@ -4,9 +4,9 @@
 
   yuefmt is an opinionated linter for Yuescript
 ]]
-import 'yue'
 import 'argparse'
 import 'dkjson' as json
+import 'yue'
 
 import 'yuecheck.formatter'
 import 'yuecheck.internal.fs'
@@ -80,5 +80,3 @@ for file in *files
 
   fs.write_file file, ret
   io.stdout\write "formatted #{ file }\n"
-
-

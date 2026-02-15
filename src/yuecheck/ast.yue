@@ -1,10 +1,10 @@
 -- AST utilities for yuecheck
 -- provides AST building, traversal helpers, and extraction utilities
-import 'yue'
 import 'dkjson' as json
+import 'yue'
 
-import 'yuecheck.types'
 import 'yuecheck.internal.xstring'
+import 'yuecheck.types'
 
 -- Build internal AST representation from yue.to_ast output
 build = (ast, parent = nil) ->
@@ -139,6 +139,7 @@ extract.items = (node) ->
         var[] = v
 
       vars[] = var
+
   vars
 
 -- Extract assignments from ExpListAssign node
@@ -216,10 +217,10 @@ extract.simple_value = (node) ->
 
   -- Only handle simple types
   unless is.any_of v, {
-    types.ConstValue
-    types.Num
-    types.DoubleString
-    types.SingleString
+    types.ConstValue,
+    types.Num,
+    types.DoubleString,
+    types.SingleString,
   }
     return nil
 
@@ -236,7 +237,6 @@ extract.simple_value = (node) ->
 -- Expression accessors (extract.exp_*)
 -- These simplify common patterns for accessing Exp node contents
 -- -----------------------------------------------------------------------------
-
 -- Get the first value item from an Exp node
 -- Equivalent to: exp.pipeExprs?[1]?.expos?[1]?.item
 extract.exp_first_value = (exp) ->
@@ -270,7 +270,6 @@ extract.exp_unary_op = (exp) ->
 -- -----------------------------------------------------------------------------
 -- ChainValue accessors (extract.chainvalue_*)
 -- -----------------------------------------------------------------------------
-
 -- Get the base name from a ChainValue (first item's variable name)
 -- Equivalent to: cv.items?[1]?.item?.name?.v
 extract.chainvalue_base = (cv) ->
@@ -286,7 +285,6 @@ extract.chainvalue_first_item = (cv) ->
 -- -----------------------------------------------------------------------------
 -- If/condition accessors (extract.if_*)
 -- -----------------------------------------------------------------------------
-
 -- Get the condition expression from an If node's first branch
 -- Equivalent to: if_node.nodes?[1]?.condition
 extract.if_condition = (if_node) ->
@@ -342,6 +340,7 @@ simplify.assignment = (node) ->
                     continue -- skip unknown
           else
             continue -- skip unknown
+
     (table.concat r, '.'), r
 
   value = (values) ->

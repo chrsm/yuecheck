@@ -2,8 +2,8 @@ import 'yuecheck.macros' as { $ }
 
 import 'dkjson' as json
 
-import 'yuecheck.types'
 import 'yuecheck.internal.xstring'
+import 'yuecheck.types'
 
 extract = {}
 is = {}
@@ -46,7 +46,6 @@ simplify.assignment = (node) ->
                 else
                   if ex.item and ex.item\is types.String
                     r[] = extract.string ex.item
-                  -- TODO: come back to this, seems like a ast/p change that has wider impact (and this is lazy/ugly)
                   elseif ex.item and ex.item\is types.ChainValue
                     if ex.item.items[1].item?.name?.v?
                       r[] = "$VAR{#{ ex.item.items[1].item.name.v }}"
@@ -82,7 +81,7 @@ simplify.assignment = (node) ->
         { type: 'number', value: v.v }
       else
         { type: 'unknown', value: v }
-      --[[
+    --[[
       else
         -- error "unknown type node #{ v\g_yue_name! } for value: #{ json.encode v }"
         if v.g_yue_name

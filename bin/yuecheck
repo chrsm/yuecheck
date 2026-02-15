@@ -1,7 +1,7 @@
 #!/usr/bin/env -S yue -e
-import 'yue'
 import 'argparse'
 import 'dkjson' as json
+import 'yue'
 
 import 'yuecheck'
 import 'yuecheck.internal.fs'

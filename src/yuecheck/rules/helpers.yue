@@ -39,8 +39,7 @@ _check_cond_expr = (iftyp, n, args) ->
 
   -- look for the const value
   cv = cond.opValues[1].pipeExprs[1].expos[1]
-  unless (cv.item\is types.SimpleValue) and
-         (cv.item.value\is types.ConstValue)
+  unless (cv.item\is types.SimpleValue) and (cv.item.value\is types.ConstValue)
     return -- bail for now
 
   -- we're only dealing with nil-ness here
@@ -76,8 +75,7 @@ _check_cond_expr = (iftyp, n, args) ->
 
   {
     type: 'WARN'
-    message: "`#{ varn }` defaults to `#{ defv }`; " ..
-             "cond #{ why } occurs `#{ iftyp } #{ varn } #{ op } #{ cv.item.value.v }`"
+    message: "`#{ varn }` defaults to `#{ defv }`; " .. "cond #{ why } occurs `#{ iftyp } #{ varn } #{ op } #{ cv.item.value.v }`"
     line: n\g_src_line!
     col: n\g_src_col!
   }

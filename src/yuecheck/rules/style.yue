@@ -1,5 +1,5 @@
-import 'yuecheck.types'
 import 'yuecheck.internal.xstring'
+import 'yuecheck.types'
 
 -- style_comment_space
 -- warns about comments that have no leading space after the `--`
@@ -139,8 +139,8 @@ style_unnecessary_doublestring =
         return
 
     -- could build list of valid escapes, is that necessary?
-    if (node.segments[1].content.v\match "\\.+") or
-       (node.segments[1].content.v\match "'") -- contains a singlequote, so it's OK
+    singleq = (node.segments[1].content.v\match "'") -- contains a singlequote, so it's OK
+    if (node.segments[1].content.v\match '\\.+') or singleq
       return
 
     {
@@ -175,7 +175,7 @@ style_conditionals =
     * types.If
   check: (node) ->
     unless node.nodes[1]?.condition?.pipeExprs?[1]?.ops?[1]?.v == 'not'
-        return
+      return
 
     -- ignore multiple exprs, can likely add them tho
     unless #node.nodes[1].condition.opValues == 0

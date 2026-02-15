@@ -1,3 +1,4 @@
+import 'dkjson' as json
 import 'yue'
 
 import 'yuecheck.ast' as ast
@@ -6,8 +7,7 @@ import 'yuecheck.types'
 invalid_checker = (rule, args) ->
   args or= {}
   () =>
-    msg = "#{ rule }/#{ @name }: checker not found. " ..
-          "define one with (#{ table.concat args, ', ' }) as arguments"
+    msg = "#{ rule }/#{ @name }: checker not found. define one with (#{ table.concat args, ', ' }) as arguments"
     error msg
 
 class Rule
@@ -16,19 +16,16 @@ class Rule
   on: []
   config: {}
   checker: invalid_checker 'Rule'
-
   new: (opts = {}) =>
     @name = opts.name
     @description = opts.description
     @on = opts.on
     @checker = opts.checker
     @config = opts.config
-
   set_on: (@on) =>
     assert (type @on) == 'table'
   set_checker: (@checker) =>
     assert (type @checker) == 'function'
-
   report: (severity, message, node) =>
     {
       type: severity
@@ -36,17 +33,14 @@ class Rule
       line: node\g_src_line!
       col: node\g_src_col!
     }
-
   check: (node) =>
     @checker node
 
 class AssignRule extends Rule
   on: { types.ExpListAssign }
   checker: invalid_checker 'Rule', ['simplified_assigns', 'node']
-
   new: (opts = {}) =>
     super opts
-
   check: (node) =>
     if ast.is.chainvalue_call node
       return
@@ -74,17 +68,14 @@ class AssignRule extends Rule
 class FuncRule extends Rule
   name: 'func_rule'
   description: 'rule for checking function calls'
-  on: [ types.ExpListAssign, types.ChainValue ]
+  on: [types.ExpListAssign, types.ChainValue]
   fns: []
   checker: invalid_checker 'FuncRule', ['fully_qualified_fn_path', 'arguments', 'varnames', 'node']
-
   new: (opts) =>
     super opts
     @fns = opts.fns
-
   set_funcs: (@fns) =>
     assert (type @fns) == 'table'
-
   check: (node) =>
     pkg = nil
     ianode = nil
@@ -116,8 +107,7 @@ class FuncRule extends Rule
       --    `love.filesystem.append` = package(love.filesystem) fn(append)
       cv = nil
       if node\is types.ExpListAssign
-        unless v.pipeExprs and
-               v.pipeExprs[1]?.expos?[1]?.item?.items?
+        unless v.pipeExprs and v.pipeExprs[1]?.expos?[1]?.item?.items?
           continue
         cv = v.pipeExprs[1].expos[1].item.items
       else
@@ -152,7 +142,7 @@ class FuncRule extends Rule
       return
 
     -- they have an incomplete call, will be caught by stdlib_usage
-    unless ianode and ianode.args and #ianode.args>0
+    unless ianode and ianode.args and #ianode.args > 0
       return
 
     -- specific to string.match

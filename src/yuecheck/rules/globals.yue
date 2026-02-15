@@ -1,5 +1,5 @@
-import 'yuecheck.rule'
 import 'yuecheck.internal.xstring'
+import 'yuecheck.rule'
 
 -- global_writes
 -- warns about using global variables, they should be treated as read-only
@@ -18,7 +18,7 @@ _G[a] = 'b'
 global_writes = rule.AssignRule
   name: 'global_writes'
   description: 'checks for writes to known-globals'
-  config: 
+  config:
     patterns: ['^_G[%.%[]', '^_ENV[%.%[]', '^package[%.%[]', '^_G$']
   checker: (assigns, node) =>
     unless assigns and #assigns > 0

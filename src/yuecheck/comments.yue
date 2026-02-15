@@ -1,8 +1,8 @@
 import 'lpegrex' as lp
 
-import 'yuecheck.types'
 import 'yuecheck.internal.xstring'
 import 'yuecheck.internal.xtable'
+import 'yuecheck.types'
 
 -- see:
 --   * https://github.com/edubart/lpegrex/blob/main/parsers/lua.lua
@@ -26,7 +26,6 @@ StringLong  <- ('[' {:level:('='*):} '[' ( !(']' =level ']') .)* ']' =level $']'
 EOL <- %cn %cr / %cr %cn / %cn / %cr
 EOF <- !.
 ]===]
-
 
 pat = lp.compile grammar
 
@@ -86,6 +85,7 @@ comments_between = (comments, p1, p2) ->
 
       for c in *comments[v]
         r[v][] = c
+
   r
 
 export default {
