@@ -1,0 +1,14 @@
+-- lazy dedup
+dedup = (t) ->
+  uniq = {}
+  vals = {}
+  for v in *t
+    if uniq[v]
+      continue
+    uniq[v] = v
+    vals[] = v
+  vals
+
+export default {
+  :dedup
+}

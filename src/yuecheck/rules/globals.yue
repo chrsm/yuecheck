@@ -1,5 +1,5 @@
 import 'yuecheck.rule'
-import 'yuecheck.util'
+import 'yuecheck.internal.xstring'
 
 -- global_writes
 -- warns about using global variables, they should be treated as read-only
@@ -26,11 +26,11 @@ global_writes = rule.AssignRule
 
     issues = {}
     for p in *assigns
-      unless util.match_any p.name, @config.patterns
+      unless xstring.match_any p.name, @config.patterns
         continue
 
       msg = if #p.path > 0
-        "discourage write to global (#{ util.stripq p.name })"
+        "discourage write to global (#{ xstring.stripq p.name })"
       else
         "discourage write to global (#{ p.path[1] })"
       issues[] = @report 'WARN', msg, node

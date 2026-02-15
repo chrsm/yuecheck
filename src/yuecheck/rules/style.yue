@@ -1,5 +1,5 @@
 import 'yuecheck.types'
-import 'yuecheck.util'
+import 'yuecheck.internal.xstring'
 
 -- style_comment_space
 -- warns about comments that have no leading space after the `--`
@@ -189,7 +189,7 @@ style_conditionals =
       name = vnode.name.v
     else
       name = vnode.v
-    name = util.stripq name
+    name = xstring.stripq name
 
     message = switch iftyp
       when 'if'
@@ -348,7 +348,7 @@ style_discourage_unnecessary_sb =
 
               if item\is types.String
                 if item.str\is types.SingleString
-                  k = util.stripq item.str.v
+                  k = xstring.stripq item.str.v
                   -- skip 'keys-like-this' (telescope)
                   if k\match '%w+%-%w'
                     continue

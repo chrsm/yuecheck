@@ -1,7 +1,8 @@
 import 'lpegrex' as lp
 
 import 'yuecheck.types'
-import 'yuecheck.util'
+import 'yuecheck.internal.xstring'
+import 'yuecheck.internal.xtable'
 
 -- see:
 --   * https://github.com/edubart/lpegrex/blob/main/parsers/lua.lua
@@ -56,7 +57,7 @@ to_ast = (src) ->
       when 'YueMultilineComment'
         t = types.YueMultilineComment content
       when 'YueLineComment'
-        t = types.YueLineComment util.stripnl content
+        t = types.YueLineComment xstring.stripnl content
       else
         -- should never happen unless this isn't kept up-to-date with grammar
         continue
@@ -68,7 +69,7 @@ to_ast = (src) ->
     comments.indices[] = line
 
   -- remove dup lines
-  comments.indices = util.dedup comments.indices
+  comments.indices = xtable.dedup comments.indices
   table.sort comments.indices
 
   comments

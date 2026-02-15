@@ -1,0 +1,45 @@
+import 'lfs'
+
+-- example: exec_cmd [[ yue -e 'print _VERSION .. os.getenv '\''VAR'\''' ]], { env: { 'VAR': 'xyz' } }
+-- see:
+--   https://man7.org/linux/man-pages/man3/popen.3.html
+-- returns: success (boolean), exit_type ('exit'|'signal'), exit_code (number)
+exec_cmd = (cmd, opts = {}) ->
+  if opts.chdir
+    cmd = "cd #{ opts.chdir } && #{ cmd }"
+  if opts.env
+    for k, v in pairs opts.env
+      cmd = "#{ k }='#{ v }' #{ cmd }"
+
+  p = io.popen cmd, 'w'
+  if opts.stdin
+    p\write opts.stdin
+  ok, exit_type, code = p\close!
+
+  -- pass back what \close gives
+  (ok == true), exit_type, code
+
+chdir_root = ->
+  origdir = lfs.currentdir!
+  found = false
+  while not found
+    cwd = lfs.currentdir!
+    if cwd == '/'
+      break
+
+    for f in lfs.dir cwd
+      if f == '.git'
+        found = true
+        break
+
+    unless found
+      lfs.chdir "#{ cwd }/.."
+
+  origdir, lfs.currentdir!
+
+export default {
+  :exec_cmd
+
+  :chdir_root
+  chdir: lfs.chdir
+}

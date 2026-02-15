@@ -3,7 +3,7 @@ import 'yuecheck.macros' as { $ }
 import 'dkjson' as json
 
 import 'yuecheck.types'
-import 'yuecheck.util'
+import 'yuecheck.internal.xstring'
 
 extract = {}
 is = {}
@@ -69,11 +69,11 @@ simplify.assignment = (node) ->
       when v == nil or v.is == nil
         nil
       when v\is types.String
-        { type: 'string', value: util.stripq extract.string v }
+        { type: 'string', value: xstring.stripq extract.string v }
       when (v\is types.SimpleValue) and v.value\is types.Num
         { type: 'number', value: v.value.v }
       when (v\is types.SimpleValue) and v.value\is types.ConstValue
-        { type: 'const', value: util.stripq v.value.v }
+        { type: 'const', value: xstring.stripq v.value.v }
       when (v\is types.SimpleValue) and v.value\is types.FunLit
         { type: 'function', value: nil }
       when v\is types.ChainValue

@@ -5,7 +5,9 @@ import 'yuecheck.comments' as ycomments
 import 'yuecheck.rule'
 import 'yuecheck.rules'
 import 'yuecheck.types'
-import 'yuecheck.util'
+
+import 'yuecheck.internal.fs'
+import 'yuecheck.internal.sys'
 
 ruleset = { k, v for k, v in pairs rules }
 
@@ -33,11 +35,7 @@ linter.to_ast = (src) ->
 linter.build_ast = ast.build
 
 linter.lint_file = (path) ->
-  fp, err = io.open path, 'r'
-  content = fp\read 'a*'
-  fp\close!
-
-  linter.lint_string content
+  path |> fs.read_file |> linter.lint_string
 
 linter.lint_string = (src) ->
   raw_ast, err = yue.to_ast src, 0
@@ -78,10 +76,10 @@ linter.lint_string = (src) ->
   if linter.enable_compilation
     tmpname = os.tmpname!
     cmd = "yue -- 2>&1 > #{ tmpname }" -- popen is a bit annoying, can't do stdin+stdout
-    ok, _, _ = util.exec_cmd_w cmd, stdin: src
+    ok, _, _ = sys.exec_cmd cmd, stdin: src
 
     unless ok
-      tmp = util.readfile tmpname
+      tmp = fs.read_file tmpname
       col = 0
       cpos = tmp\match '(%s+%^)$'
       if cpos and (cpos\sub 1, 1) == "\n"

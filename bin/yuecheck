@@ -1,77 +1,21 @@
 #!/usr/bin/env -S yue -e
 import 'yue'
-import 'lfs'
 import 'argparse'
 import 'dkjson' as json
-import 'inspect'
 
 import 'yuecheck'
+import 'yuecheck.internal.fs'
+import 'yuecheck.internal.sys'
 
--- TODO: cleanup!
-
---[[ util ]]
-_str_ends_with = (s, suffix) ->
-  len = #s
-  slen = #suffix
-  for i = 0, slen - 1
-    if (s\byte len - i) != suffix\byte (slen - i)
-      return false
-  true
-is_dir = (dir) -> (lfs.attributes dir, 'mode') == 'directory'
-find_files = (path, ext, exclude = {}) ->
-  unless is_dir path
-    return nil, error "(#{ path }, #{ ext }) is not a directory"
-
-  if (path\sub #path, #path) == '/'
-    path = path\sub 1, #path - 1
-
-  files = {}
-  for ent in lfs.dir path
-    continue if ent in { '.', '..' }
-
-    p = "#{ path }/#{ ent }"
-    skip = false
-    for v in *exclude
-      if p\match v
-        skip = true
-        break
-    if skip
-      continue
-
-    if is_dir p
-      -- skip common dirs
-      if p\match '%.git$'
-        continue
-      files = { ...files, ...(find_files p, ext, exclude)}
-    elseif _str_ends_with p, ".#{ ext }"
-      files[] = p
-  files
---[[ /util ]]
-
--- find config
-origdir = lfs.currentdir!
-found = false
-while not found
-  cwd = lfs.currentdir!
-  if cwd == '/'
-    break
-
-  for f in lfs.dir cwd
-    if f == '.git'
-      found = true
-      break
-
-  unless found
-    lfs.chdir "#{ cwd }/.."
-
-cfg = if lfs.attributes '.yuecheck', 'mode'
+orig_dir, root_dir = sys.chdir_root!
+cfg = if fs.exists '.yuecheck', 'mode'
   yue.dofile '.yuecheck'
-elseif lfs.attributes ("#{ os.getenv 'HOME' }/.yuecheck"), 'mode'
+elseif fs.exists "#{ os.getenv 'HOME' }/.yuecheck"
   yue.dofile "#{ os.getenv 'HOME' }/.yuecheck"
 else
   nil
 
-lfs.chdir origdir
+sys.chdir orig_dir
 argp = argparse!
   name: 'yuecheck'
   description: 'tool for analyzing and linting yue code'
@@ -133,10 +77,10 @@ if args.stdin
 
   return
 elseif args.directory
-  src = find_files args.directory, 'yue', args.exclude
+  src = fs.find_files args.directory, 'yue', args.exclude
 elseif args.dir_or_file
-  if (lfs.attributes args.dir_or_file, 'mode') == 'directory'
-    src = find_files args.dir_or_file, 'yue', args.exclude
+  if fs.is_dir args.dir_or_file
+    src = fs.find_files args.dir_or_file, 'yue', args.exclude
   else
     src = { args.dir_or_file }
 elseif args.file

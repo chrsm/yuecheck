@@ -1,0 +1,14 @@
+stripq = (str) -> str\gsub "[\"']", ''
+
+stripnl = (str) -> str\gsub '(.+)\n+', '%1'
+
+match_any = (str, pats) ->
+  for p in *pats
+    if str\match p
+      return p
+
+export default {
+  :stripnl
+  :stripq
+  :match_any
+}
