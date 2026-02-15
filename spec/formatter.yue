@@ -438,6 +438,12 @@ describe 'formatter', ->
       r = fmt.format src
       assert.same expect, r
 
+    it 'should not transform :key into lists', ->
+      src, expect = parse_td fget 'fmt_table_keynames'
+
+      r = fmt.format src
+      assert.same expect, r
+
   -- skip these for now, testing on case-by-case basis
   describe 'yuescript repo inputs', ->
     unless os.getenv 'YUESCRIPT_SPECS'

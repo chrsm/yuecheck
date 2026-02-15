@@ -1,0 +1,14 @@
+-- make sure `:var` names do not get mucked up
+-- input
+x =
+  fs:
+    :exists
+    :is_dir
+    :find_files
+
+-- expect
+x =
+  fs:
+    :exists
+    :is_dir
+    :find_files

@@ -276,11 +276,11 @@ render_to_string = (state, node, ctx) ->
   result, is_multiline
 
 -- check if an item is a key-value pair type
+-- TODO(@chrsm): make \is_any types.NormalPair, types.VariablePair, etc (not sure how many need to be included)
 is_pair_type = (item) ->
-  unless item and item.g_yue_name
+  unless item?.g_yue_name
     return false
 
-  -- lazy
   return (string.find item\g_yue_name!, 'Pair') != nil
 
 -- pack items onto lines respecting line_width
@@ -996,7 +996,7 @@ visitors.TableBlock = (state, node, ctx) ->
     write_above state, ctx, val
     state\write_indent!
 
-    unless val\is types.NormalPair
+    unless is_pair_type val
       state\write '* '
 
     visit state, val, ctx
