@@ -138,6 +138,19 @@ describe 'find_comments lpegrex', ->
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
+  it 'should properly parse comments with mixed content', -> 
+    r = linter.find_comments fget '../spec/testdata/fmt_comment_content.yue'
+    expect =
+      * n: 1, line: 5, comment: "-- example: exec_cmd_w [[ yue -e 'print _VERSION .. os.getenv '\\''VAR'\\''' ]], { env: { 'VAR': 'xyz' } }"
+      * n: 1, line: 6, comment: '-- see:'
+      * n: 1, line: 7, comment: '--   https://man7.org/linux/man-pages/man3/popen.3.html'
+      * n: 1, line: 8, comment: "-- returns: success (boolean), exit_type ('exit'|'signal'), exit_code (number)"
+    for v in *expect
+      assert.truthy r[v.line], "expect r[#{ v.line }] to exist in results"
+      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert.same v.comment, r[v.line][v.n].v
+
+
 describe 'comments/between', ->
   linter.enabled_rules = {}
 

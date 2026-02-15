@@ -18,8 +18,8 @@ YueMultilineComment <== ('--[' {:level:('='*):} '[' ( !(']' =level ']') . )* ']'
 
 -- need string defined so that we do not include comments that are inside of them
 String      <-- (StringShort / StringLong)
-StringShort <- ('"' ( !'"' ('\\.' / . ) )* '"' /
-                   "'" ( !"'" ('\\.' / . ) )* "'")->0
+StringShort <- ('"' ( !'"' ([\\] . / . ) )* '"' /
+                   "'" ( !"'" ([\\] . / . ) )* "'")->0
 StringLong  <- ('[' {:level:('='*):} '[' ( !(']' =level ']') .)* ']' =level $']')->0
 
 EOL <- %cn %cr / %cr %cn / %cn / %cr

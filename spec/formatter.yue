@@ -444,6 +444,14 @@ describe 'formatter', ->
       r = fmt.format src
       assert.same expect, r
 
+    -- duplicative of the comment parser one, but i also want to make sure it
+    -- comes out in the formatter, not _just_ parsed correctly.
+    it 'should keep comments even with mixed formatting', ->
+      src, expect = parse_td fget 'fmt_comment_content_fmt'
+
+      r = fmt.format src
+      assert.same expect, r
+
   -- skip these for now, testing on case-by-case basis
   describe 'yuescript repo inputs', ->
     unless os.getenv 'YUESCRIPT_SPECS'
