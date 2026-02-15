@@ -340,6 +340,17 @@ describe 'formatter', ->
       r = fmt.format input
       assert.same "x = {\n  args:\n    * '--stdin'\n  key: true\n}", r
 
+  describe 'for break values', ->
+    it 'should handle assignment breaks', ->
+      input = "x = for v in *t\n  break true"
+      r = fmt.format input
+      assert.same "x = for v in *t\n  break true", r
+
+    it 'should handle _multiple_ assignment breaks', ->
+      input = "x, y = for v in *t\n  break true,1"
+      r = fmt.format input
+      assert.same "x, y = for v in *t\n  break true, 1", r
+
   -- TODO: add some more thorough test cases
   -- mostly adding these as i work on stuff and dogfood the formatter
   describe 'golden files', ->

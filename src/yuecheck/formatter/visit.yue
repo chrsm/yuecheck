@@ -1533,9 +1533,9 @@ visitors.Continue = (state, node) ->
 
 visitors.BreakLoop = (state, node, ctx) ->
   visit state, node.type, ctx
-  if node.value
+  if node.valueList
     state\write ' '
-    visit state, node.value, ctx
+    visit state, node.valueList, ctx
 
 visitors.Local = (state, node, ctx) ->
   state\write 'local '
