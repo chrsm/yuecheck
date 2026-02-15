@@ -1,6 +1,6 @@
 -- yuecheck:ignore=stdlib_usage,style_comment_space
-import 'lfs'
 import 'busted.runner' as busted
+import 'lfs'
 busted!
 
 import 'yuecheck.formatter' as fmt
@@ -342,14 +342,14 @@ describe 'formatter', ->
 
   describe 'for break values', ->
     it 'should handle assignment breaks', ->
-      input = "x = for v in *t\n  break true"
+      input = 'x = for v in *t\n  break true'
       r = fmt.format input
-      assert.same "x = for v in *t\n  break true", r
+      assert.same 'x = for v in *t\n  break true', r
 
     it 'should handle _multiple_ assignment breaks', ->
-      input = "x, y = for v in *t\n  break true,1"
+      input = 'x, y = for v in *t\n  break true,1'
       r = fmt.format input
-      assert.same "x, y = for v in *t\n  break true, 1", r
+      assert.same 'x, y = for v in *t\n  break true, 1', r
 
   -- TODO: add some more thorough test cases
   -- mostly adding these as i work on stuff and dogfood the formatter
@@ -448,6 +448,18 @@ describe 'formatter', ->
     -- comes out in the formatter, not _just_ parsed correctly.
     it 'should keep comments even with mixed formatting', ->
       src, expect = parse_td fget 'fmt_comment_content_fmt'
+
+      r = fmt.format src
+      assert.same expect, r
+
+    it 'should not add a nl after an if block if not already present', ->
+      src, expect = parse_td fget 'fmt_else_nl'
+
+      r = fmt.format src
+      assert.same expect, r
+
+    it 'should not add newlines after for blocks automagically', ->
+      src, expect = parse_td fget 'fmt_for_nl'
 
       r = fmt.format src
       assert.same expect, r

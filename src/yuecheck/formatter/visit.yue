@@ -1133,7 +1133,8 @@ visitors.If = (state, node, ctx) ->
           state\pop!
 
           -- add newline after body if there's more (elseif/else) coming
-          state\newline! if i < #nodes
+          if i < #nodes and #state.current_line > 0
+            state\newline!
     elseif item\is types.Block or item\is types.Statement
       -- this is an else block (no condition before it)
       state\write_indent!
@@ -1234,7 +1235,6 @@ visitors.ForNum = (state, node, ctx) ->
   state\push!
   visit state, node.body, ctx
   state\pop!
-  state\newline!
 
 visitors.ForEach = (state, node, ctx) ->
   state\write 'for '
@@ -1246,7 +1246,6 @@ visitors.ForEach = (state, node, ctx) ->
   state\push!
   visit state, node.body, ctx
   state\pop!
-  state\newline!
 
 visitors.While = (state, node, ctx) ->
   state\write 'while '

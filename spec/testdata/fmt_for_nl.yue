@@ -1,0 +1,39 @@
+-- input
+f = ->
+  switch true
+    when x
+      p
+    when y
+      for v in *v
+        p
+    else
+      p2
+
+for x in *x
+  print y
+
+print 1
+
+for x in *x
+  print y
+print 1
+
+-- expect
+f = ->
+  switch true
+    when x
+      p
+    when y
+      for v in *v
+        p
+    else
+      p2
+
+for x in *x
+  print y
+
+print 1
+
+for x in *x
+  print y
+print 1

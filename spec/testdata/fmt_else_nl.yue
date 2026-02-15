@@ -1,0 +1,35 @@
+-- input
+for ex in *p.expos
+  if ex.items
+    for item in *ex.items
+      r[] = extract.string item
+  else
+    if ex.item and ex.item\is types.String
+      r[] = extract.string ex.item
+    elseif ex.item and ex.item\is types.ChainValue
+      if ex.item.items[1].item?.name?.v?
+        r[] = "$VAR{#{ ex.item.items[1].item.name.v }}"
+      elseif ex.item.items[1]\is types.String
+        r[] = extract.string ex.item.items[1]
+      else
+        continue -- skip unknown
+    else
+      continue -- skip unknown
+
+-- expect
+for ex in *p.expos
+  if ex.items
+    for item in *ex.items
+      r[] = extract.string item
+  else
+    if ex.item and ex.item\is types.String
+      r[] = extract.string ex.item
+    elseif ex.item and ex.item\is types.ChainValue
+      if ex.item.items[1].item?.name?.v?
+        r[] = "$VAR{#{ ex.item.items[1].item.name.v }}"
+      elseif ex.item.items[1]\is types.String
+        r[] = extract.string ex.item.items[1]
+      else
+        continue -- skip unknown
+    else
+      continue -- skip unknown
