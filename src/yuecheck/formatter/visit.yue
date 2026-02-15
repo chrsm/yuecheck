@@ -1,6 +1,6 @@
 import 'yuecheck.ast'
-import 'yuecheck.types'
 import 'yuecheck.comments' as comment_parser
+import 'yuecheck.types'
 
 -- reserved keywords, cannot be used as simple identifiers
 -- see `ast_parser.cpp` :15 and :28
@@ -443,9 +443,15 @@ visitors.SingleString = (state, node) ->
     state\write "'"
 
 visitors.LuaString = (state, node) ->
-  state\write '[['
+  visit state, node.open, ctx
+  unless node.open\g_src_line! == node.content\g_src_line!
+    state\newline!
+
   state\write node.content.v if node.content
-  state\write ']]'
+
+  unless node.close\g_src_line! == node.content\g_src_line!
+    state\newline!
+  visit state, node.close, ctx
 
 --[[ identifiers ]]
 
