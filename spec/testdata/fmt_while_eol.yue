@@ -1,0 +1,25 @@
+-- input
+if best_node and best_type == 'end_of_line'
+  if best_node\is_any types.Block, types.Body
+    -- look for the actual statement on the next line
+    next_line = comment_line + 1
+    while next_line <= comment_line + 50 -- arbitrary search 50 lines ahead
+      if nodes_by_line[next_line] and #nodes_by_line[next_line] > 0
+        best_node = nodes_by_line[next_line][1].node
+        best_type = 'above'
+        break
+
+      next_line += 1
+
+-- expect
+if best_node and best_type == 'end_of_line'
+  if best_node\is_any types.Block, types.Body
+    -- look for the actual statement on the next line
+    next_line = comment_line + 1
+    while next_line <= comment_line + 50 -- arbitrary search 50 lines ahead
+      if nodes_by_line[next_line] and #nodes_by_line[next_line] > 0
+        best_node = nodes_by_line[next_line][1].node
+        best_type = 'above'
+        break
+
+      next_line += 1
