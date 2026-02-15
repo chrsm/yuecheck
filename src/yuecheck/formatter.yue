@@ -7,7 +7,7 @@ import 'yuecheck.formatter.state' as state
 import 'yuecheck.formatter.visit' as visit
 
 join_import = (inners) ->
-  s = []
+  s = [inner.v for inner in *inners]
   table.concat s, '.'
 
 -- extract module name from an Import statement (for sorting)
@@ -25,7 +25,7 @@ get_import_module_name = (stmt) ->
     return nil
 
   -- TODO(@chrsm): support ImportFrom, ImportGlobal and ImportAllGlobal
-  -- 
+  --
   switch true
     -- ImportAs: import 'module' or import 'module' as x
     when inner\is types.ImportAs
@@ -54,7 +54,7 @@ import 'a'
 ]]
 -- will be sorted distinctly
 sort_imports = (block) ->
-  unless block and block.statementOrComments
+  unless block?.statementOrComments
     return
 
   stmts = block.statementOrComments
@@ -86,7 +86,7 @@ sort_imports = (block) ->
 
       -- check for blank line between imports (line gap > 1)
       next_line = next_stmt\g_src_line!
-      if prev_line and next_line and (next_line - prev_line) > 1
+      if (next_line - prev_line) > 1
         -- blank line found, start new group
         break
 
