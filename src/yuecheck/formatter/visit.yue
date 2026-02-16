@@ -858,6 +858,11 @@ visitors.FnArgDefList = (state, node, ctx) ->
 visitors.FnArgDef = (state, node, ctx) ->
   visit state, node.name, ctx
   write_trailing state, ctx, node.name if node.name
+  
+  -- type annotation: `TypeName
+  if node.label
+    state\write '`'
+    visit state, node.label, ctx
 
   if node.defaultValue
     state\write ' = '
@@ -2038,10 +2043,13 @@ visitors.LuaKeyword = (state, node) ->
 -- YAML literals
 -- TODO: validate this, i don't use this feature (write some tests)
 visitors.YAMLLine = (state, node, ctx) ->
-  visit state, node.content, ctx if node.content
+  -- output indent then segments
+  visit state, node.indent, ctx if node.indent
+  for seg in *(node.segments or {})
+    visit state, seg, ctx
 
-visitors.YAMLLineContent = (state, node) ->
-  state\write node.v if node.v
+visitors.YAMLLineContent = (state, node, ctx) ->
+  visit state, node.content, ctx if node.content
 
 visitors.YAMLLineInner = (state, node) ->
   state\write node.v if node.v
@@ -2050,9 +2058,41 @@ visitors.YAMLIndent = (state, node) ->
   state\write node.v if node.v
 
 visitors.YAMLMultiline = (state, node, ctx) ->
-  for i, line in ipairs (node.lines or {})
+  -- YAML multiline strings (used in macros) - extract from source to preserve
+  -- interpolations and indentation which are lost in the AST
+  src_line = node\g_src_line!
+  src_col = node\g_src_col!
+  
+  if src_line and ctx.source_lines
+    -- find the `|` and extract everything from there to end of YAML block
+    line = ctx.source_lines[src_line]
+    if line
+      pipe_pos = line\find '|', src_col
+      if pipe_pos
+        -- determine base indent level (indent of the `|` line)
+        base_indent = #(line\match '^%s*' or '')
+        
+        -- start building from the pipe
+        result = line\sub pipe_pos
+        -- scan subsequent lines that are more indented (part of YAML block)
+        current_line = src_line + 1
+        while ctx.source_lines[current_line]
+          next_line = ctx.source_lines[current_line]
+          -- YAML block continues while lines are more indented than base
+          line_indent = #(next_line\match '^%s*' or '')
+          if next_line == '' or line_indent > base_indent
+            result ..= "\n" .. next_line
+            current_line += 1
+          else
+            break
+        state\write result
+        return
+  
+  -- fallback: output what we have from AST
+  state\write '|'
+  for line in *(node.lines or {})
+    state\newline!
     visit state, line, ctx
-    state\newline! if i < #(node.lines or {})
 
 visitors.StatementSep = (state, node) ->
   state\write ';'

@@ -294,6 +294,10 @@ describe 'formatter', ->
       r = fmt.format 'print (class WhatsUp).__name'
       assert.same 'print (class WhatsUp).__name', r
 
+    it 'should handle macros (including `)', ->
+      r = fmt.format 'macro NumAndStr2 = (num`Num, str`SingleString) -> |\n  [#{num}, #{str}]'
+      assert.same 'macro NumAndStr2 = (num`Num, str`SingleString) -> |\n  [#{num}, #{str}]', r
+
   describe 'classes', ->
     it 'should format simple class', ->
       r = fmt.format 'class Foo\n  x: 1'
