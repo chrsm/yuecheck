@@ -1233,6 +1233,11 @@ visitors.ForNum = (state, node, ctx) ->
     visit state, node.stepValue.value, ctx
   state\newline!
   state\push!
+
+  -- single-statement body (inline `do`), reformatted to multiline and loses `do`
+  if node.body\is types.Statement
+    state\write_indent!
+
   visit state, node.body, ctx
   state\pop!
 
@@ -1244,6 +1249,11 @@ visitors.ForEach = (state, node, ctx) ->
   state\newline!
 
   state\push!
+
+  -- single-statement body (inline `do`), reformatted to multiline and loses `do`
+  if node.body\is types.Statement
+    state\write_indent!
+
   visit state, node.body, ctx
   state\pop!
 
