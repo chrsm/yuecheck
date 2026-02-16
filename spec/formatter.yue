@@ -194,6 +194,13 @@ describe 'formatter', ->
       r = fmt.format input
       assert.same expect, r
 
+    it 'should handle nested if-elseif inline to ml with indent', ->
+      input = 'if x\n  y\nelseif y\n  z else show 5'
+      expect = 'if x\n  y\nelseif y\n  z\nelse\n  show 5'
+
+      r = fmt.format input
+      assert.same expect, r
+
   describe 'local attributes', ->
     it 'should format const declaration', ->
       r = fmt.format 'const z=42'

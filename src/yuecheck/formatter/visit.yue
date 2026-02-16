@@ -1191,6 +1191,8 @@ visitors.If = (state, node, ctx) ->
         state\write 'else'
         state\newline!
         state\push!
+        -- for Statement (inline else converted to block), write indent before content
+        state\write_indent! if item\is types.Statement
         visit state, item, ctx
         state\pop!
     i += 1
