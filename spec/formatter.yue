@@ -185,6 +185,10 @@ describe 'formatter', ->
       r = fmt.format 'while x > 0\n  x -= 1'
       assert.same 'while x > 0\n  x -= 1', r
 
+    it 'should format inline while', ->
+      r = fmt.format 'while true do print 1'
+      assert.same 'while true\n  print 1', r
+
     it 'should handle if multi-assign', ->
       input = 'if x, y := z!\n  p!'
       r = fmt.format input

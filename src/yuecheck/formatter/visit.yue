@@ -1381,6 +1381,7 @@ visitors.While = (state, node, ctx) ->
   state\newline!
 
   state\push!
+  state\write_indent!
   visit state, node.body, ctx
   state\pop!
   state\newline!

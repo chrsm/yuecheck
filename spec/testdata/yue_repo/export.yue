@@ -150,7 +150,7 @@ f {k, v for k, v in pairs tb}
 f for k, v in pairs tb
   { k, v }
 f while a
-true
+  true
 f with a
   .b = 123
 f a?.b
