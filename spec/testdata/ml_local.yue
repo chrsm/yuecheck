@@ -1,0 +1,11 @@
+-- input
+do
+	local *
+	x, \
+  y \
+	= 123, 456
+
+-- expect
+do
+  local *
+  x, y = 123, 456

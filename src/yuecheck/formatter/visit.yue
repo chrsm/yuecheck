@@ -1096,10 +1096,16 @@ visitors.MetaNormalPairDef = (state, node, ctx) ->
 visitors.Metatable = (state, node) ->
   state\write node.v
 
--- <methodname> in table lit
+-- <methodname> in table lit, or <[expr]> for computed keys
 visitors.Metamethod = (state, node, ctx) ->
   state\write '<'
-  visit state, node.item, ctx
+  -- computed key (expression) needs brackets
+  if node.item\is types.Exp
+    state\write '['
+    visit state, node.item, ctx
+    state\write ']'
+  else
+    visit state, node.item, ctx
   state\write '>'
 
 -- <:var> shorthand in table lit
@@ -1901,7 +1907,12 @@ visitors.Macro = (state, node, ctx) ->
 
 -- $macro! inline execution
 visitors.MacroInPlace = (state, node, ctx) ->
+  state\write '$ ->'
+  state\newline!
+  state\push!
+  state\write_indent!
   visit state, node.body, ctx
+  state\pop!
 
 visitors.MacroName = (state, node, ctx) ->
   -- $name for macro calls

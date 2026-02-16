@@ -231,6 +231,11 @@ describe 'formatter', ->
       r = fmt.format 'close f = io.open "file"'
       assert.same "close f = io.open 'file'", r
 
+    it 'should handle multiline local decl', ->
+      input, expect = parse_td fget 'ml_local'
+      r = fmt.format input
+      assert.same expect, r
+
   describe 'pipe bodies', ->
     it 'should format multi-line pipe chain with indent', ->
       r = fmt.format 'x = 1\n  |> fn1\n  |> fn2'
@@ -294,9 +299,21 @@ describe 'formatter', ->
       r = fmt.format 'print (class WhatsUp).__name'
       assert.same 'print (class WhatsUp).__name', r
 
+  describe 'macros', ->
     it 'should handle macros (including `)', ->
       r = fmt.format 'macro NumAndStr2 = (num`Num, str`SingleString) -> |\n  [#{num}, #{str}]'
       assert.same 'macro NumAndStr2 = (num`Num, str`SingleString) -> |\n  [#{num}, #{str}]', r
+
+    it 'should handle macro call', ->
+      input = '$ ->\n  "a!"'
+      expected = "$ ->\n  'a!'"
+      r = fmt.format input
+      assert.same expected, r
+    
+    it 'should handle macro call with args', ->
+      input = '$m 1, 2'
+      r = fmt.format input
+      assert.same input, r
 
   describe 'classes', ->
     it 'should format simple class', ->
@@ -327,6 +344,12 @@ describe 'formatter', ->
       input = '{<>: {func: a.b(-> 123).c = item?.defVal}} = tb'
       expected = '{ <>: { func: a.b(-> 123).c = item?.defVal } } = tb'
 
+      r = fmt.format input
+      assert.same expected, r
+
+    it 'should handle mt index key', ->
+      input = 'tb\\<[\'value\'..tostring x > y]> 123'
+      expected = "tb\\<['value' .. tostring x > y]> 123"
       r = fmt.format input
       assert.same expected, r
 
