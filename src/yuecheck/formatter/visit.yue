@@ -640,7 +640,7 @@ visitors.ChainValue = (state, node, ctx) ->
       when item\is types.TableAppendingOp
         state\write '[]'
       when item\is types.ReversedIndex
-        state\write '[#]'
+        visit state, item, ctx
       else
         visit state, item, ctx
 
@@ -723,9 +723,9 @@ visitors.String = (state, node, ctx) ->
   visit state, node.str, ctx
 
 visitors.DoubleString = (state, node, ctx) ->
-  -- yue ast does not preserve interpolated strings (`x = "#{ a }"`) in an
-  -- immediately obvious way.
-  -- we'll just check the source and just write it back if need be.
+  -- yue ast does not preserve interpolated strings (`x = "#{ a }"`) or
+  -- leading/trailing newlines in an immediately obvious way.
+  -- we'll extract from source when possible.
   src_line = node\g_src_line!
   src_col = node\g_src_col!
 
@@ -736,22 +736,52 @@ visitors.DoubleString = (state, node, ctx) ->
       str_start = line\find '"', src_col
 
       if str_start
-        -- find closing, handling escapes
+        -- find closing quote, handling escapes and multi-line strings
+        current_line = src_line
         pos = str_start + 1
-        while pos <= #line
-          ch = line\sub pos, pos
-          if ch == '\\'
-            pos += 2 -- skip escaped char
-          elseif ch == '"'
-            original_str = line\sub str_start, pos
-
-            -- preserve
-            if original_str\find '#{', 1, true
-              state\write original_str
-              return
-            break
-          else
-            pos += 1
+        found = false
+        original_str = nil
+        
+        while not found
+          current_line_text = ctx.source_lines[current_line]
+          break unless current_line_text
+          
+          -- if we moved to a new line, start from beginning
+          if current_line > src_line
+            pos = 1
+          
+          while pos <= #current_line_text
+            ch = current_line_text\sub pos, pos
+            if ch == '\\'
+              pos += 2 -- skip escaped char
+            elseif ch == '"'
+              -- found closing quote - extract the full string
+              found = true
+              if current_line == src_line
+                original_str = line\sub str_start, pos
+              else
+                -- multi-line: build from parts
+                original_str = line\sub str_start  -- first line from quote to end
+                for ln = src_line + 1, current_line - 1
+                  original_str ..= "\n" .. ctx.source_lines[ln]
+                original_str ..= "\n" .. current_line_text\sub 1, pos
+              break
+            else
+              pos += 1
+          
+          -- didn't find closing on this line, move to next
+          unless found
+            if pos > #current_line_text
+              current_line += 1
+              pos = 1
+            else
+              break  -- hit end without finding
+        
+        -- for interpolated strings or multi-line, preserve original
+        if found and original_str
+          if original_str\find('#{', 1, true) or current_line > src_line
+            state\write original_str
+            return
 
   content = ''
   if node.segments
@@ -1916,7 +1946,9 @@ visitors.TableAppendingOp = (state, node) ->
 
 visitors.ReversedIndex = (state, node, ctx) ->
   state\write '[#'
-  visit state, node.modifier, ctx if node.modifier
+  if node.modifier
+    state\write ' - '
+    visit state, node.modifier, ctx
   state\write ']'
 
 visitors.ImportLiteralInner = (state, node) ->

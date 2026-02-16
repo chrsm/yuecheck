@@ -92,6 +92,11 @@ describe 'formatter', ->
       r = fmt.format 'x = y^2'
       assert.same 'x = y^2', r
 
+    -- yue ast turns this into 'hello world', no nls, but we extract from source
+    it 'should handle multiline strings with leading / trailing nl', ->
+      r = fmt.format 'x = "\nhello world\n"'
+      assert.same "x = \"\nhello world\n\"", r
+
   describe 'inline comment preservation', ->
     it 'should preserve inline comment on variable', ->
       r = fmt.format 'b --[[ x ]] = 2'
@@ -140,6 +145,10 @@ describe 'formatter', ->
     it 'should format table with string value', ->
       r = fmt.format 'x = { a: "str" }'
       assert.same "x = { a: 'str' }", r
+
+    it 'should format table len (# op) with expr', ->
+      r = fmt.format 'y = x[#-2]'
+      assert.same 'y = x[# - 2]', r
 
   -- mostly verification that these don't get messed up
   describe 'functions', ->
