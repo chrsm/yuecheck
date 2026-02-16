@@ -1049,7 +1049,7 @@ visitors.Metamethod = (state, node, ctx) ->
 
 -- <:var> shorthand in table lit
 visitors.MetaVariablePair = (state, node, ctx) ->
-  state\write '<:'
+  state\write ':<'
   visit state, node.name, ctx
   state\write '>'
 
@@ -1148,8 +1148,23 @@ visitors.If = (state, node, ctx) ->
 visitors.IfCond = (state, node, ctx) ->
   visit state, node.condition, ctx
   if node.assignment
-    state\write ' :'
-    visit state, node.assignment, ctx
+    -- NOTE(@chrsm): for `if x, y := z!`: condition=x, expList=y, assign values=z!
+    -- note that this is because the first var is the only one checked.
+    -- see: https://yuescript.org/doc/assignment/if-assignment.html
+    --
+    -- assignment contains expList (additional vars) and assign (op + values)
+    -- if-assign always uses := (declaration) not = (assignment)
+    if node.assignment.expList
+      state\write ', '
+      visit state, node.assignment.expList, ctx
+    state\write ' := '
+
+    -- write assign values directly (skip the Assign visitor which writes `=`, we need `:=`)
+    assign = node.assignment.assign
+    if assign and assign.values
+      for i, val in ipairs assign.values
+        visit state, val, ctx
+        state\write ', ' if i < #assign.values
 
 visitors.Unless = (state, node, ctx) ->
   state\write 'unless '
@@ -1299,7 +1314,10 @@ visitors.Do = (state, node, ctx) ->
   state\pop!
 
 visitors.With = (state, node, ctx) ->
-  state\write 'with '
+  state\write 'with'
+  if node.eop
+    state\write '?'
+  state\write ' '
   visit state, node.valueList, ctx
 
   if node.assign
@@ -1340,17 +1358,22 @@ visitors.ClassDecl = (state, node, ctx) ->
   visit state, node.name, ctx
 
   if node.mixes
-    state\write ' using '
+    state\write ' ' if node.name
+    state\write 'using '
     visit state, node.mixes, ctx
+    has_prev_write = true
 
   if node.extend
-    state\write ' extends '
+    state\write ' ' if node.name
+    state\write 'extends '
     visit state, node.extend, ctx
 
-  state\newline!
-  state\push!
-  visit state, node.body, ctx
-  state\pop!
+  -- only add newline and body if there's actually a body with contents
+  if node.body
+    state\newline!
+    state\push!
+    visit state, node.body, ctx
+    state\pop!
 
 visitors.ClassBlock = (state, node, ctx) ->
   contents = node.contents or {}
