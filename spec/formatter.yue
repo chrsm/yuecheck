@@ -38,6 +38,13 @@ fget = (path) ->
   fp\close!
   content
 
+fget_yr = (path) ->
+  fp, err = io.open path, 'r'
+  error err if err
+  content = fp\read 'a*'
+  fp\close!
+  content
+
 parse_td = (src) ->
   ipos = src\find '%-%- input'
   epos = src\find '%-%- expect'
@@ -165,6 +172,18 @@ describe 'formatter', ->
       r = fmt.format 'while x > 0\n  x -= 1'
       assert.same 'while x > 0\n  x -= 1', r
 
+    it 'should handle if multi-assign', ->
+      input = 'if x, y := z!\n  p!'
+      r = fmt.format input
+      assert.same input, r
+
+    -- change `else if` to `elseif`
+    it 'should handle nested if-elseif', ->
+      input = "if x\n  if y\n    one\n  else if ed\n    two\n  else\n    three\nelse\n  no"
+      expect = "if x\n  if y\n    one\n  elseif ed\n    two\n  else\n    three\nelse\n  no"
+      r = fmt.format input
+      assert.same expect, r
+
   describe 'local attributes', ->
     it 'should format const declaration', ->
       r = fmt.format 'const z=42'
@@ -229,10 +248,18 @@ describe 'formatter', ->
       r = fmt.format 'import fn1, fn2 from "mod"'
       assert.same "import fn1, fn2 from 'mod'", r
 
+    it 'should not use unnecessary nl around paren+dc', ->
+      r = fmt.format 'print (class WhatsUp).__name'
+      assert.same 'print (class WhatsUp).__name', r
+
   describe 'classes', ->
     it 'should format simple class', ->
       r = fmt.format 'class Foo\n  x: 1'
       assert.same 'class Foo\n  x: 1', r
+
+    it 'should handle metatable properties', ->
+      r = fmt.format 'class Foo\n:<add>'
+      assert.same 'class Foo\n:<add>', r
 
   describe 'metatables', ->
     it 'should format metatable literal', ->
@@ -466,22 +493,13 @@ describe 'formatter', ->
 
   -- skip these for now, testing on case-by-case basis
   describe 'yuescript repo inputs', ->
-    unless os.getenv 'YUESCRIPT_SPECS'
-      pending 'not done here'
-      return
-
-    inputs = find_yue_files '../spec/yuespec', 'yue'
+    inputs = find_yue_files '../spec/testdata/yue_repo', 'yue'
 
     for f in *inputs
       it "should handle #{ f }", ->
-        content = if fp := io.open f, 'r'
-          fp, err = io.open f, 'r'
-          error err if err
-          content = fp\read 'a*'
-          fp\close!
-          content
-        else
-          error "could not open #{ f }"
+        src, expect = parse_td fget_yr f
 
-        r = fmt.format content
-        assert.true r != nil
+        r = fmt.format src
+        assert.same r, expect
+
+

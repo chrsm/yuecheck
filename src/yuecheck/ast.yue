@@ -55,6 +55,9 @@ build = (ast, parent = nil) ->
       elseif ntype == 'OuterVarShadow' and ast[4] == 'using nil'
         -- leave node empty; formatter writes 'using nil' when varList is nil
         _ = nil
+      -- `x = class` with nothing else
+      elseif ntype == 'ClassDecl' and ast[4] == 'class'
+        _ = nil
       else
         arg[] = ast[4]
 

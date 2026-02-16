@@ -1135,14 +1135,41 @@ visitors.If = (state, node, ctx) ->
           -- add newline after body if there's more (elseif/else) coming
           if i < #nodes and #state.current_line > 0
             state\newline!
-    elseif item\is types.Block or item\is types.Statement
+    elseif item\is_any types.Block, types.Statement
       -- this is an else block (no condition before it)
-      state\write_indent!
-      state\write 'else'
-      state\newline!
-      state\push!
-      visit state, item, ctx
-      state\pop!
+
+      -- check if it's `else if` pattern - convert to `elseif`
+      nested_if = nil
+      if item\is types.Statement
+        content = item.content
+        if content and content\is types.ExpListAssign
+          expList = content.expList
+          if expList and expList.exprs and #expList.exprs == 1
+            exp = expList.exprs[1]
+            unaryExp = exp.pipeExprs?[1]
+            val = unaryExp.expos?[1]
+
+            -- could be SimpleValue, SimpleTable, or ChainValue
+            if (val.item?\is types.SimpleValue) and val.item.value?\is types.If
+              nested_if = val.item.value
+
+      -- convert `else if` to `elseif` by replacing this item with nested If's nodes
+      if nested_if
+        table.remove nodes, i
+        insert_pos = i
+        for nested_node in *(nested_if.nodes or {})
+          continue if nested_node\is types.IfType
+          table.insert nodes, insert_pos, nested_node
+          insert_pos += 1
+        -- don't increment i - we want to process the newly inserted IfCond
+        continue
+      else
+        state\write_indent!
+        state\write 'else'
+        state\newline!
+        state\push!
+        visit state, item, ctx
+        state\pop!
     i += 1
 
 visitors.IfCond = (state, node, ctx) ->

@@ -2,3 +2,8 @@
 /src/yuecheck/transpiler*
 /bin/yue2go
 /spec/transpiler.yue
+
+# local test scripts
+/scratch
+# set of yue spec files, being checked one at a time
+/spec/yuespec
