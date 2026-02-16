@@ -1108,18 +1108,41 @@ visitors.If = (state, node, ctx) ->
       is_inline = next_node and (next_node\is types.Statement) and next_node\g_src_line! == cond_line
 
       if is_inline
-        -- inline: if cond then expr [else expr]
+        -- inline: if cond then expr [elseif cond then expr]* [else expr]
         state\write ' then '
         i += 1
         visit state, nodes[i], ctx
 
-        -- check for else branch (another Statement on same line)
-        if i + 1 <= #nodes
-          else_node = nodes[i + 1]
-          if else_node\is(types.Statement) and else_node\g_src_line! == cond_line
+        -- check for elseif or else branch on same line
+        while i + 1 <= #nodes
+          next_item = nodes[i + 1]
+          -- elseif branch (IfCond on same line)
+          if (next_item\is types.IfCond) and next_item\g_src_line! == cond_line
+            state\write ' elseif '
+            i += 1
+            visit state, nodes[i], ctx  -- visit the IfCond
+            -- expect Statement for the elseif body
+            if i + 1 <= #nodes and (nodes[i + 1]\is types.Statement) and nodes[i + 1]\g_src_line! == cond_line
+              state\write ' then '
+              i += 1
+              visit state, nodes[i], ctx
+          -- else branch (Statement on same line)
+          elseif (next_item\is types.Statement) and next_item\g_src_line! == cond_line
             state\write ' else '
             i += 1
             visit state, nodes[i], ctx
+            break  -- else is always last
+          -- else branch with body on different line (Block not on same line)
+          elseif next_item\is types.Block
+            state\write ' else'
+            state\newline!
+            i += 1
+            state\push!
+            visit state, nodes[i], ctx
+            state\pop!
+            break
+          else
+            break
       else
         -- multi-line block form
         write_eol_for_line state, ctx, cond_line
@@ -1142,9 +1165,9 @@ visitors.If = (state, node, ctx) ->
       nested_if = nil
       if item\is types.Statement
         content = item.content
-        if content and content\is types.ExpListAssign
+        if content?\is types.ExpListAssign
           expList = content.expList
-          if expList and expList.exprs and #expList.exprs == 1
+          if expList?.exprs and #expList.exprs == 1
             exp = expList.exprs[1]
             unaryExp = exp.pipeExprs?[1]
             val = unaryExp.expos?[1]

@@ -176,6 +176,16 @@ describe 'formatter', ->
       input = 'if x, y := z!\n  p!'
       r = fmt.format input
       assert.same input, r
+    
+    it 'should handle inline if/elseif/else', ->
+      input = 'if x then y elseif y then z else a'
+      r = fmt.format input
+      assert.same input, r
+
+    it 'should handle if/elseif/else with nl else body', ->
+      input = 'if x then y elseif y then z else\n  a'
+      r = fmt.format input
+      assert.same input, r
 
     -- change `else if` to `elseif`
     it 'should handle nested if-elseif', ->
