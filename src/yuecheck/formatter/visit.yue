@@ -1339,6 +1339,10 @@ visitors.ClassDecl = (state, node, ctx) ->
   state\write 'class '
   visit state, node.name, ctx
 
+  if node.mixes
+    state\write ' using '
+    visit state, node.mixes, ctx
+
   if node.extend
     state\write ' extends '
     visit state, node.extend, ctx
