@@ -181,6 +181,7 @@ manual_overrides =
           * 'FunLit'
           * 'Num'
           * 'VarArg'
+          * 'SimpleValue'
       }
   TableLit:
     attr:

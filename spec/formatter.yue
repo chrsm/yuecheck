@@ -257,6 +257,14 @@ describe 'formatter', ->
       r = fmt.format 'repeat\n  x += 1\nuntil x > 10'
       assert.same 'repeat\n  x += 1\nuntil x > 10', r
 
+    it 'should format repeat/until w indent', ->
+      r = fmt.format 'do\n  repeat print 1 until true'
+      assert.same 'do\n  repeat\n    print 1\n  until true', r
+
+    it 'should format assign repeat/until', ->
+      r = fmt.format 'x = repeat print 1 until true'
+      assert.same 'x = repeat\n  print 1\nuntil true', r
+
   describe 'other shit', ->
     it 'should format slice', ->
       r = fmt.format 'x[1, 3]'

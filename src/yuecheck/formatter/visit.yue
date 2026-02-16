@@ -1375,7 +1375,8 @@ visitors.ForEach = (state, node, ctx) ->
   state\pop!
 
 visitors.While = (state, node, ctx) ->
-  state\write 'while '
+  visit state, node.type, ctx
+  state\write ' '
   visit state, node.condition, ctx
   write_eol_for_line state, ctx, node.condition\g_src_line!
   state\newline!
@@ -1391,6 +1392,7 @@ visitors.Repeat = (state, node, ctx) ->
   state\newline!
 
   state\push!
+  state\write_indent!
   visit state, node.body, ctx
   state\pop!
 
