@@ -18,6 +18,17 @@ reserved_keywords = {
   'try', 'unless', 'using', 'when', 'with',
 }
 
+valid_meta_methods = {
+	"add", "ub", "mul", "div", "mod",
+	"pow", "unm", "concat", "len", "eq",
+	"lt", "le", "index", "newindex", "call",
+	"gc", "mode", "tostring", "metatable", -- Lua 5.1
+	"pairs", "ipairs", -- Lua 5.2
+	"name", "idiv", "band", "bor", "bxor",
+	"bnot", "hl", "hr", -- Lua 5.3 ipairs deprecated
+	"close" -- Lua 5.4
+}
+
 -- check if a string is a valid identifier that can be used as a simple key
 is_valid_identifier = (str) ->
   unless str and #str > 0
@@ -1027,9 +1038,17 @@ visitors.TableBlockIndent = (state, node, ctx) ->
 -- <key>: value in table lit
 visitors.MetaNormalPair = (state, node, ctx) ->
   state\write '<'
-  visit state, node.key, ctx
-  state\write '>: '
-  visit state, node.value, ctx
+  -- when key is present but value is nil, the key IS the value (empty meta key `<>:`)
+  if node.key and node.value
+    visit state, node.key, ctx
+    state\write '>: '
+    visit state, node.value, ctx
+  elseif node.key
+    state\write '>: '
+    visit state, node.key, ctx
+  else
+    state\write '>: '
+    visit state, node.value, ctx
 
 visitors.MetaNormalPairDef = (state, node, ctx) ->
   visit state, node.pair, ctx

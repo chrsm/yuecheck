@@ -287,6 +287,26 @@ describe 'formatter', ->
       r = fmt.format '{ <index>: val }'
       assert.same '{ <index>: val }', r
 
+    it 'should handle mt destructuring', ->
+      input = '{<>: mt = {__index: {abc: 123}}, <>: {:<call> = (-> {}), :<add>}} = tb'
+      expected = '{ <>: mt = { __index: { abc: 123 } }, <>: { :<call> = (-> {}), :<add> } } = tb'
+      
+      r = fmt.format input
+      assert.same expected, r
+
+    it 'should handle mt set directly', ->
+      input = '{<>: {func: a.b(-> 123).c = item?.defVal}} = tb'
+      expected = '{ <>: { func: a.b(-> 123).c = item?.defVal } } = tb'
+
+      r = fmt.format input
+      assert.same expected, r
+
+    it 'should handle destructring with keys and symbols', ->
+      input = "{ key1: { key2: value1 = 123 }, :key3 = 'abc' } = tb"
+
+      r = fmt.format input
+      assert.same input, r
+
   describe 'import/export', ->
     it 'should format export default', ->
       r = fmt.format 'export default -> 1'
