@@ -88,6 +88,10 @@ describe 'formatter', ->
       r = fmt.format 'x -=1'
       assert.same 'x -= 1', r
 
+    it 'should handle ^', ->
+      r = fmt.format 'x = y^2'
+      assert.same 'x = y^2', r
+
   describe 'inline comment preservation', ->
     it 'should preserve inline comment on variable', ->
       r = fmt.format 'b --[[ x ]] = 2'

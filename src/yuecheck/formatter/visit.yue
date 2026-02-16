@@ -511,8 +511,9 @@ visitors.UnaryExp = (state, node, ctx) ->
       if op.v == 'not'
         state\write ' '
 
-  -- values
+  -- values (multiple expos means ^ operator, which is lost in AST)
   for i, val in ipairs node.expos
+    state\write '^' if i > 1
     visit state, val, ctx
 
   -- 'in' expression i.e. `x in { 1, 2 }`
