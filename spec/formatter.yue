@@ -359,6 +359,13 @@ describe 'formatter', ->
       r = fmt.format input
       assert.same input, r
 
+    it 'should handle computed and string meta keys', ->
+      input = 'w = <[name]>:123, <\'new\'>:(val)=> {val}'
+      expected = "w = <[name]>: 123, <'new'>: (val) => { val }"
+
+      r = fmt.format input
+      assert.same expected, r
+
   describe 'import/export', ->
     it 'should format export default', ->
       r = fmt.format 'export default -> 1'

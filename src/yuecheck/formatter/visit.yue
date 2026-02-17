@@ -1076,7 +1076,13 @@ visitors.MetaNormalPair = (state, node, ctx) ->
   state\write '<'
   -- when key is present but value is nil, the key IS the value (empty meta key `<>:`)
   if node.key and node.value
-    visit state, node.key, ctx
+    -- computed key (Exp) needs brackets: <[expr]>
+    if node.key\is types.Exp
+      state\write '['
+      visit state, node.key, ctx
+      state\write ']'
+    else
+      visit state, node.key, ctx
     state\write '>: '
     visit state, node.value, ctx
   elseif node.key
