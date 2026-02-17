@@ -1879,13 +1879,13 @@ ast_nodes.SimpleTable = SimpleTable
 class SimpleValue extends Node
   @yue_name: 'SimpleValue'
   
-  -- @value: _sel_t(true,TableLit,ConstValue,If,Switch,With,ClassDecl,ForEach,For,While,Do,Try,Repeat,UnaryValue,TblComprehension,Comprehension,FunLit,Num,VarArg)
+  -- @value: _sel_t(true,TableLit,ConstValue,If,Switch,With,ClassDecl,ForEach,For,While,Do,Try,UnaryValue,TblComprehension,Comprehension,FunLit,Num,VarArg,Repeat)
   new: (value = nil) =>
     @value = value
 
   from_table: (tbl) =>
     for i, v in ipairs tbl
-      if (not @value) and _in v\g_yue_name!, {'TableLit','ConstValue','If','Switch','With','ClassDecl','ForEach','For','While','Do','Try','Repeat','UnaryValue','TblComprehension','Comprehension','FunLit','Num','VarArg'}
+      if (not @value) and _in v\g_yue_name!, {'TableLit','ConstValue','If','Switch','With','ClassDecl','ForEach','For','While','Do','Try','UnaryValue','TblComprehension','Comprehension','FunLit','Num','VarArg','Repeat'}
         @value = v
         continue
       _ = v
