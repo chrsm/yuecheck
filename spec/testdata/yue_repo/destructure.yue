@@ -431,7 +431,7 @@ do
 
   { :one, :two, :three } = {w, true for w in foo\gmatch('%S+')}
 
-  { :a }, b = a\(123) + t, 123
+  { :a }, b = a\if(123) + t, 123
 
 do
   { :name = 'nameless', :job = 'jobless' } = person

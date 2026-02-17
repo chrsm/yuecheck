@@ -409,7 +409,7 @@ do
 do
   f = ->
     print(
-      globalTB[#]\ 123,
+      globalTB[#]\end 123,
       a.b.c[5,-5][# - 2],
       x?\y?!.z?[# - 3]?[,-3]
     )

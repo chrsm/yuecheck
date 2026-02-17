@@ -494,7 +494,8 @@ visitors.Exp = (state, node, ctx) ->
       state\write ' '
       visit state, op_val.op, ctx
       state\write ' '
-      for pipe in *op_val.pipeExprs
+      for i, pipe in ipairs op_val.pipeExprs
+        state\write ' |> ' if i > 1
         visit state, pipe, ctx
 
   -- nil coal
@@ -565,6 +566,8 @@ visitors.ChainValue = (state, node, ctx) ->
           is_multiline_chain = true
           break
 
+  -- push scope once for multiline chain indent
+  did_push_chain = false
   for i, item in ipairs items
     -- multiline chain: newline + indent before DotChainItem/ColonChainItem on different lines
     if is_multiline_chain and i > 1
@@ -572,9 +575,11 @@ visitors.ChainValue = (state, node, ctx) ->
         item_line = item\g_src_line!
         prev_line = items[i - 1]\g_src_line!
         if item_line and prev_line and item_line != prev_line
+          unless did_push_chain
+            state\push!
+            did_push_chain = true
           state\newline!
           state\write_indent!
-          state\write '  '
 
     switch true
       when item\is types.Callable
@@ -643,6 +648,8 @@ visitors.ChainValue = (state, node, ctx) ->
         visit state, item, ctx
       else
         visit state, item, ctx
+
+  state\pop! if did_push_chain
 
 visitors.Callable = (state, node, ctx) ->
   visit state, node.item, ctx
@@ -2054,8 +2061,8 @@ visitors.LuaStringContent = (state, node) ->
 visitors.LuaStringClose = (state, node) ->
   state\write node.v if node.v
 
-visitors.LuaKeyword = (state, node) ->
-  state\write node.v if node.v
+visitors.LuaKeyword = (state, node, ctx) ->
+  visit state, node.name, ctx if node.name
 
 -- YAML literals
 -- TODO: validate this, i don't use this feature (write some tests)

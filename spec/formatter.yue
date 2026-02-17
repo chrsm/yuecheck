@@ -245,6 +245,12 @@ describe 'formatter', ->
       r = fmt.format 'x = val\n  |> transform'
       assert.same 'x = val\n  |> transform', r
 
+    it 'should preserve all pipes', ->
+      input = 'x = 123 |> a |> b or 456 |> c |> d or a.if\\then(\'abc\') or a?.b\\c?(123) or x\\y'
+
+      r = fmt.format input
+      assert.same input, r
+
   describe 'control structures', ->
     it 'should format do block', ->
       r = fmt.format 'do\n  x = 1'
@@ -298,6 +304,11 @@ describe 'formatter', ->
     it 'should not use unnecessary nl around paren+dc', ->
       r = fmt.format 'print (class WhatsUp).__name'
       assert.same 'print (class WhatsUp).__name', r
+
+    it 'should handle indenting in multiline chain', ->
+      input = 'result = origin\n  .transform\n  \\Parents!\n  \\Where (x) ->\n    x!'
+      r = fmt.format input
+      assert.same input, r
 
   describe 'macros', ->
     it 'should handle macros (including `)', ->
