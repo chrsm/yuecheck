@@ -466,18 +466,20 @@ do
     print 'abc'
 
 do
-  while byte
+  while byte := stream\read_one!
     -- do something with the byte
     continue if byte == 0
     print byte
 
 do
   local func
-  while success
+  while success, result := try func 1, 2, 3
+  catch err
+      print err
     print result
 
 do
-  until x
+  until x := func 'a', b
     print 'false expected'
 
 do

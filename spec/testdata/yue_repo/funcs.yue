@@ -169,7 +169,7 @@ do
 						handle item
 		true
 
-	items.every (item): true ->
+	items.every (item):true ->
 		if item.field
 			value = item.field.get "abc"
 			if value
@@ -180,7 +180,7 @@ do
 						-- prevent implicit return for next line
 						handle item
 
-	HttpServer\post "/login", (req): success: false ->
+	HttpServer\post "/login", (req):success:false ->
 		switch req when {:name, :pwd}
 			if name ~= ""
 				if user := DB\queryUser name, pwd
@@ -362,7 +362,7 @@ do
             handle item
     true
 
-  items.every (item) ->
+  items.every (item):true ->
     if item.field
       value = item.field.get 'abc'
       if value
@@ -373,7 +373,7 @@ do
             -- prevent implicit return for next line
             handle item
 
-  HttpServer\post '/login', (req) ->
+  HttpServer\post '/login', (req):success: false ->
     switch req
       when { :name, :pwd }
         if name != ''
@@ -383,7 +383,7 @@ do
 
   check = (num) -> return num
   -- func without implicit return
-  func = () -> check 123
+  func = (): -> check 123
   print func! -- get nil
 
 do

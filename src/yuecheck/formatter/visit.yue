@@ -2,6 +2,8 @@ import 'yuecheck.ast'
 import 'yuecheck.comments' as comment_parser
 import 'yuecheck.types'
 
+import 'dkjson' as json
+
 -- reserved keywords, cannot be used as simple identifiers
 -- see `ast_parser.cpp` :15 and :28
 reserved_keywords = {
@@ -829,7 +831,14 @@ visitors.FunLit = (state, node, ctx) ->
   if has_args
     state\write '('
     visit state, defList, ctx
-    state\write ') '
+    state\write ')'
+
+  if node.defaultReturn
+    state\write ':'
+    visit state, node.defaultReturn, ctx
+
+  if has_args or node.defaultReturn
+    state\write ' '
 
   arrow = node.arrow?.v or '->'
   state\write arrow
@@ -1401,7 +1410,29 @@ visitors.ForEach = (state, node, ctx) ->
 visitors.While = (state, node, ctx) ->
   visit state, node.type, ctx
   state\write ' '
+
+  -- condition comes first (e.g., `while x` or `while x := true`)
   visit state, node.condition, ctx
+
+  if node.assignment
+    -- NOTE(@chrsm): for `while x, y := z!`: condition=x, expList=y, assign values=z!
+    -- note that this is because the first var is the only one checked.
+    -- see: https://yuescript.org/doc/assignment/if-assignment.html
+    --
+    -- assignment contains expList (additional vars) and assign (op + values)
+    -- while-assign always uses := (declaration) not = (assignment)
+    if node.assignment.expList
+      state\write ', '
+      visit state, node.assignment.expList, ctx
+    state\write ' := '
+
+    -- write assign values directly (skip the Assign visitor which writes `=`, we need `:=`)
+    assign = node.assignment.assign
+    if assign and assign.values
+      for i, val in ipairs assign.values
+        visit state, val, ctx
+        state\write ', ' if i < #assign.values
+
   write_eol_for_line state, ctx, node.condition\g_src_line!
   state\newline!
 
@@ -1460,11 +1491,20 @@ visitors.With = (state, node, ctx) ->
 
 visitors.Try = (state, node, ctx) ->
   state\write 'try'
-  state\newline!
 
-  state\push!
-  visit state, node.func, ctx
-  state\pop!
+  -- check if inline (func on same line) or multiline
+  try_line = node\g_src_line!
+  func_line = node.func and node.func\g_src_line!
+  is_inline = func_line and func_line == try_line
+
+  if is_inline
+    state\write ' '
+    visit state, node.func, ctx
+  else
+    state\newline!
+    state\push!
+    visit state, node.func, ctx
+    state\pop!
 
   state\newline!
   if node.catchBlock
@@ -1476,8 +1516,13 @@ visitors.CatchBlock = (state, node, ctx) ->
   visit state, node.err, ctx
 
   state\newline!
+  -- push twice: once for catch body being "inside" the try,
+  -- and once more because catch body must be deeper than the outer block body
+  -- (e.g., while body) when try is used as a value
+  state\push!
   state\push!
   visit state, node.block, ctx
+  state\pop!
   state\pop!
 
 --[[ class handling ]]
@@ -2139,3 +2184,5 @@ visitors.YueMultilineComment = (state, node) ->
   state\write node.v
 
 export default visit
+
+
