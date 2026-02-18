@@ -190,6 +190,14 @@ describe 'formatter', ->
       r = fmt.format 'x = (a, ...) -> nil'
       assert.same 'x = (a, ...) -> nil', r
 
+    it 'should format using vars', ->
+      r = fmt.format '(x using nil) ->'
+      assert.same '(x using nil) ->', r
+
+    it 'should handle format using vars multi', ->
+      r = fmt.format '(x, y using x, y) ->'
+      assert.same '(x, y using x, y) ->', r
+
   describe 'control flow', ->
     it 'should format if/else', ->
       r = fmt.format 'if x\n  y = 1\nelse\n  y = 2'
@@ -295,6 +303,10 @@ describe 'formatter', ->
     it 'should format with block', ->
       r = fmt.format 'with x\n  .foo = 1'
       assert.same 'with x\n  .foo = 1', r
+
+    it 'should format with block short append', ->
+      r = fmt.format 'with x\n  []="a"'
+      assert.same 'with x\n  [] = \'a\'', r
 
     it 'should format try/catch', ->
       r = fmt.format 'try\n  risky!\ncatch err\n  handle err'

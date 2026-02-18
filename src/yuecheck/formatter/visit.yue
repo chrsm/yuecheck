@@ -897,19 +897,45 @@ visitors.Interpolation = (state, node, ctx) ->
 visitors.FunLit = (state, node, ctx) ->
   -- arguments in argsDef.defList.definitions
   defList = node.argsDef?.defList
-  has_defs = defList and defList.definitions and #defList.definitions > 0
-  has_vararg = defList and defList.varArg
+  shadowOption = node.argsDef?.shadowOption
+  
+  -- check if definitions have actual content (not empty placeholders)
+  -- empty FnArgDefList has definitions with name.name.v == ''
+  has_defs = false
+  if defList and defList.definitions and #defList.definitions > 0
+    for def in *defList.definitions
+      -- regular args: def.name is Variable with name.v (check for non-empty)
+      -- self args (@x): def.name is SelfItem
+      -- destructure args: def.name is TableLit or SimpleTable
+      if def.name
+        typ = def.name.typ
+        if typ == 'SelfItem' or typ == 'TableLit' or typ == 'SimpleTable'
+          has_defs = true
+          break
+        elseif typ == 'Variable' and def.name.name?.v and def.name.name.v != ''
+          has_defs = true
+          break
+  
+  has_vararg = defList?.varArg
+  -- has_vararg = defList and defList.varArg
   has_args = has_defs or has_vararg
-  if has_args
+  has_using = shadowOption != nil
+  -- explicit empty parens: argsDef exists but no args/using (user wrote "()")
+  has_explicit_parens = node.argsDef != nil and not has_args and not has_using
+  
+  if has_args or has_using or has_explicit_parens
     state\write '('
-    visit state, defList, ctx
+    visit state, defList, ctx if has_args
+    if has_using
+      state\write ' ' if has_args
+      visit state, shadowOption, ctx
     state\write ')'
 
   if node.defaultReturn
     state\write ':'
     visit state, node.defaultReturn, ctx
 
-  if has_args or node.defaultReturn
+  if has_args or has_using or has_explicit_parens or node.defaultReturn
     state\write ' '
 
   arrow = node.arrow?.v or '->'
@@ -1589,11 +1615,12 @@ visitors.With = (state, node, ctx) ->
   state\write 'with'
   if node.eop
     state\write '?'
+
   state\write ' '
   visit state, node.valueList, ctx
 
   if node.assign
-    state\write ' '
+    state\write ' :'
     visit state, node.assign, ctx
 
   state\newline!
@@ -2165,6 +2192,7 @@ visitors.ExistentialOp = (state, node) ->
 
 -- t[] = v as standalone statement
 visitors.ShortTabAppending = (state, node, ctx) ->
+  state\write '[] '
   visit state, node.assign, ctx
 
 visitors.TableAppendingOp = (state, node) ->
@@ -2236,9 +2264,7 @@ visitors.OuterVarShadow = (state, node, ctx) ->
   -- using (varlist) for variable shadowing
   state\write 'using '
   if node.varList
-    state\write '('
     visit state, node.varList, ctx
-    state\write ')'
   else
     state\write 'nil'
 

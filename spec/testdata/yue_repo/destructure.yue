@@ -376,7 +376,7 @@ do
 --
 
 do
-  with { a, b } = thing
+  with { a, b } := thing
     print a, b
 
 --

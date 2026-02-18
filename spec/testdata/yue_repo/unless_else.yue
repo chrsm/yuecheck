@@ -1,0 +1,13 @@
+-- input
+if a
+	unless b
+		print "hi"
+	elseif c
+		print "not hi"
+
+-- expect
+if a
+  unless b
+    print 'hi'
+  elseif c
+    print 'not hi'
