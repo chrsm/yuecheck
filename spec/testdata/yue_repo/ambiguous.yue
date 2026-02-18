@@ -124,9 +124,9 @@ do
   () <- async_fn!
   print!
   $lua([==[
---[[a comment to insert]]
+		--[[a comment to insert]]
 		(haha)()
-]==])
+	]==])
   nil
 
 macro v = -> 'print 123'

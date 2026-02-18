@@ -97,6 +97,11 @@ describe 'formatter', ->
       r = fmt.format 'x = "\nhello world\n"'
       assert.same "x = \"\nhello world\n\"", r
 
+    it 'should handle ml bracket strings with indentation', ->
+      input = 'x = [[\n    string\n]]'
+      r = fmt.format input
+      assert.same input, r
+
   describe 'inline comment preservation', ->
     it 'should preserve inline comment on variable', ->
       r = fmt.format 'b --[[ x ]] = 2'
@@ -149,6 +154,10 @@ describe 'formatter', ->
     it 'should format table len (# op) with expr', ->
       r = fmt.format 'y = x[#-2]'
       assert.same 'y = x[# - 2]', r
+
+    it 'should format table set with luastring as expr', ->
+      r = fmt.format 'x[ [[a]]] = 1'
+      assert.same 'x[ [[a]] ] = 1', r
 
   -- mostly verification that these don't get messed up
   describe 'functions', ->
@@ -494,6 +503,12 @@ describe 'formatter', ->
       input = 'x, y = for v in *t\n  break true,1'
       r = fmt.format input
       assert.same 'x, y = for v in *t\n  break true, 1', r
+
+  describe 'formatting strings', ->
+    it 'should properly handle string | syntax in a pipe', ->
+      input = '(|\n  1\n  2\n  3\n) |> print'
+      r = fmt.format input
+      assert.same input, r
 
   -- TODO: add some more thorough test cases
   -- mostly adding these as i work on stuff and dogfood the formatter

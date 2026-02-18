@@ -150,9 +150,9 @@ do
   f = tb\<"value#{x < y}">(123, ...)
   f tb\<'value'> 123, ...
   tb\<[[
-value
+		value
 		1
-]]>(123, ...)
+	]]>(123, ...)
   return tb\<['value' .. tostring x > y]>(123, ...)
 
 do
@@ -165,9 +165,8 @@ do
   f = tb.<['value']> 123, ...
   f = tb.<"value#{x < y}">(123, ...)
   f tb.<'value'> 123, ...
-  tb.<[[value
-1
-]]>(123, ...)
+  tb.<[[ value
+1]]>(123, ...)
   return tb.<['value' .. tostring x > y]>(123, ...)
 
 nil

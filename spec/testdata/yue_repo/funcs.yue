@@ -404,7 +404,7 @@ do
     print 'kv:', k, v
     print 'rest count:', select '#', ...
   macro gen = (fname) -> |
-		#{fname} = ({:a, :b = 0}) -> print a, b
+    #{fname} = ({:a, :b = 0}) -> print a, b
   $gen foo
   t1 = (:a, x) -> print a, x
   t2 = (:a) -> print a

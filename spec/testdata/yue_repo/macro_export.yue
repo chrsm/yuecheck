@@ -80,11 +80,11 @@ export macro config = (debugging = true) ->
 
 export macro showMacro = (name, res) ->
   if debugMacro then |
-		do
-			txt = #{res}
-			print '[macro #{name}]'
-			print txt
-			txt else
+    do
+      txt = #{res}
+      print '[macro #{name}]'
+      print txt
+      txt else
     res
 
 export macro asserts = (cond) ->
@@ -109,11 +109,11 @@ export macro copy = (src, dst, ...) ->
     '\n\t\t\t'
   )
   |
-		do
-			local _src_, _dst_
-			with _dst_ := #{dst}
-				with _src_ := #{src}
-					#{copyFields}
+    do
+      local _src_, _dst_
+      with _dst_ := #{dst}
+        with _src_ := #{src}
+          #{copyFields}
 
 export macro enum = (...) ->
   items = { ... }

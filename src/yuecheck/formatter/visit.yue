@@ -455,15 +455,40 @@ visitors.SingleString = (state, node) ->
     state\write v
     state\write "'"
 
-visitors.LuaString = (state, node) ->
+visitors.LuaString = (state, node, ctx) ->
   visit state, node.open, ctx
-  unless node.open\g_src_line! == node.content\g_src_line!
-    state\newline!
 
-  state\write node.content.v if node.content
+  open_line = node.open\g_src_line!
+  close_line = node.close\g_src_line!
+  source_lines = ctx.source_lines
 
-  unless node.close\g_src_line! == node.content\g_src_line!
-    state\newline!
+  -- multiline: extract content from source to preserve indentation
+  if source_lines and open_line and close_line and close_line > open_line
+    for ln = open_line, close_line
+      src = source_lines[ln]
+      if ln == open_line
+        -- first line: everything after the [[ or [=[
+        open_col = node.open\g_src_col!
+        open_len = #node.open.v
+        after_open = src\sub(open_col + open_len)
+        -- write content on same line as [[ (no newline before)
+        state\write after_open if #after_open > 0
+      elseif ln == close_line
+        -- last line: everything before the ]] or ]=]
+        close_col = node.close\g_src_col!
+        before_close = src\sub(1, close_col - 1)
+        state\newline!
+        state\write before_close if #before_close > 0
+      else
+        -- middle lines: full content
+        state\newline!
+        state\write src
+  elseif node.content
+    -- single line or no source: use AST content
+    unless open_line == node.content\g_src_line!
+      state\newline!
+    state\write node.content.v
+
   visit state, node.close, ctx
 
 --[[ identifiers ]]
@@ -637,7 +662,19 @@ visitors.ChainValue = (state, node, ctx) ->
       when item\is types.Exp
         -- brackets, i.e. `x[expr]`
         state\write '['
+
+        -- `x[ [[a]]] = 1` is valid, even if stupid, but formatting it to closed
+        -- brackets (`x[[[a]]] = 1`) is not valid.
+        -- so, inject a leading and trailing space to make it nice.
+        is_stupid_luastring = item.pipeExprs?[1]?.expos?[1]?.item?.items?[1]?.str?\is types.LuaString
+        if is_stupid_luastring
+          state\write ' '
+
         visit state, item, ctx
+
+        if is_stupid_luastring
+          state\write ' '
+
         state\write ']'
       when item\is types.String
         -- no bracket
@@ -1886,8 +1923,16 @@ visitors.Parens = (state, node, ctx) ->
   state\write '('
   saved_output_len = #state.output
   visit state, node.expr, ctx
-  -- if content was multiline, indent the closing paren
-  if #state.output > saved_output_len
+  -- if content was multiline, add newline before closing paren
+  -- check both output array length AND if current_line has embedded newlines
+  is_multiline = #state.output > saved_output_len
+  unless is_multiline
+    -- check for embedded newlines in current_line parts
+    for part in *state.current_line
+      if part\find '\n'
+        is_multiline = true
+        break
+  if is_multiline
     state\newline! if #state.current_line > 0
     state\write_indent!
   state\write ')'
@@ -2131,6 +2176,7 @@ visitors.YAMLMultiline = (state, node, ctx) ->
   -- interpolations and indentation which are lost in the AST
   src_line = node\g_src_line!
   src_col = node\g_src_col!
+  indent_size = state.indent_size or 2
   
   if src_line and ctx.source_lines
     -- find the `|` and extract everything from there to end of YAML block
@@ -2150,7 +2196,9 @@ visitors.YAMLMultiline = (state, node, ctx) ->
           -- YAML block continues while lines are more indented than base
           line_indent = #(next_line\match '^%s*' or '')
           if next_line == '' or line_indent > base_indent
-            result ..= "\n" .. next_line
+            -- convert tabs to spaces to avoid mixed indent issues
+            converted = next_line\gsub '\t', string.rep(' ', indent_size)
+            result ..= "\n" .. converted
             current_line += 1
           else
             break
