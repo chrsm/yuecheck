@@ -202,6 +202,10 @@ describe 'formatter', ->
       r = fmt.format 'while x := true\n  p!'
       assert.same 'while x := true\n  p!', r
 
+    it 'should handle switch-assign', ->
+      r = fmt.format 'switch x := true\n  when true\n    print 1'
+      assert.same 'switch x := true\n  when true\n    print 1', r
+
     it 'should handle while assign try', ->
       input = 'while x := try func 1, 2, 3\ncatch err\n\t\tprint err\n\tprint result'
       expect = 'while x := try func 1, 2, 3\ncatch err\n    print err\n  print result'

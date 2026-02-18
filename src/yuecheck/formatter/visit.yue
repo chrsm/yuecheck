@@ -994,7 +994,8 @@ visitors.ExpList = (state, node, ctx) ->
     state\write ', ' if i < #node.exprs
 
 visitors.Assign = (state, node, ctx) ->
-  op = node.op?.v or '='
+  -- Use walrus operator := if context indicates it (e.g., switch assignment)
+  op = if ctx?.walrus_assign then ':=' else (node.op?.v or '=')
   state\write op
   state\write ' '
 
@@ -1381,6 +1382,12 @@ visitors.Unless = (state, node, ctx) ->
 visitors.Switch = (state, node, ctx) ->
   state\write 'switch '
   visit state, node.target, ctx
+  if node.assignment
+    state\write ' '
+    -- Pass walrus_assign context for := operator
+    walrus_ctx = { k, v for k, v in pairs ctx }
+    walrus_ctx.walrus_assign = true
+    visit state, node.assignment, walrus_ctx
   state\newline!
   state\push!
 
