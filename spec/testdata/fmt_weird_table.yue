@@ -1,0 +1,37 @@
+-- input
+menus =
+	* text: "Save"
+		sub:
+			* text: "Slot 1: " .. (slots[1].name or "None")
+				click: ->
+			* text: {"Slot 2"}
+				click: ->
+			* text: [[Slot 3]]
+				click: ->
+			* text: ("Slot 4")\name!
+				click: ->
+			* text: ({{"slot5"}})[1]\name!
+				click: ->
+			[6]: {
+				text: ("Slot 6")
+				click: ->
+			}
+
+-- expect
+menus =
+  * text: 'Save'
+    sub:
+      * text: 'Slot 1: ' .. (slots[1].name or 'None')
+        click: ->
+      * text: { 'Slot 2' }
+        click: ->
+      * text: [[Slot 3]]
+        click: ->
+      * text: ('Slot 4')\name!
+        click: ->
+      * text: ({ { 'slot5' } })[1]\name!
+        click: ->
+      [6]: {
+        text: ('Slot 6')
+        click: ->
+      }

@@ -50,6 +50,9 @@ is_valid_identifier = (str) ->
 
   true
 
+is_stupid_luastring = (item) ->
+  item.pipeExprs?[1]?.expos?[1]?.item?.items?[1]?.str?\is types.LuaString
+
 -- Check if source has trailing comma before closing bracket
 -- open_char and close_char specify the bracket pair (e.g., '[' ']' or '{' '}')
 has_trailing_comma = (node, ctx, open_char='[', close_char=']') ->
@@ -692,13 +695,12 @@ visitors.ChainValue = (state, node, ctx) ->
         -- `x[ [[a]]] = 1` is valid, even if stupid, but formatting it to closed
         -- brackets (`x[[[a]]] = 1`) is not valid.
         -- so, inject a leading and trailing space to make it nice.
-        is_stupid_luastring = item.pipeExprs?[1]?.expos?[1]?.item?.items?[1]?.str?\is types.LuaString
-        if is_stupid_luastring
+        if is_stupid_luastring item
           state\write ' '
 
         visit state, item, ctx
 
-        if is_stupid_luastring
+        if is_stupid_luastring item
           state\write ' '
 
         state\write ']'
@@ -796,8 +798,7 @@ visitors.String = (state, node, ctx) ->
 
 visitors.DoubleString = (state, node, ctx) ->
   -- yue ast does not preserve interpolated strings (`x = "#{ a }"`) or
-  -- leading/trailing newlines in an immediately obvious way.
-  -- we'll extract from source when possible.
+  -- leading/trailing whitespace in strings. Extract from source when possible.
   src_line = node\g_src_line!
   src_col = node\g_src_col!
 
@@ -849,12 +850,20 @@ visitors.DoubleString = (state, node, ctx) ->
             else
               break  -- hit end without finding
         
-        -- for interpolated strings or multi-line, preserve original
+        -- use source extraction for all strings to preserve whitespace
         if found and original_str
-          if original_str\find('#{', 1, true) or current_line > src_line
+          is_multiline = current_line > src_line
+          -- convert to single quotes if possible (no interpolation, no embedded single quotes, single line)
+          content = original_str\sub 2, -2  -- strip outer quotes
+          if not is_multiline and not original_str\find('#{', 1, true) and not content\find("'", 1, true)
+            state\write "'"
+            state\write content
+            state\write "'"
+          else
             state\write original_str
-            return
+          return
 
+  -- fallback: use AST content (may lose trailing whitespace)
   content = ''
   if node.segments
     for seg in *node.segments
@@ -1083,26 +1092,50 @@ visitors.NormalPairDef = (state, node, ctx) ->
 visitors.NormalPair = (state, node, ctx) ->
   -- attempt to simplify `["key"]:` to `key:`
   key = node.key
+  key_line = key and key\g_src_line!
+  value_is_multiline = node.value and node.value\is_any types.TableBlock, types.FunLit
+
   if key and key\is types.Exp
     -- see if we can simplify
     simple_str = extract_simple_string key
     if simple_str and is_valid_identifier simple_str
       -- visit as simple key instead of bracketed string
       state\write simple_str
-      state\write ': '
+      state\write ':'
+      -- Write EOL comment for key line before multiline value
+      if value_is_multiline and key_line
+        write_eol_for_line state, ctx, key_line
+      else
+        state\write ' '
       visit state, node.value, ctx
       return
 
     -- key is not simplifiable - needs brackets (e.g., [0], [expr], ["invalid-key"])
     state\write '['
+
+    -- `x[ [[a]]] = 1` is valid, even if stupid, but formatting it to closed
+    -- brackets (`x[[[a]]] = 1`) is not valid.
+    -- so, inject a leading and trailing space to make it nice.
+    if is_stupid_luastring key
+      state\write ' '
     visit state, key, ctx
-    state\write ']: '
+    if is_stupid_luastring key
+      state\write ' '
+    state\write ']:'
+    if value_is_multiline and key_line
+      write_eol_for_line state, ctx, key_line
+    else
+      state\write ' '
     visit state, node.value, ctx
     return
 
   -- default: key is KeyName or similar, visit as-is
   visit state, key, ctx
-  state\write ': '
+  state\write ':'
+  if value_is_multiline and key_line
+    write_eol_for_line state, ctx, key_line
+  else
+    state\write ' '
   visit state, node.value, ctx
 
 visitors.KeyName = (state, node, ctx) ->
@@ -1150,9 +1183,13 @@ visitors.TableBlock = (state, node, ctx) ->
 visitors.TableBlockIndent = (state, node, ctx) ->
   for i, val in ipairs node.values
     if i > 1
+      -- Push scope for proper nested indentation of any TableBlock values
+      state\push!
       state\write_indent!
-      state\write '  '
-    visit state, val, ctx
+      visit state, val, ctx
+      state\pop!
+    else
+      visit state, val, ctx
     state\newline! if i < #node.values
 
 --[[ metatable handling ]]
@@ -1566,6 +1603,9 @@ visitors.With = (state, node, ctx) ->
 
 visitors.Try = (state, node, ctx) ->
   state\write 'try'
+
+  if node.eop
+    visit state, node.eop, ctx
 
   -- check if inline (func on same line) or multiline
   try_line = node\g_src_line!

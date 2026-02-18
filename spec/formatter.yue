@@ -119,6 +119,10 @@ describe 'formatter', ->
       r = fmt.format '-- above\nx = 1'
       assert.same '-- above\nx = 1', r
 
+    it 'should handle eol comments on table blocks', ->
+      r = fmt.format 'x =\n  --yeah\n  cool: -- umm\n    * 1'
+      assert.same 'x =\n  --yeah\n  cool: -- umm\n    * 1', r
+
   describe 'comment formatting', ->
     it 'should add spacing between statement and trailing comment', ->
       r = fmt.format 'x = 1-- lol'
@@ -158,6 +162,15 @@ describe 'formatter', ->
     it 'should format table set with luastring as expr', ->
       r = fmt.format 'x[ [[a]]] = 1'
       assert.same 'x[ [[a]] ] = 1', r
+
+    it 'should handle table decl with luastring as expr', ->
+      r = fmt.format 'x = {\n  [ [[hello]] ]: 123\n}'
+      assert.same 'x = {\n  [ [[hello]] ]: 123\n}', r
+
+    it 'should handle table lit with item indentation', ->
+      input, expect = parse_td fget 'fmt_weird_table'
+      r = fmt.format input
+      assert.same expect, r
 
   -- mostly verification that these don't get messed up
   describe 'functions', ->

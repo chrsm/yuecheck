@@ -153,11 +153,23 @@ associate = (src, ast, comments) ->
         -- _if_ we found a node, check if comment is truly at end of line
         if best_node
           -- check if there are more tokens after this comment on the line
+          -- exclude multiline container types that may have position on this line
+          -- but actual content on subsequent lines
+          multiline_containers = {
+            'TableBlock': true
+            'Block': true
+            'Body': true
+            'FunLit': true
+            'With': true
+            'Do': true
+          }
           has_more = false
           for entry in *same_line_nodes
             if entry.col > comment_col
-              has_more = true
-              break
+              node_type = entry.node\g_yue_name!
+              unless multiline_containers[node_type]
+                has_more = true
+                break
 
           unless has_more
             best_type = 'end_of_line'

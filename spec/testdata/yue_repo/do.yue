@@ -36,7 +36,7 @@ x = do
 
 y = do
   things = 'shhh'
-  -> 'hello:' .. things
+  -> 'hello: ' .. things
 
 _ = -> if something then do 'yeah'
 
