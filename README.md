@@ -101,7 +101,8 @@ You can also pass via `-f file.yue` or pump to `yuefmt` via stdin (`--stdin`).
 See below for other options.
 
 ```
-Usage: yuefmt [-h] [-w] ([-f <file>] | [<dir_or_file>] | [--stdin])
+Usage: yuefmt [-h] [-w]
+       ([-d <directory>] | [-f <file>] | [<dir_or_file>] | [--stdin])
        [-x [<exclude>] ...]
 
 tool for formatting yue code
@@ -111,6 +112,9 @@ Arguments:
 
 Options:
    -h, --help            Show this help message and exit.
+            -d <directory>,
+   --directory <directory>
+                         directory containing files to format (requires -w)
        -f <file>,        file to format
    --file <file>
    --stdin               parse stdin
@@ -127,7 +131,7 @@ see https://github.com/chrsm/yuecheck
 ## example neovim setup
 
 If you're a neovim user, you can refer to my dotfiles for how I hooked this up via [nvim-lint][2]:
-[nvim_lint config][3].
+[nvim_lint config][3], and for formatting [here][4].
 
 
 # configuration
@@ -460,6 +464,7 @@ for idx in *comments.indices
 [1]: https://github.com/IppClub/YueScript
 [2]: https://github.com/mfussenegger/nvim-lint
 [3]: https://github.com/chrsm/dotfiles/blob/master/neovim/.config/nvim/lua/plug/nvim_lint.yue#L14
+[4]: https://github.com/chrsm/dotfiles/blob/mother/neovim/.config/nvim/lua/plug/formatter.yue
 
 
 # changelog
