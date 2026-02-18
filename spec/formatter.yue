@@ -623,6 +623,12 @@ describe 'formatter', ->
       r = fmt.format src
       assert.same expect, r
 
+    it 'should format tables with commas as destructure targets in a switch', ->
+      src, expect = parse_td fget 'switch_table_destructure'
+      r = fmt.format src
+      assert.same expect, r
+
+
   -- skip these for now, testing on case-by-case basis
   describe 'yuescript repo inputs', ->
     inputs = find_yue_files '../spec/testdata/yue_repo', 'yue'

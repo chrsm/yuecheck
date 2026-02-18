@@ -348,17 +348,17 @@ _ = -> a = b for row in *rows
 
 with tb
   f [a] -- indexing
-  f [a] -- list with one element
+  f [a,] -- list with one element
   print v for v in *f[a,] -- table slicing in for-loop
   f [] -- empty list
   f[] = x -- table appending to f
   [a] = x -- assign to tb[a]
-  [a] = x -- list destructuring for x
+  [a,] = x -- list destructuring for x
   = x -- table appending to tb
   c = a in [1] -- check if a in tb[1]
-  c = a in [1] -- check if a == 1
+  c = a in [1,] -- check if a == 1
   c = a in { 1 } -- check if a == 1
-  c = a in { 1 } -- check if a == 1
+  c = a in { 1, } -- check if a == 1
 
 do
   [a, b] = hello
@@ -396,7 +396,7 @@ do
 
 do
   cloneList1 = (list) -> list[,]
-  cloneList2 = (list) -> [...list]
+  cloneList2 = (list) -> [...list,]
   cloneTable = (tb) -> { ...tb }
 
 do
@@ -478,7 +478,7 @@ do
     cfg.tags[#] = 'newbie'
 
 do
-  mat = [[1, 2], [3, 4], [5, 6]]
+  mat = [ [1, 2], [3, 4], [5, 6] ]
   last_row = mat[#]
   rows = []
   rows[#] = last_row[1]

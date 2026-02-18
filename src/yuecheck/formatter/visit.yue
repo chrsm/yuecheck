@@ -50,6 +50,32 @@ is_valid_identifier = (str) ->
 
   true
 
+-- Check if source has trailing comma before closing bracket
+-- open_char and close_char specify the bracket pair (e.g., '[' ']' or '{' '}')
+has_trailing_comma = (node, ctx, open_char='[', close_char=']') ->
+  return false unless ctx.source_lines
+  src_line = node\g_src_line!
+  src_col = node\g_src_col!
+  return false unless src_line and src_col
+  line_content = ctx.source_lines[src_line]
+  return false unless line_content
+  -- Extract from the opening bracket to end of line
+  bracket_content = line_content\sub src_col
+  -- Find matching close by counting brackets
+  depth = 0
+  last_nonspace = nil
+  for i = 1, #bracket_content
+    c = bracket_content\sub i, i
+    if c == open_char
+      depth += 1
+    elseif c == close_char
+      depth -= 1
+      if depth == 0
+        return last_nonspace == ','
+    elseif c != ' ' and c != '\t'
+      last_nonspace = c
+  false
+
 -- extract a simple string value from an Exp node if it's a plain string literal
 -- returns the string value if simplifiable, nil otherwise
 extract_simple_string = (exp_node) ->
@@ -999,6 +1025,9 @@ visitors.TableLit = (state, node, ctx) ->
         is_multiline = true
         break
 
+  -- Check if source had trailing comma (semantically insignificant but preserves style)
+  trailing_comma = has_trailing_comma node, ctx, '{', '}'
+
   state\write '{'
   if node.values and #node.values > 0
     if is_multiline
@@ -1020,6 +1049,8 @@ visitors.TableLit = (state, node, ctx) ->
         if i < #node.values
           state\write ','
           state\write ' '
+      -- Add trailing comma if source had one
+      state\write ',' if trailing_comma
       state\write ' ' if ctx?.table_spacing
   state\write '}'
 
@@ -1684,6 +1715,21 @@ visitors.File = (state, node, ctx) ->
 
 --[[ comprehension handling ]]
 
+-- Check if a NormalDef item starts with a nested Comprehension (bracket)
+first_item_is_bracket = (item) ->
+  return false unless item\is types.NormalDef
+  exp = item.item
+  return false unless exp and exp\is types.Exp
+  return false unless exp.pipeExprs and #exp.pipeExprs > 0
+  unary = exp.pipeExprs[1]
+  return false unless unary and unary\is types.UnaryExp
+  return false unless unary.expos and #unary.expos > 0
+  val = unary.expos[1]
+  return false unless val and val\is types.Value
+  sv = val.item
+  return false unless sv and sv\is types.SimpleValue
+  sv.value and sv.value\is types.Comprehension
+
 visitors.Comprehension = (state, node, ctx) ->
   -- Comprehension items can be NormalDef (presupplied values), CompFor, etc.
   has_comp_for = false
@@ -1711,7 +1757,14 @@ visitors.Comprehension = (state, node, ctx) ->
           is_multiline = true
           break
 
+    -- Check if first item is a nested bracket (to avoid [[ looking like LuaString)
+    needs_spacing = #node.items > 0 and first_item_is_bracket node.items[1]
+    -- Check if source had trailing comma (semantically significant for destructures)
+    trailing_comma = has_trailing_comma node, ctx
+
     state\write '['
+    -- Only add space after [ for inline arrays (multiline handles its own formatting)
+    state\write ' ' if needs_spacing and not is_multiline
     if #node.items > 0
       if is_multiline
         eol_fn = (s, c, item) ->
@@ -1722,6 +1775,10 @@ visitors.Comprehension = (state, node, ctx) ->
           visit state, item, ctx
           if i < #node.items
             state\write ', '
+      -- Add trailing comma if source had one
+      state\write ',' if trailing_comma
+    -- Only add space before ] for inline arrays
+    state\write ' ' if needs_spacing and not is_multiline
     state\write ']'
 
 visitors.TblComprehension = (state, node, ctx) ->

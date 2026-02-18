@@ -293,7 +293,7 @@ do
   print x, a, b
 
 do
-  list = [[1, 2], [3, 4]]
+  list = [ [1, 2], [3, 4] ]
   { x, y }, list = lume.first(list), lume.slice list, 2
 
 do
