@@ -464,6 +464,13 @@ for idx in *comments.indices
 
 # changelog
 
+2026-02-18 (+ recent days)
+  * fixed various `yuefmt` bugs by importing YueScript spec and verifying output
+  * cleanup cli shared functionality
+  * `yuefmt` can run against directory like `yuecheck`
+  * formatter visitors
+    * some cleanup to do, checking source lines to determine certain content where AST is unhelpful
+
 2026-02
   * implemented `yuefmt`, a tool for formatting yue code
   * WONTFIX'd .yuecheck comp protection; so little use of yue that this seems unnecessary and annoying
