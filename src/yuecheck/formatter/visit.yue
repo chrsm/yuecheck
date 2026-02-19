@@ -21,14 +21,14 @@ reserved_keywords = {
 }
 
 valid_meta_methods = {
-	"add", "ub", "mul", "div", "mod",
-	"pow", "unm", "concat", "len", "eq",
-	"lt", "le", "index", "newindex", "call",
-	"gc", "mode", "tostring", "metatable", -- Lua 5.1
-	"pairs", "ipairs", -- Lua 5.2
-	"name", "idiv", "band", "bor", "bxor",
-	"bnot", "hl", "hr", -- Lua 5.3 ipairs deprecated
-	"close" -- Lua 5.4
+  'add', 'ub', 'mul', 'div', 'mod',
+  'pow', 'unm', 'concat', 'len', 'eq',
+  'lt', 'le', 'index', 'newindex', 'call',
+  'gc', 'mode', 'tostring', 'metatable', -- Lua 5.1
+  'pairs', 'ipairs', -- Lua 5.2
+  'name', 'idiv', 'band', 'bor', 'bxor',
+  'bnot', 'hl', 'hr', -- Lua 5.3 ipairs deprecated
+  'close', -- Lua 5.4
 }
 
 -- check if a string is a valid identifier that can be used as a simple key
@@ -55,7 +55,7 @@ is_stupid_luastring = (item) ->
 
 -- Check if source has trailing comma before closing bracket
 -- open_char and close_char specify the bracket pair (e.g., '[' ']' or '{' '}')
-has_trailing_comma = (node, ctx, open_char='[', close_char=']') ->
+has_trailing_comma = (node, ctx, open_char = '[', close_char = ']') ->
   return false unless ctx.source_lines
   src_line = node\g_src_line!
   src_col = node\g_src_col!
@@ -574,9 +574,9 @@ visitors.UnaryExp = (state, node, ctx) ->
     visit state, val, ctx
 
   -- 'in' expression i.e. `x in { 1, 2 }`
-  if node.inExp
+  with? node.inExp
     state\write ' in '
-    visit state, node.inExp.value, ctx
+    visit state, .value, ctx
 
 visitors.ExpOpValue = (state, node, ctx) ->
   visit state, node.op, ctx
@@ -603,13 +603,17 @@ visitors.SimpleValue = (state, node, ctx) ->
 -- check if an Invoke has a single string/table arg that doesn't need parens
 -- in Yuescript, `f""`, `f''`, `f{}` are valid without parens
 is_single_noparen_arg = (item) ->
-  return false unless item.args and #item.args == 1
-  arg = item.args[1]
-  arg\is_any types.DoubleString, types.SingleString, types.TableLit
+  unless item and #item?.args == 1
+    return false
+
+  item.args[1]\is_any types.DoubleString,
+    types.SingleString,
+    types.TableLit
 
 --[[ chain value: ugly as hell, sorry ]]
 visitors.ChainValue = (state, node, ctx) ->
   items = node.items
+
   -- detect multiline chains: chain items on different source lines
   first_line = items[1] and items[1]\g_src_line!
   is_multiline_chain = false
@@ -620,6 +624,7 @@ visitors.ChainValue = (state, node, ctx) ->
         -- only count DotChainItem/ColonChainItem as multiline triggers
         if items[i]\is_any types.DotChainItem, types.ColonChainItem
           is_multiline_chain = true
+
           break
 
   -- push scope once for multiline chain indent
@@ -774,8 +779,7 @@ visitors.InvokeArgs = (state, node, ctx) ->
           state\write_indent!
         visit state, arg, ctx
 
-        if orig := arg\g_src_line!
-          write_eol_for_line state, ctx, orig
+        write_eol_for_line state, ctx, arg\g_src_line!
 
       state\pop!
     else
@@ -814,15 +818,15 @@ visitors.DoubleString = (state, node, ctx) ->
         pos = str_start + 1
         found = false
         original_str = nil
-        
-        while not found
+
+        until found
           current_line_text = ctx.source_lines[current_line]
           break unless current_line_text
-          
+
           -- if we moved to a new line, start from beginning
           if current_line > src_line
             pos = 1
-          
+
           while pos <= #current_line_text
             ch = current_line_text\sub pos, pos
             if ch == '\\'
@@ -834,28 +838,28 @@ visitors.DoubleString = (state, node, ctx) ->
                 original_str = line\sub str_start, pos
               else
                 -- multi-line: build from parts
-                original_str = line\sub str_start  -- first line from quote to end
+                original_str = line\sub str_start -- first line from quote to end
                 for ln = src_line + 1, current_line - 1
-                  original_str ..= "\n" .. ctx.source_lines[ln]
-                original_str ..= "\n" .. current_line_text\sub 1, pos
+                  original_str ..= '\n' .. ctx.source_lines[ln]
+                original_str ..= '\n' .. current_line_text\sub 1, pos
               break
             else
               pos += 1
-          
+
           -- didn't find closing on this line, move to next
           unless found
             if pos > #current_line_text
               current_line += 1
               pos = 1
             else
-              break  -- hit end without finding
-        
+              break -- hit end without finding
+
         -- use source extraction for all strings to preserve whitespace
         if found and original_str
           is_multiline = current_line > src_line
           -- convert to single quotes if possible (no interpolation, no embedded single quotes, single line)
-          content = original_str\sub 2, -2  -- strip outer quotes
-          if not is_multiline and not original_str\find('#{', 1, true) and not content\find("'", 1, true)
+          content = original_str\sub 2, -2 -- strip outer quotes
+          unless is_multiline or (original_str\find '#{', 1, true) or (content\find "'", 1, true)
             state\write "'"
             state\write content
             state\write "'"
@@ -898,31 +902,31 @@ visitors.FunLit = (state, node, ctx) ->
   -- arguments in argsDef.defList.definitions
   defList = node.argsDef?.defList
   shadowOption = node.argsDef?.shadowOption
-  
+
   -- check if definitions have actual content (not empty placeholders)
   -- empty FnArgDefList has definitions with name.name.v == ''
   has_defs = false
-  if defList and defList.definitions and #defList.definitions > 0
+  if defList?.definitions and #defList.definitions > 0
     for def in *defList.definitions
+      continue unless def.name
       -- regular args: def.name is Variable with name.v (check for non-empty)
       -- self args (@x): def.name is SelfItem
       -- destructure args: def.name is TableLit or SimpleTable
-      if def.name
-        typ = def.name.typ
-        if typ == 'SelfItem' or typ == 'TableLit' or typ == 'SimpleTable'
-          has_defs = true
-          break
-        elseif typ == 'Variable' and def.name.name?.v and def.name.name.v != ''
-          has_defs = true
-          break
-  
+      typ = def.name.typ
+      if typ == 'SelfItem' or typ == 'TableLit' or typ == 'SimpleTable'
+        has_defs = true
+        break
+      elseif typ == 'Variable' and def.name.name?.v and def.name.name.v != ''
+        has_defs = true
+        break
+
   has_vararg = defList?.varArg
   -- has_vararg = defList and defList.varArg
   has_args = has_defs or has_vararg
   has_using = shadowOption != nil
   -- explicit empty parens: argsDef exists but no args/using (user wrote "()")
   has_explicit_parens = node.argsDef != nil and not has_args and not has_using
-  
+
   if has_args or has_using or has_explicit_parens
     state\write '('
     visit state, defList, ctx if has_args
@@ -972,7 +976,7 @@ visitors.FnArgDefList = (state, node, ctx) ->
 visitors.FnArgDef = (state, node, ctx) ->
   visit state, node.name, ctx
   write_trailing state, ctx, node.name if node.name
-  
+
   -- type annotation: `TypeName
   if node.label
     state\write '`'
@@ -1073,10 +1077,9 @@ visitors.TableLit = (state, node, ctx) ->
           * { -- comment
           }
       ]]
-      write_eol_for_line state, ctx, table_line if table_line
+      write_eol_for_line state, ctx, table_line
       eol_fn = (s, c, val) ->
-        val_line = val\g_src_line!
-        write_eol_for_line s, c, val_line if val_line
+        write_eol_for_line s, c, val\g_src_line!
       write_packed_items state, node.values, ctx, eol_fn
     else
       state\write ' ' if ctx?.table_spacing
@@ -1121,7 +1124,7 @@ visitors.NormalPair = (state, node, ctx) ->
   key_line = key and key\g_src_line!
   value_is_multiline = node.value and node.value\is_any types.TableBlock, types.FunLit
 
-  if key and key\is types.Exp
+  if key?\is types.Exp
     -- see if we can simplify
     simple_str = extract_simple_string key
     if simple_str and is_valid_identifier simple_str
@@ -1199,8 +1202,7 @@ visitors.TableBlock = (state, node, ctx) ->
     visit state, val, ctx
 
     -- trailing comments
-    if src_line := val\g_src_line!
-      write_eol_for_line state, ctx, src_line
+    write_eol_for_line state, ctx, val\g_src_line!
 
     state\newline! if i < #node.values
 
@@ -1337,7 +1339,7 @@ visitors.If = (state, node, ctx) ->
           if (next_item\is types.IfCond) and next_item\g_src_line! == cond_line
             state\write ' elseif '
             i += 1
-            visit state, nodes[i], ctx  -- visit the IfCond
+            visit state, nodes[i], ctx -- visit the IfCond
             -- expect Statement for the elseif body
             if i + 1 <= #nodes and (nodes[i + 1]\is types.Statement) and nodes[i + 1]\g_src_line! == cond_line
               state\write ' then '
@@ -1348,7 +1350,7 @@ visitors.If = (state, node, ctx) ->
             state\write ' else '
             i += 1
             visit state, nodes[i], ctx
-            break  -- else is always last
+            break -- else is always last
           -- else branch with body on different line (Block not on same line)
           elseif next_item\is types.Block
             state\write ' else'
@@ -1377,7 +1379,6 @@ visitors.If = (state, node, ctx) ->
             state\newline!
     elseif item\is_any types.Block, types.Statement
       -- this is an else block (no condition before it)
-
       -- check if it's `else if` pattern - convert to `elseif`
       nested_if = nil
       if item\is types.Statement
@@ -1452,7 +1453,7 @@ visitors.Switch = (state, node, ctx) ->
   if node.assignment
     state\write ' '
     -- Pass walrus_assign context for := operator
-    walrus_ctx = { k, v for k, v in pairs ctx }
+    walrus_ctx = {k, v for k, v in pairs ctx}
     walrus_ctx.walrus_assign = true
     visit state, node.assignment, walrus_ctx
   state\newline!
@@ -1485,8 +1486,7 @@ visitors.SwitchCase = (state, node, ctx) ->
   visit state, node.condition, ctx
 
   -- `when x -- comment`
-  cond_line = node.condition\g_src_line!
-  write_eol_for_line state, ctx, cond_line if cond_line
+  write_eol_for_line state, ctx, node.condition\g_src_line!
 
   -- is single statement (then-style) or block?
   if node.body\is types.Statement
@@ -1701,8 +1701,7 @@ visitors.ClassBlock = (state, node, ctx) ->
     write_above state, ctx, item
     state\write_indent!
     visit state, item, ctx
-    src_line = item\g_src_line!
-    write_eol_for_line state, ctx, src_line if src_line
+    write_eol_for_line state, ctx, item\g_src_line!
     state\newline!
 
 visitors.ClassMemberList = (state, node, ctx) ->
@@ -1769,7 +1768,7 @@ visitors.Block = (state, node, ctx) ->
     write_above state, ctx, stmt
     state\write_indent!
     visit state, stmt, ctx
-    write_eol_for_line state, ctx, src_line if src_line
+    write_eol_for_line state, ctx, src_line
 
     -- add newline after statement if not the last one
     -- only skip if current_line is already empty (fresh line after compound statement)
@@ -1792,7 +1791,6 @@ visitors.File = (state, node, ctx) ->
   visit state, node.block, ctx
 
 --[[ comprehension handling ]]
-
 -- Check if a NormalDef item starts with a nested Comprehension (bracket)
 first_item_is_bracket = (item) ->
   return false unless item\is types.NormalDef
@@ -1846,7 +1844,7 @@ visitors.Comprehension = (state, node, ctx) ->
     if #node.items > 0
       if is_multiline
         eol_fn = (s, c, item) ->
-          write_eol_for_line s, c, item\g_src_line! if item\g_src_line!
+          write_eol_for_line s, c, item\g_src_line!
         write_packed_items state, node.items, ctx, eol_fn
       else
         for i, item in ipairs node.items
@@ -2311,7 +2309,7 @@ visitors.YAMLMultiline = (state, node, ctx) ->
   src_line = node\g_src_line!
   src_col = node\g_src_col!
   indent_size = state.indent_size or 2
-  
+
   if src_line and ctx.source_lines
     -- find the `|` and extract everything from there to end of YAML block
     line = ctx.source_lines[src_line]
@@ -2320,7 +2318,7 @@ visitors.YAMLMultiline = (state, node, ctx) ->
       if pipe_pos
         -- determine base indent level (indent of the `|` line)
         base_indent = #(line\match '^%s*' or '')
-        
+
         -- start building from the pipe
         result = line\sub pipe_pos
         -- scan subsequent lines that are more indented (part of YAML block)
@@ -2332,13 +2330,13 @@ visitors.YAMLMultiline = (state, node, ctx) ->
           if next_line == '' or line_indent > base_indent
             -- convert tabs to spaces to avoid mixed indent issues
             converted = next_line\gsub '\t', string.rep(' ', indent_size)
-            result ..= "\n" .. converted
+            result ..= '\n' .. converted
             current_line += 1
           else
             break
         state\write result
         return
-  
+
   -- fallback: output what we have from AST
   state\write '|'
   for line in *(node.lines or {})
@@ -2366,5 +2364,3 @@ visitors.YueMultilineComment = (state, node) ->
   state\write node.v
 
 export default visit
-
-
