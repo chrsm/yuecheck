@@ -1313,6 +1313,8 @@ visitors.If = (state, node, ctx) ->
         state\write ' '
         first = false
       else
+        -- write any "above" comments for this elseif branch
+        write_above state, ctx, item
         state\write_indent!
         state\write 'elseif '
       visit state, item, ctx
@@ -1402,6 +1404,8 @@ visitors.If = (state, node, ctx) ->
         -- don't increment i - we want to process the newly inserted IfCond
         continue
       else
+        -- write any "above" comments for this else branch
+        write_above state, ctx, item
         state\write_indent!
         state\write 'else'
         state\newline!

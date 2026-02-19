@@ -1,0 +1,61 @@
+-- input
+while i + 1 <= #nodes
+  next_item = nodes[i + 1]
+  -- elseif branch (IfCond on same line)
+  if (next_item\is types.IfCond) and next_item\g_src_line! == cond_line
+    state\write ' elseif '
+    i += 1
+    visit state, nodes[i], ctx -- visit the IfCond
+    -- Statement for the elseif body
+    if i + 1 <= #nodes and (nodes[i + 1]\is types.Statement) and nodes[i + 1]\g_src_line! == cond_line
+      state\write ' then '
+      i += 1
+      visit state, nodes[i], ctx
+  -- else branch (Statement on same line)
+  elseif (next_item\is types.Statement) and next_item\g_src_line! == cond_line
+    state\write ' else '
+    i += 1
+    visit state, nodes[i], ctx
+    break -- else is always last
+  -- else branch with body on different line (Block not on same line)
+  elseif next_item\is types.Block
+    state\write ' else'
+    state\newline!
+    i += 1
+    state\push!
+    visit state, nodes[i], ctx
+    state\pop!
+    break
+  else
+    break
+
+-- expect
+while i + 1 <= #nodes
+  next_item = nodes[i + 1]
+  -- elseif branch (IfCond on same line)
+  if (next_item\is types.IfCond) and next_item\g_src_line! == cond_line
+    state\write ' elseif '
+    i += 1
+    visit state, nodes[i], ctx -- visit the IfCond
+    -- Statement for the elseif body
+    if i + 1 <= #nodes and (nodes[i + 1]\is types.Statement) and nodes[i + 1]\g_src_line! == cond_line
+      state\write ' then '
+      i += 1
+      visit state, nodes[i], ctx
+  -- else branch (Statement on same line)
+  elseif (next_item\is types.Statement) and next_item\g_src_line! == cond_line
+    state\write ' else '
+    i += 1
+    visit state, nodes[i], ctx
+    break -- else is always last
+  -- else branch with body on different line (Block not on same line)
+  elseif next_item\is types.Block
+    state\write ' else'
+    state\newline!
+    i += 1
+    state\push!
+    visit state, nodes[i], ctx
+    state\pop!
+    break
+  else
+    break

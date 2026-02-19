@@ -657,6 +657,11 @@ describe 'formatter', ->
       r = fmt.format src
       assert.same expect, r
 
+    it 'should not lose comments on a multibranch if', ->
+      src, expect = parse_td fget 'fmt_switch_comments_2'
+      r = fmt.format src
+      assert.same expect, r
+
 
   -- skip these for now, testing on case-by-case basis
   describe 'yuescript repo inputs', ->
