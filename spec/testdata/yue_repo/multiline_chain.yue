@@ -110,11 +110,9 @@ x
   .b
   \c!
 
-func 1,
-  arg2
+func 1, arg2
     .value
-    \get!,
-  arg3
+    \get!, arg3
     .value
     \get!,
 

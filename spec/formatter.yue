@@ -95,7 +95,7 @@ describe 'formatter', ->
     -- yue ast turns this into 'hello world', no nls, but we extract from source
     it 'should handle multiline strings with leading / trailing nl', ->
       r = fmt.format 'x = "\nhello world\n"'
-      assert.same "x = \"\nhello world\n\"", r
+      assert.same 'x = \"\nhello world\n\"', r
 
     it 'should handle ml bracket strings with indentation', ->
       input = 'x = [[\n    string\n]]'
@@ -237,7 +237,7 @@ describe 'formatter', ->
       input = 'if x, y := z!\n  p!'
       r = fmt.format input
       assert.same input, r
-    
+
     it 'should handle inline if/elseif/else', ->
       input = 'if x then y elseif y then z else a'
       r = fmt.format input
@@ -250,8 +250,8 @@ describe 'formatter', ->
 
     -- change `else if` to `elseif`
     it 'should handle nested if-elseif', ->
-      input = "if x\n  if y\n    one\n  else if ed\n    two\n  else\n    three\nelse\n  no"
-      expect = "if x\n  if y\n    one\n  elseif ed\n    two\n  else\n    three\nelse\n  no"
+      input = 'if x\n  if y\n    one\n  else if ed\n    two\n  else\n    three\nelse\n  no'
+      expect = 'if x\n  if y\n    one\n  elseif ed\n    two\n  else\n    three\nelse\n  no'
       r = fmt.format input
       assert.same expect, r
 
@@ -368,7 +368,7 @@ describe 'formatter', ->
       expected = "$ ->\n  'a!'"
       r = fmt.format input
       assert.same expected, r
-    
+
     it 'should handle macro call with args', ->
       input = '$m 1, 2'
       r = fmt.format input
@@ -395,7 +395,7 @@ describe 'formatter', ->
     it 'should handle mt destructuring', ->
       input = '{<>: mt = {__index: {abc: 123}}, <>: {:<call> = (-> {}), :<add>}} = tb'
       expected = '{ <>: mt = { __index: { abc: 123 } }, <>: { :<call> = (-> {}), :<add> } } = tb'
-      
+
       r = fmt.format input
       assert.same expected, r
 
@@ -662,6 +662,10 @@ describe 'formatter', ->
       r = fmt.format src
       assert.same expect, r
 
+    it 'should preserve indentation on ml calls with lit', ->
+      src, expect = parse_td fget 'fmt_ident_args'
+      r = fmt.format src
+      assert.same expect, r
 
   -- skip these for now, testing on case-by-case basis
   describe 'yuescript repo inputs', ->
@@ -673,5 +677,3 @@ describe 'formatter', ->
 
         r = fmt.format src
         assert.same r, expect
-
-

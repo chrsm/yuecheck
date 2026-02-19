@@ -12,7 +12,7 @@ _in = (val, set) ->
     return true if v == val
   false
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L92
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L94
 class Num extends Leaf
   @yue_name: 'Num'
   
@@ -21,7 +21,7 @@ class Num extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.Num = Num
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L95
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L97
 class Name extends Leaf
   @yue_name: 'Name'
   
@@ -30,7 +30,7 @@ class Name extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.Name = Name
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L98
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L100
 class UnicodeName extends Leaf
   @yue_name: 'UnicodeName'
   
@@ -39,7 +39,7 @@ class UnicodeName extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.UnicodeName = UnicodeName
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L101
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L103
 class Variable extends Node
   @yue_name: 'Variable'
   
@@ -60,7 +60,7 @@ class Variable extends Node
     visitor @
 ast_nodes.Variable = Variable
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L106
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L108
 class LuaKeyword extends Node
   @yue_name: 'LuaKeyword'
   
@@ -81,7 +81,7 @@ class LuaKeyword extends Node
     visitor @
 ast_nodes.LuaKeyword = LuaKeyword
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L111
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L113
 class Self extends Leaf
   @yue_name: 'Self'
   
@@ -90,7 +90,7 @@ class Self extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.Self = Self
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L114
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L116
 class SelfName extends Node
   @yue_name: 'SelfName'
   
@@ -111,7 +111,7 @@ class SelfName extends Node
     visitor @
 ast_nodes.SelfName = SelfName
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L119
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L121
 class SelfClass extends Leaf
   @yue_name: 'SelfClass'
   
@@ -120,7 +120,7 @@ class SelfClass extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.SelfClass = SelfClass
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L122
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L124
 class SelfClassName extends Node
   @yue_name: 'SelfClassName'
   
@@ -141,7 +141,7 @@ class SelfClassName extends Node
     visitor @
 ast_nodes.SelfClassName = SelfClassName
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L127
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L129
 class SelfItem extends Node
   @yue_name: 'SelfItem'
   
@@ -162,7 +162,7 @@ class SelfItem extends Node
     visitor @
 ast_nodes.SelfItem = SelfItem
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L132
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L134
 class KeyName extends Node
   @yue_name: 'KeyName'
   
@@ -183,7 +183,7 @@ class KeyName extends Node
     visitor @
 ast_nodes.KeyName = KeyName
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L137
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L139
 class VarArgDef extends Node
   @yue_name: 'VarArgDef'
   
@@ -204,7 +204,7 @@ class VarArgDef extends Node
     visitor @
 ast_nodes.VarArgDef = VarArgDef
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L142
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L144
 class VarArg extends Leaf
   @yue_name: 'VarArg'
   
@@ -213,7 +213,7 @@ class VarArg extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.VarArg = VarArg
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L145
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L147
 class LocalFlag extends Leaf
   @yue_name: 'LocalFlag'
   
@@ -222,7 +222,7 @@ class LocalFlag extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.LocalFlag = LocalFlag
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L151
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L153
 class NameList extends Node
   @yue_name: 'NameList'
   
@@ -243,7 +243,7 @@ class NameList extends Node
     visitor @
 ast_nodes.NameList = NameList
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L157
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L159
 class LocalValues extends Node
   @yue_name: 'LocalValues'
   
@@ -270,7 +270,7 @@ class LocalValues extends Node
     visitor @
 ast_nodes.LocalValues = LocalValues
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L163
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L165
 class Local extends Node
   @yue_name: 'Local'
   
@@ -291,7 +291,7 @@ class Local extends Node
     visitor @
 ast_nodes.Local = Local
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L172
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L174
 class ConstAttrib extends Leaf
   @yue_name: 'ConstAttrib'
   
@@ -300,7 +300,7 @@ class ConstAttrib extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.ConstAttrib = ConstAttrib
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L175
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L177
 class CloseAttrib extends Leaf
   @yue_name: 'CloseAttrib'
   
@@ -309,7 +309,7 @@ class CloseAttrib extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.CloseAttrib = CloseAttrib
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L178
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L180
 class LocalAttrib extends Node
   @yue_name: 'LocalAttrib'
   
@@ -342,7 +342,7 @@ class LocalAttrib extends Node
     visitor @
 ast_nodes.LocalAttrib = LocalAttrib
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L187
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L189
 class ColonImportName extends Node
   @yue_name: 'ColonImportName'
   
@@ -363,7 +363,7 @@ class ColonImportName extends Node
     visitor @
 ast_nodes.ColonImportName = ColonImportName
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L192
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L194
 class ImportLiteralInner extends Leaf
   @yue_name: 'ImportLiteralInner'
   
@@ -372,7 +372,7 @@ class ImportLiteralInner extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.ImportLiteralInner = ImportLiteralInner
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L195
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L197
 class ImportLiteral extends Node
   @yue_name: 'ImportLiteral'
   
@@ -393,7 +393,7 @@ class ImportLiteral extends Node
     visitor @
 ast_nodes.ImportLiteral = ImportLiteral
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L201
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L203
 class ImportFrom extends Node
   @yue_name: 'ImportFrom'
   
@@ -420,7 +420,7 @@ class ImportFrom extends Node
     visitor @
 ast_nodes.ImportFrom = ImportFrom
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L208
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L210
 class FromImport extends Node
   @yue_name: 'FromImport'
   
@@ -447,7 +447,7 @@ class FromImport extends Node
     visitor @
 ast_nodes.FromImport = FromImport
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L215
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L217
 class MacroNamePair extends Node
   @yue_name: 'MacroNamePair'
   
@@ -474,7 +474,7 @@ class MacroNamePair extends Node
     visitor @
 ast_nodes.MacroNamePair = MacroNamePair
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L221
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L223
 class ImportAllMacro extends Leaf
   @yue_name: 'ImportAllMacro'
   
@@ -483,7 +483,7 @@ class ImportAllMacro extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.ImportAllMacro = ImportAllMacro
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L224
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L226
 class ImportTabLit extends Node
   @yue_name: 'ImportTabLit'
   
@@ -504,7 +504,7 @@ class ImportTabLit extends Node
     visitor @
 ast_nodes.ImportTabLit = ImportTabLit
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L230
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L232
 class ImportAs extends Node
   @yue_name: 'ImportAs'
   
@@ -531,7 +531,7 @@ class ImportAs extends Node
     visitor @
 ast_nodes.ImportAs = ImportAs
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L236
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L238
 class ImportAllGlobal extends Leaf
   @yue_name: 'ImportAllGlobal'
   
@@ -540,7 +540,7 @@ class ImportAllGlobal extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.ImportAllGlobal = ImportAllGlobal
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L239
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L241
 class ImportGlobal extends Node
   @yue_name: 'ImportGlobal'
   
@@ -567,7 +567,7 @@ class ImportGlobal extends Node
     visitor @
 ast_nodes.ImportGlobal = ImportGlobal
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L246
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L248
 class Import extends Node
   @yue_name: 'Import'
   
@@ -588,7 +588,7 @@ class Import extends Node
     visitor @
 ast_nodes.Import = Import
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L251
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L253
 class Label extends Node
   @yue_name: 'Label'
   
@@ -609,7 +609,7 @@ class Label extends Node
     visitor @
 ast_nodes.Label = Label
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L256
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L258
 class Goto extends Node
   @yue_name: 'Goto'
   
@@ -630,7 +630,7 @@ class Goto extends Node
     visitor @
 ast_nodes.Goto = Goto
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L261
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L263
 class ShortTabAppending extends Node
   @yue_name: 'ShortTabAppending'
   
@@ -651,7 +651,7 @@ class ShortTabAppending extends Node
     visitor @
 ast_nodes.ShortTabAppending = ShortTabAppending
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L266
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L268
 class FnArrowBack extends Leaf
   @yue_name: 'FnArrowBack'
   
@@ -660,7 +660,7 @@ class FnArrowBack extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.FnArrowBack = FnArrowBack
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L269
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L271
 class Backcall extends Node
   @yue_name: 'Backcall'
   
@@ -693,7 +693,7 @@ class Backcall extends Node
     visitor @
 ast_nodes.Backcall = Backcall
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L276
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L278
 class ExpList extends Node
   @yue_name: 'ExpList'
   
@@ -714,7 +714,7 @@ class ExpList extends Node
     visitor @
 ast_nodes.ExpList = ExpList
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L284
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L286
 class Return extends Node
   @yue_name: 'Return'
   
@@ -735,7 +735,7 @@ class Return extends Node
     visitor @
 ast_nodes.Return = Return
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L291
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L293
 class With extends Node
   @yue_name: 'With'
   
@@ -774,7 +774,7 @@ class With extends Node
     visitor @
 ast_nodes.With = With
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L299
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L301
 class SwitchList extends Node
   @yue_name: 'SwitchList'
   
@@ -795,7 +795,7 @@ class SwitchList extends Node
     visitor @
 ast_nodes.SwitchList = SwitchList
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L305
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L307
 class SwitchCase extends Node
   @yue_name: 'SwitchCase'
   
@@ -822,7 +822,7 @@ class SwitchCase extends Node
     visitor @
 ast_nodes.SwitchCase = SwitchCase
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L311
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L313
 class Assignment extends Node
   @yue_name: 'Assignment'
   
@@ -849,7 +849,7 @@ class Assignment extends Node
     visitor @
 ast_nodes.Assignment = Assignment
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L317
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L319
 class Switch extends Node
   @yue_name: 'Switch'
   
@@ -888,7 +888,7 @@ class Switch extends Node
     visitor @
 ast_nodes.Switch = Switch
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L326
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L328
 class IfCond extends Node
   @yue_name: 'IfCond'
   
@@ -915,7 +915,7 @@ class IfCond extends Node
     visitor @
 ast_nodes.IfCond = IfCond
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L332
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L334
 class IfType extends Leaf
   @yue_name: 'IfType'
   
@@ -924,7 +924,7 @@ class IfType extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.IfType = IfType
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L335
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L337
 class If extends Node
   @yue_name: 'If'
   
@@ -951,7 +951,7 @@ class If extends Node
     visitor @
 ast_nodes.If = If
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L341
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L343
 class WhileType extends Leaf
   @yue_name: 'WhileType'
   
@@ -960,7 +960,7 @@ class WhileType extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.WhileType = WhileType
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L344
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L346
 class While extends Node
   @yue_name: 'While'
   
@@ -999,7 +999,7 @@ class While extends Node
     visitor @
 ast_nodes.While = While
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L352
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L354
 class Repeat extends Node
   @yue_name: 'Repeat'
   
@@ -1026,7 +1026,7 @@ class Repeat extends Node
     visitor @
 ast_nodes.Repeat = Repeat
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L358
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L360
 class ForStepValue extends Node
   @yue_name: 'ForStepValue'
   
@@ -1047,7 +1047,7 @@ class ForStepValue extends Node
     visitor @
 ast_nodes.ForStepValue = ForStepValue
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L363
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L365
 class ForNum extends Node
   @yue_name: 'ForNum'
   
@@ -1092,7 +1092,7 @@ class ForNum extends Node
     visitor @
 ast_nodes.ForNum = ForNum
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L372
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L374
 class ForEach extends Node
   @yue_name: 'ForEach'
   
@@ -1125,7 +1125,7 @@ class ForEach extends Node
     visitor @
 ast_nodes.ForEach = ForEach
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L379
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L381
 class For extends Node
   @yue_name: 'For'
   
@@ -1146,7 +1146,7 @@ class For extends Node
     visitor @
 ast_nodes.For = For
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L384
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L386
 class Do extends Node
   @yue_name: 'Do'
   
@@ -1167,7 +1167,7 @@ class Do extends Node
     visitor @
 ast_nodes.Do = Do
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L389
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L391
 class CatchBlock extends Node
   @yue_name: 'CatchBlock'
   
@@ -1194,7 +1194,7 @@ class CatchBlock extends Node
     visitor @
 ast_nodes.CatchBlock = CatchBlock
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L395
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L397
 class Try extends Node
   @yue_name: 'Try'
   
@@ -1227,7 +1227,7 @@ class Try extends Node
     visitor @
 ast_nodes.Try = Try
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L402
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L404
 class Comprehension extends Node
   @yue_name: 'Comprehension'
   
@@ -1248,7 +1248,7 @@ class Comprehension extends Node
     visitor @
 ast_nodes.Comprehension = Comprehension
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L409
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L411
 class CompValue extends Node
   @yue_name: 'CompValue'
   
@@ -1269,7 +1269,7 @@ class CompValue extends Node
     visitor @
 ast_nodes.CompValue = CompValue
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L414
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L416
 class TblComprehension extends Node
   @yue_name: 'TblComprehension'
   
@@ -1302,7 +1302,7 @@ class TblComprehension extends Node
     visitor @
 ast_nodes.TblComprehension = TblComprehension
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L421
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L423
 class StarExp extends Node
   @yue_name: 'StarExp'
   
@@ -1323,7 +1323,7 @@ class StarExp extends Node
     visitor @
 ast_nodes.StarExp = StarExp
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L426
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L428
 class CompForEach extends Node
   @yue_name: 'CompForEach'
   
@@ -1350,7 +1350,7 @@ class CompForEach extends Node
     visitor @
 ast_nodes.CompForEach = CompForEach
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L432
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L434
 class CompForNum extends Node
   @yue_name: 'CompForNum'
   
@@ -1389,7 +1389,7 @@ class CompForNum extends Node
     visitor @
 ast_nodes.CompForNum = CompForNum
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L440
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L442
 class CompFor extends Node
   @yue_name: 'CompFor'
   
@@ -1410,7 +1410,7 @@ class CompFor extends Node
     visitor @
 ast_nodes.CompFor = CompFor
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L446
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L448
 class Assign extends Node
   @yue_name: 'Assign'
   
@@ -1431,7 +1431,7 @@ class Assign extends Node
     visitor @
 ast_nodes.Assign = Assign
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L452
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L454
 class UpdateOp extends Leaf
   @yue_name: 'UpdateOp'
   
@@ -1440,7 +1440,7 @@ class UpdateOp extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.UpdateOp = UpdateOp
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L455
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L457
 class Update extends Node
   @yue_name: 'Update'
   
@@ -1467,7 +1467,7 @@ class Update extends Node
     visitor @
 ast_nodes.Update = Update
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L461
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L463
 class BinaryOperator extends Leaf
   @yue_name: 'BinaryOperator'
   
@@ -1476,7 +1476,7 @@ class BinaryOperator extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.BinaryOperator = BinaryOperator
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L464
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L466
 class UnaryOperator extends Leaf
   @yue_name: 'UnaryOperator'
   
@@ -1485,7 +1485,7 @@ class UnaryOperator extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.UnaryOperator = UnaryOperator
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L467
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L469
 class NotIn extends Leaf
   @yue_name: 'NotIn'
   
@@ -1494,7 +1494,7 @@ class NotIn extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.NotIn = NotIn
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L470
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L472
 class In extends Node
   @yue_name: 'In'
   
@@ -1521,7 +1521,7 @@ class In extends Node
     visitor @
 ast_nodes.In = In
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L476
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L478
 class Assignable extends Node
   @yue_name: 'Assignable'
   
@@ -1542,7 +1542,7 @@ class Assignable extends Node
     visitor @
 ast_nodes.Assignable = Assignable
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L481
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L483
 class ExpOpValue extends Node
   @yue_name: 'ExpOpValue'
   
@@ -1569,7 +1569,7 @@ class ExpOpValue extends Node
     visitor @
 ast_nodes.ExpOpValue = ExpOpValue
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L487
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L489
 class Exp extends Node
   @yue_name: 'Exp'
   
@@ -1602,7 +1602,7 @@ class Exp extends Node
     visitor @
 ast_nodes.Exp = Exp
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L495
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L497
 class Callable extends Node
   @yue_name: 'Callable'
   
@@ -1623,7 +1623,7 @@ class Callable extends Node
     visitor @
 ast_nodes.Callable = Callable
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L500
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L502
 class VariablePair extends Node
   @yue_name: 'VariablePair'
   
@@ -1644,7 +1644,7 @@ class VariablePair extends Node
     visitor @
 ast_nodes.VariablePair = VariablePair
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L505
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L507
 class VariablePairDef extends Node
   @yue_name: 'VariablePairDef'
   
@@ -1671,7 +1671,7 @@ class VariablePairDef extends Node
     visitor @
 ast_nodes.VariablePairDef = VariablePairDef
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L511
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L513
 class NormalPair extends Node
   @yue_name: 'NormalPair'
   
@@ -1698,7 +1698,7 @@ class NormalPair extends Node
     visitor @
 ast_nodes.NormalPair = NormalPair
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L517
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L519
 class NormalPairDef extends Node
   @yue_name: 'NormalPairDef'
   
@@ -1725,7 +1725,7 @@ class NormalPairDef extends Node
     visitor @
 ast_nodes.NormalPairDef = NormalPairDef
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L523
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L525
 class NormalDef extends Node
   @yue_name: 'NormalDef'
   
@@ -1752,7 +1752,7 @@ class NormalDef extends Node
     visitor @
 ast_nodes.NormalDef = NormalDef
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L530
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L532
 class MetaVariablePair extends Node
   @yue_name: 'MetaVariablePair'
   
@@ -1773,7 +1773,7 @@ class MetaVariablePair extends Node
     visitor @
 ast_nodes.MetaVariablePair = MetaVariablePair
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L535
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L537
 class MetaVariablePairDef extends Node
   @yue_name: 'MetaVariablePairDef'
   
@@ -1800,7 +1800,7 @@ class MetaVariablePairDef extends Node
     visitor @
 ast_nodes.MetaVariablePairDef = MetaVariablePairDef
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L541
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L543
 class MetaNormalPair extends Node
   @yue_name: 'MetaNormalPair'
   
@@ -1827,7 +1827,7 @@ class MetaNormalPair extends Node
     visitor @
 ast_nodes.MetaNormalPair = MetaNormalPair
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L547
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L549
 class MetaNormalPairDef extends Node
   @yue_name: 'MetaNormalPairDef'
   
@@ -1854,7 +1854,7 @@ class MetaNormalPairDef extends Node
     visitor @
 ast_nodes.MetaNormalPairDef = MetaNormalPairDef
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L553
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L555
 class SimpleTable extends Node
   @yue_name: 'SimpleTable'
   
@@ -1875,7 +1875,7 @@ class SimpleTable extends Node
     visitor @
 ast_nodes.SimpleTable = SimpleTable
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L559
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L561
 class SimpleValue extends Node
   @yue_name: 'SimpleValue'
   
@@ -1896,7 +1896,7 @@ class SimpleValue extends Node
     visitor @
 ast_nodes.SimpleValue = SimpleValue
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L570
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L572
 class LuaStringOpen extends Leaf
   @yue_name: 'LuaStringOpen'
   
@@ -1905,7 +1905,7 @@ class LuaStringOpen extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.LuaStringOpen = LuaStringOpen
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L573
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L575
 class LuaStringContent extends Leaf
   @yue_name: 'LuaStringContent'
   
@@ -1914,7 +1914,7 @@ class LuaStringContent extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.LuaStringContent = LuaStringContent
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L576
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L578
 class LuaStringClose extends Leaf
   @yue_name: 'LuaStringClose'
   
@@ -1923,7 +1923,7 @@ class LuaStringClose extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.LuaStringClose = LuaStringClose
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L579
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L581
 class LuaString extends Node
   @yue_name: 'LuaString'
   
@@ -1956,7 +1956,7 @@ class LuaString extends Node
     visitor @
 ast_nodes.LuaString = LuaString
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L586
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L588
 class SingleString extends Leaf
   @yue_name: 'SingleString'
   
@@ -1965,7 +1965,7 @@ class SingleString extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.SingleString = SingleString
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L589
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L591
 class DoubleStringInner extends Leaf
   @yue_name: 'DoubleStringInner'
   
@@ -1974,7 +1974,7 @@ class DoubleStringInner extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.DoubleStringInner = DoubleStringInner
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L592
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L594
 class DoubleStringContent extends Node
   @yue_name: 'DoubleStringContent'
   
@@ -1995,7 +1995,7 @@ class DoubleStringContent extends Node
     visitor @
 ast_nodes.DoubleStringContent = DoubleStringContent
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L597
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L599
 class DoubleString extends Node
   @yue_name: 'DoubleString'
   
@@ -2016,7 +2016,7 @@ class DoubleString extends Node
     visitor @
 ast_nodes.DoubleString = DoubleString
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L603
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L605
 class YAMLIndent extends Leaf
   @yue_name: 'YAMLIndent'
   
@@ -2025,7 +2025,7 @@ class YAMLIndent extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.YAMLIndent = YAMLIndent
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L606
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L608
 class YAMLLineInner extends Leaf
   @yue_name: 'YAMLLineInner'
   
@@ -2034,7 +2034,7 @@ class YAMLLineInner extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.YAMLLineInner = YAMLLineInner
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L609
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L611
 class YAMLLineContent extends Node
   @yue_name: 'YAMLLineContent'
   
@@ -2055,7 +2055,7 @@ class YAMLLineContent extends Node
     visitor @
 ast_nodes.YAMLLineContent = YAMLLineContent
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L614
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L616
 class YAMLLine extends Node
   @yue_name: 'YAMLLine'
   
@@ -2082,7 +2082,7 @@ class YAMLLine extends Node
     visitor @
 ast_nodes.YAMLLine = YAMLLine
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L620
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L622
 class YAMLMultiline extends Node
   @yue_name: 'YAMLMultiline'
   
@@ -2103,7 +2103,7 @@ class YAMLMultiline extends Node
     visitor @
 ast_nodes.YAMLMultiline = YAMLMultiline
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L626
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L628
 class String extends Node
   @yue_name: 'String'
   
@@ -2124,7 +2124,7 @@ class String extends Node
     visitor @
 ast_nodes.String = String
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L631
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L633
 class Metatable extends Leaf
   @yue_name: 'Metatable'
   
@@ -2133,7 +2133,7 @@ class Metatable extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.Metatable = Metatable
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L634
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L636
 class Metamethod extends Node
   @yue_name: 'Metamethod'
   
@@ -2154,7 +2154,7 @@ class Metamethod extends Node
     visitor @
 ast_nodes.Metamethod = Metamethod
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L639
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L641
 class DotChainItem extends Node
   @yue_name: 'DotChainItem'
   
@@ -2175,7 +2175,7 @@ class DotChainItem extends Node
     visitor @
 ast_nodes.DotChainItem = DotChainItem
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L644
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L646
 class ColonChainItem extends Node
   @yue_name: 'ColonChainItem'
   
@@ -2196,7 +2196,7 @@ class ColonChainItem extends Node
     visitor @
 ast_nodes.ColonChainItem = ColonChainItem
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L650
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L652
 class Slice extends Node
   @yue_name: 'Slice'
   
@@ -2229,7 +2229,7 @@ class Slice extends Node
     visitor @
 ast_nodes.Slice = Slice
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L657
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L659
 class Parens extends Node
   @yue_name: 'Parens'
   
@@ -2250,7 +2250,7 @@ class Parens extends Node
     visitor @
 ast_nodes.Parens = Parens
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L663
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L665
 class Invoke extends Node
   @yue_name: 'Invoke'
   
@@ -2271,7 +2271,7 @@ class Invoke extends Node
     visitor @
 ast_nodes.Invoke = Invoke
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L669
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L671
 class ExistentialOp extends Leaf
   @yue_name: 'ExistentialOp'
   
@@ -2280,7 +2280,7 @@ class ExistentialOp extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.ExistentialOp = ExistentialOp
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L672
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L674
 class TableAppendingOp extends Leaf
   @yue_name: 'TableAppendingOp'
   
@@ -2289,7 +2289,7 @@ class TableAppendingOp extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.TableAppendingOp = TableAppendingOp
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L675
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L677
 class PlainItem extends Leaf
   @yue_name: 'PlainItem'
   
@@ -2298,7 +2298,7 @@ class PlainItem extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.PlainItem = PlainItem
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L678
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L680
 class ReversedIndex extends Node
   @yue_name: 'ReversedIndex'
   
@@ -2319,7 +2319,7 @@ class ReversedIndex extends Node
     visitor @
 ast_nodes.ReversedIndex = ReversedIndex
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L683
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L685
 class ChainValue extends Node
   @yue_name: 'ChainValue'
   
@@ -2340,7 +2340,7 @@ class ChainValue extends Node
     visitor @
 ast_nodes.ChainValue = ChainValue
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L690
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L692
 class AssignableChain extends Node
   @yue_name: 'AssignableChain'
   
@@ -2361,7 +2361,7 @@ class AssignableChain extends Node
     visitor @
 ast_nodes.AssignableChain = AssignableChain
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L696
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L698
 class Value extends Node
   @yue_name: 'Value'
   
@@ -2382,7 +2382,7 @@ class Value extends Node
     visitor @
 ast_nodes.Value = Value
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L701
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L703
 class DefaultValue extends Leaf
   @yue_name: 'DefaultValue'
   
@@ -2391,7 +2391,7 @@ class DefaultValue extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.DefaultValue = DefaultValue
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L704
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L706
 class SpreadExp extends Node
   @yue_name: 'SpreadExp'
   
@@ -2412,7 +2412,7 @@ class SpreadExp extends Node
     visitor @
 ast_nodes.SpreadExp = SpreadExp
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L709
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L711
 class SpreadListExp extends Node
   @yue_name: 'SpreadListExp'
   
@@ -2433,7 +2433,7 @@ class SpreadListExp extends Node
     visitor @
 ast_nodes.SpreadListExp = SpreadListExp
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L714
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L716
 class TableLit extends Node
   @yue_name: 'TableLit'
   
@@ -2454,7 +2454,7 @@ class TableLit extends Node
     visitor @
 ast_nodes.TableLit = TableLit
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L725
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L728
 class TableBlockIndent extends Node
   @yue_name: 'TableBlockIndent'
   
@@ -2475,17 +2475,17 @@ class TableBlockIndent extends Node
     visitor @
 ast_nodes.TableBlockIndent = TableBlockIndent
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L733
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L737
 class TableBlock extends Node
   @yue_name: 'TableBlock'
   
-  -- @values: _sel_list_t(false,VariablePair,NormalPair,TableBlockIndent,Exp,TableBlock,SpreadExp,MetaVariablePair,MetaNormalPair)
+  -- @values: _sel_list_t(false,VariablePair,NormalPair,TableBlockIndent,Exp,TableBlock,SpreadExp,MetaVariablePair,MetaNormalPair,YueComment,EmptyLine)
   new: (values = {}) =>
     @values = values
 
   from_table: (tbl) =>
     for i, v in ipairs tbl
-      if _in v\g_yue_name!, {'VariablePair','NormalPair','TableBlockIndent','Exp','TableBlock','SpreadExp','MetaVariablePair','MetaNormalPair'}
+      if _in v\g_yue_name!, {'VariablePair','NormalPair','TableBlockIndent','Exp','TableBlock','SpreadExp','MetaVariablePair','MetaNormalPair','YueComment','EmptyLine'}
         table.insert @values, v
         continue
       _ = v
@@ -2496,7 +2496,7 @@ class TableBlock extends Node
     visitor @
 ast_nodes.TableBlock = TableBlock
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L739
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L743
 class ClassMemberList extends Node
   @yue_name: 'ClassMemberList'
   
@@ -2517,7 +2517,7 @@ class ClassMemberList extends Node
     visitor @
 ast_nodes.ClassMemberList = ClassMemberList
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L745
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L749
 class ClassBlock extends Node
   @yue_name: 'ClassBlock'
   
@@ -2538,7 +2538,7 @@ class ClassBlock extends Node
     visitor @
 ast_nodes.ClassBlock = ClassBlock
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L751
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L755
 class ClassDecl extends Node
   @yue_name: 'ClassDecl'
   
@@ -2577,7 +2577,7 @@ class ClassDecl extends Node
     visitor @
 ast_nodes.ClassDecl = ClassDecl
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L759
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L763
 class GlobalValues extends Node
   @yue_name: 'GlobalValues'
   
@@ -2604,7 +2604,7 @@ class GlobalValues extends Node
     visitor @
 ast_nodes.GlobalValues = GlobalValues
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L765
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L769
 class GlobalOp extends Leaf
   @yue_name: 'GlobalOp'
   
@@ -2613,7 +2613,7 @@ class GlobalOp extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.GlobalOp = GlobalOp
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L768
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L772
 class Global extends Node
   @yue_name: 'Global'
   
@@ -2640,7 +2640,7 @@ class Global extends Node
     visitor @
 ast_nodes.Global = Global
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L774
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L778
 class ExportDefault extends Leaf
   @yue_name: 'ExportDefault'
   
@@ -2649,7 +2649,7 @@ class ExportDefault extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.ExportDefault = ExportDefault
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L777
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L781
 class Export extends Node
   @yue_name: 'Export'
   
@@ -2682,7 +2682,7 @@ class Export extends Node
     visitor @
 ast_nodes.Export = Export
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L784
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L788
 class FnArgDef extends Node
   @yue_name: 'FnArgDef'
   
@@ -2721,7 +2721,7 @@ class FnArgDef extends Node
     visitor @
 ast_nodes.FnArgDef = FnArgDef
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L792
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L796
 class FnArgDefList extends Node
   @yue_name: 'FnArgDefList'
   
@@ -2754,7 +2754,7 @@ class FnArgDefList extends Node
     visitor @
 ast_nodes.FnArgDefList = FnArgDefList
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L800
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L804
 class OuterVarShadow extends Node
   @yue_name: 'OuterVarShadow'
   
@@ -2775,7 +2775,7 @@ class OuterVarShadow extends Node
     visitor @
 ast_nodes.OuterVarShadow = OuterVarShadow
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L805
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L809
 class FnArgsDef extends Node
   @yue_name: 'FnArgsDef'
   
@@ -2802,7 +2802,7 @@ class FnArgsDef extends Node
     visitor @
 ast_nodes.FnArgsDef = FnArgsDef
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L811
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L815
 class FnArrow extends Leaf
   @yue_name: 'FnArrow'
   
@@ -2811,7 +2811,7 @@ class FnArrow extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.FnArrow = FnArrow
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L814
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L818
 class FunLit extends Node
   @yue_name: 'FunLit'
   
@@ -2850,7 +2850,7 @@ class FunLit extends Node
     visitor @
 ast_nodes.FunLit = FunLit
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L824
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L828
 class MacroName extends Node
   @yue_name: 'MacroName'
   
@@ -2871,7 +2871,7 @@ class MacroName extends Node
     visitor @
 ast_nodes.MacroName = MacroName
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L829
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L833
 class MacroLit extends Node
   @yue_name: 'MacroLit'
   
@@ -2898,7 +2898,7 @@ class MacroLit extends Node
     visitor @
 ast_nodes.MacroLit = MacroLit
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L835
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L839
 class MacroFunc extends Node
   @yue_name: 'MacroFunc'
   
@@ -2925,7 +2925,7 @@ class MacroFunc extends Node
     visitor @
 ast_nodes.MacroFunc = MacroFunc
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L841
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L845
 class MacroInPlace extends Node
   @yue_name: 'MacroInPlace'
   
@@ -2946,7 +2946,7 @@ class MacroInPlace extends Node
     visitor @
 ast_nodes.MacroInPlace = MacroInPlace
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L846
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L850
 class Macro extends Node
   @yue_name: 'Macro'
   
@@ -2973,7 +2973,7 @@ class Macro extends Node
     visitor @
 ast_nodes.Macro = Macro
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L852
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L856
 class NameOrDestructure extends Node
   @yue_name: 'NameOrDestructure'
   
@@ -2994,7 +2994,7 @@ class NameOrDestructure extends Node
     visitor @
 ast_nodes.NameOrDestructure = NameOrDestructure
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L857
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L861
 class AssignableNameList extends Node
   @yue_name: 'AssignableNameList'
   
@@ -3015,7 +3015,7 @@ class AssignableNameList extends Node
     visitor @
 ast_nodes.AssignableNameList = AssignableNameList
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L863
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L867
 class InvokeArgs extends Node
   @yue_name: 'InvokeArgs'
   
@@ -3036,7 +3036,7 @@ class InvokeArgs extends Node
     visitor @
 ast_nodes.InvokeArgs = InvokeArgs
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L869
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L873
 class ConstValue extends Leaf
   @yue_name: 'ConstValue'
   
@@ -3045,7 +3045,7 @@ class ConstValue extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.ConstValue = ConstValue
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L872
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L876
 class UnaryValue extends Node
   @yue_name: 'UnaryValue'
   
@@ -3072,7 +3072,7 @@ class UnaryValue extends Node
     visitor @
 ast_nodes.UnaryValue = UnaryValue
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L878
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L882
 class UnaryExp extends Node
   @yue_name: 'UnaryExp'
   
@@ -3105,7 +3105,7 @@ class UnaryExp extends Node
     visitor @
 ast_nodes.UnaryExp = UnaryExp
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L885
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L889
 class SubBackcall extends Node
   @yue_name: 'SubBackcall'
   
@@ -3132,7 +3132,7 @@ class SubBackcall extends Node
     visitor @
 ast_nodes.SubBackcall = SubBackcall
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L891
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L895
 class ExpListAssign extends Node
   @yue_name: 'ExpListAssign'
   
@@ -3159,7 +3159,7 @@ class ExpListAssign extends Node
     visitor @
 ast_nodes.ExpListAssign = ExpListAssign
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L897
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L901
 class IfLine extends Node
   @yue_name: 'IfLine'
   
@@ -3186,7 +3186,7 @@ class IfLine extends Node
     visitor @
 ast_nodes.IfLine = IfLine
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L903
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L907
 class WhileLine extends Node
   @yue_name: 'WhileLine'
   
@@ -3213,7 +3213,7 @@ class WhileLine extends Node
     visitor @
 ast_nodes.WhileLine = WhileLine
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L909
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L913
 class Break extends Leaf
   @yue_name: 'Break'
   
@@ -3222,7 +3222,7 @@ class Break extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.Break = Break
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L912
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L916
 class Continue extends Leaf
   @yue_name: 'Continue'
   
@@ -3231,7 +3231,7 @@ class Continue extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.Continue = Continue
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L915
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L919
 class BreakLoop extends Node
   @yue_name: 'BreakLoop'
   
@@ -3258,7 +3258,7 @@ class BreakLoop extends Node
     visitor @
 ast_nodes.BreakLoop = BreakLoop
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L922
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L926
 class PipeBody extends Node
   @yue_name: 'PipeBody'
   
@@ -3279,7 +3279,7 @@ class PipeBody extends Node
     visitor @
 ast_nodes.PipeBody = PipeBody
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L928
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L932
 class StatementAppendix extends Node
   @yue_name: 'StatementAppendix'
   
@@ -3300,7 +3300,7 @@ class StatementAppendix extends Node
     visitor @
 ast_nodes.StatementAppendix = StatementAppendix
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L933
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L937
 class StatementSep extends Leaf
   @yue_name: 'StatementSep'
   
@@ -3309,7 +3309,7 @@ class StatementSep extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.StatementSep = StatementSep
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L936
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L940
 class YueLineComment extends Leaf
   @yue_name: 'YueLineComment'
   
@@ -3318,7 +3318,7 @@ class YueLineComment extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.YueLineComment = YueLineComment
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L939
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L943
 class YueMultilineComment extends Leaf
   @yue_name: 'YueMultilineComment'
   
@@ -3327,7 +3327,7 @@ class YueMultilineComment extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.YueMultilineComment = YueMultilineComment
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L942
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L946
 class YueComment extends Node
   @yue_name: 'YueComment'
   
@@ -3348,7 +3348,7 @@ class YueComment extends Node
     visitor @
 ast_nodes.YueComment = YueComment
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L947
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L951
 class EmptyLine extends Leaf
   @yue_name: 'EmptyLine'
   
@@ -3357,7 +3357,7 @@ class EmptyLine extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.EmptyLine = EmptyLine
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L950
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L954
 class ChainAssign extends Node
   @yue_name: 'ChainAssign'
   
@@ -3384,7 +3384,7 @@ class ChainAssign extends Node
     visitor @
 ast_nodes.ChainAssign = ChainAssign
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L957
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L961
 class Statement extends Node
   @yue_name: 'Statement'
   
@@ -3417,7 +3417,7 @@ class Statement extends Node
     visitor @
 ast_nodes.Statement = Statement
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L968
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L972
 class Body extends Node
   @yue_name: 'Body'
   
@@ -3438,7 +3438,7 @@ class Body extends Node
     visitor @
 ast_nodes.Body = Body
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L973
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L977
 class Block extends Node
   @yue_name: 'Block'
   
@@ -3459,7 +3459,7 @@ class Block extends Node
     visitor @
 ast_nodes.Block = Block
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L979
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L983
 class BlockEnd extends Node
   @yue_name: 'BlockEnd'
   
@@ -3480,7 +3480,7 @@ class BlockEnd extends Node
     visitor @
 ast_nodes.BlockEnd = BlockEnd
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L984
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L988
 class File extends Node
   @yue_name: 'File'
   

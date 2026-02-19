@@ -17,8 +17,8 @@ class _ast
   g_yue_name: => @@yue_name
   g_yue_type: => @@yue_type
   g_src_pos: => @pos
-  g_src_line: => @pos.line or 0
-  g_src_col: => @pos.col or 0
+  g_src_line: => @pos?.line or 0
+  g_src_col: => @pos?.col or 0
   set_source: (line, column) =>
     @pos = position { line, column }
   is: (typ) =>

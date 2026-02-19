@@ -1,11 +1,11 @@
 -- yuecheck:ignore=stdlib_usage,style_comment_space
-import 'yue'
 import 'busted.runner' as busted
+import 'yue'
 busted!
 
+import 'yuecheck.comments' as cmt
 import 'yuecheck.linter'
 import 'yuecheck.rules'
-import 'yuecheck.comments' as cmt
 
 fget = (path) ->
   fp, err = io.open path, 'r'
@@ -42,24 +42,38 @@ describe 'linter customization', ->
     linter.enabled_rules = { wooop: true }
 
     r = linter.lint_string 'x = 1'
-    assert.same {{
+    assert.same { {
       type: 'FOO!'
       message: 'oops!'
       line: 1
       col: 2
-    }}, r
+    } }, r
 
 describe 'find_comments lpegrex', ->
   it 'should handle retrieving comments from code', ->
     r = linter.find_comments fget '../spec/testdata/comments_single.yue'
     expect =
-      * line: 1, col: 1, comment: '--a!'
-      * line: 2, col: 1, comment: '-- b'
-      * line: 3, col: 11, comment: '--c'
-      * line: 5, col: 1, comment: '-- var_2 pre'
-      * line: 6, col: 11, comment: '-- line'
-      * line: 7, col: 1, comment: '-- var_2 post'
-      * line: 10, col: 2, comment: '-- d'
+      * line: 1
+        col: 1
+        comment: '--a!'
+      * line: 2
+        col: 1
+        comment: '-- b'
+      * line: 3
+        col: 11
+        comment: '--c'
+      * line: 5
+        col: 1
+        comment: '-- var_2 pre'
+      * line: 6
+        col: 11
+        comment: '-- line'
+      * line: 7
+        col: 1
+        comment: '-- var_2 post'
+      * line: 10
+        col: 2
+        comment: '-- d'
     for v in *expect
       rv = r[v.line][1]
       assert.same v, {
@@ -71,9 +85,15 @@ describe 'find_comments lpegrex', ->
   it 'should handle retrieving multiline comments from code', ->
     r = linter.find_comments fget '../spec/testdata/comments_multi.yue'
     expect =
-      * line: 1, col: 1, comment: "--[[ a\nb]]"
-      * line: 4, col: 9, comment: '--[[ abcd ]]'
-      * line: 5, col: 1, comment: '--[[ hmm]]'
+      * line: 1
+        col: 1
+        comment: '--[[ a\nb]]'
+      * line: 4
+        col: 9
+        comment: '--[[ abcd ]]'
+      * line: 5
+        col: 1
+        comment: '--[[ hmm]]'
     for v in *expect
       rv = r[v.line][1]
       assert.same v, {
@@ -86,13 +106,13 @@ describe 'find_comments lpegrex', ->
     r = linter.find_comments fget '../spec/testdata/comments_combo.yue'
     expect =
       [1]: {
-        { line: 1, col: 1, comment: "--[[ --a\n]]" }
+        { line: 1, col: 1, comment: '--[[ --a\n]]' },
       }
       [4]: {
-        { line: 4, col: 1, comment: '-- a --[[ b ]]' }
+        { line: 4, col: 1, comment: '-- a --[[ b ]]' },
       }
       [6]: {
-        { line: 6, col: 1, comment: "--[[\n--a\n]]" }
+        { line: 6, col: 1, comment: '--[[\n--a\n]]' },
       }
 
     assert.same 3, #r.indices
@@ -101,17 +121,21 @@ describe 'find_comments lpegrex', ->
     for k in *r.indices
       got[k] = {} unless got[k]
 
-      for kk,vv in ipairs r[k]
+      for kk, vv in ipairs r[k]
         got[k][kk] = { line: vv\g_src_line!, col: vv\g_src_col!, comment: vv.v }
         assert.same expect[k], got[k]
 
   it 'should handle retrieving mixed comments', ->
     r = linter.find_comments fget '../spec/testdata/comments_mixed.yue'
     expect =
-      * line: 1, comment: '-- a'
-      * line: 2, comment: '--b'
-      * line: 3, comment: '--[[ c]]'
-      * line: 4, comment: "--[[d\n]]"
+      * line: 1
+        comment: '-- a'
+      * line: 2
+        comment: '--b'
+      * line: 3
+        comment: '--[[ c]]'
+      * line: 4
+        comment: '--[[d\n]]'
     for v in *expect
       -- NOTE(@chrsm): todo, look into
       -- can't do an `is` here, the classes are different (busted? src.types?)
@@ -121,35 +145,54 @@ describe 'find_comments lpegrex', ->
   it 'should handle inline multicomments', ->
     r = linter.find_comments fget '../spec/testdata/comments_inline.yue'
     expect =
-      * n: 1, line: 1, comment: '--[[ x ]]'
-      * n: 1, line: 2, comment: '--[[ typ ]]'
-      * n: 2, line: 2, comment: '--[[ typ2 ]]'
+      * n: 1
+        line: 1
+        comment: '--[[ x ]]'
+      * n: 1
+        line: 2
+        comment: '--[[ typ ]]'
+      * n: 2
+        line: 2
+        comment: '--[[ typ2 ]]'
     for v in *expect
       assert.same v.comment, r[v.line][v.n].v
 
   it 'should not treat special key differently', ->
     r = linter.find_comments fget '../spec/testdata/comments_keys.yue'
     expect =
-      * n: 1, line: 5, comment: '-- if this is commented out, no complaints'
-      * n: 1, line: 7, comment: '-- has something to do with this'
-      * n: 1, line: 11, comment: '-- should not have the single-line-comment violation'
+      * n: 1
+        line: 5
+        comment: '-- if this is commented out, no complaints'
+      * n: 1
+        line: 7
+        comment: '-- has something to do with this'
+      * n: 1
+        line: 11
+        comment: '-- should not have the single-line-comment violation'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
-  it 'should properly parse comments with mixed content', -> 
+  it 'should properly parse comments with mixed content', ->
     r = linter.find_comments fget '../spec/testdata/fmt_comment_content.yue'
     expect =
-      * n: 1, line: 5, comment: "-- example: exec_cmd_w [[ yue -e 'print _VERSION .. os.getenv '\\''VAR'\\''' ]], { env: { 'VAR': 'xyz' } }"
-      * n: 1, line: 6, comment: '-- see:'
-      * n: 1, line: 7, comment: '--   https://man7.org/linux/man-pages/man3/popen.3.html'
-      * n: 1, line: 8, comment: "-- returns: success (boolean), exit_type ('exit'|'signal'), exit_code (number)"
+      * n: 1
+        line: 5
+        comment: "-- example: exec_cmd_w [[ yue -e 'print _VERSION .. os.getenv '\\''VAR'\\''' ]], { env: { 'VAR': 'xyz' } }"
+      * n: 1
+        line: 6
+        comment: '-- see:'
+      * n: 1
+        line: 7
+        comment: '--   https://man7.org/linux/man-pages/man3/popen.3.html'
+      * n: 1
+        line: 8
+        comment: "-- returns: success (boolean), exit_type ('exit'|'signal'), exit_code (number)"
     for v in *expect
       assert.truthy r[v.line], "expect r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
-
 
 describe 'comments/between', ->
   linter.enabled_rules = {}
@@ -161,9 +204,15 @@ describe 'comments/between', ->
     r = cmt.comments_between ast, 1, 3
     expect =
       indices: [1, 2, 3]
-      * n: 1, line: 1, comment: '-- comment 1 (l1)'
-      * n: 1, line: 2, comment: '-- (l2)'
-      * n: 1, line: 3, comment: '-- comment 2 (l3)'
+      * n: 1
+        line: 1
+        comment: '-- comment 1 (l1)'
+      * n: 1
+        line: 2
+        comment: '-- (l2)'
+      * n: 1
+        line: 3
+        comment: '-- comment 2 (l3)'
     assert.same expect.indices, r.indices
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
@@ -173,8 +222,12 @@ describe 'comments/between', ->
     r = cmt.comments_between ast, 4, 12
     expect =
       indices: [5, 6]
-      * n: 1, line: 5, comment: '-- comment 3 (l5)'
-      * n: 1, line: 6, comment: "--[[\n  a long\n  multiline\n  kinda\n  comment (l6)\n]]"
+      * n: 1
+        line: 5
+        comment: '-- comment 3 (l5)'
+      * n: 1
+        line: 6
+        comment: '--[[\n  a long\n  multiline\n  kinda\n  comment (l6)\n]]'
     assert.same expect.indices, r.indices
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
@@ -184,8 +237,12 @@ describe 'comments/between', ->
     r = cmt.comments_between ast, 15, 19
     expect =
       indices: [16, 19]
-      * n: 1, line: 16, comment: '-- comment (l16)'
-      * n: 1, line: 19, comment: '-- all done? (l19)'
+      * n: 1
+        line: 16
+        comment: '-- comment (l16)'
+      * n: 1
+        line: 19
+        comment: '-- all done? (l19)'
     assert.same expect.indices, r.indices
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
@@ -198,7 +255,9 @@ describe 'comment/string handling', ->
   it 'should skip "comments" that are inside valid strings', ->
     r = linter.find_comments "x = '1 --2'\nprint x -- hmm\na!"
     expect =
-      * n: 1, line: 2, comment: '-- hmm'
+      * n: 1
+        line: 2
+        comment: '-- hmm'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
@@ -206,15 +265,19 @@ describe 'comment/string handling', ->
 
     r = linter.find_comments "x = \"1 --2\"\nprint x -- 'hmm'\na!"
     expect =
-      * n: 1, line: 2, comment: "-- 'hmm'"
+      * n: 1
+        line: 2
+        comment: "-- 'hmm'"
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
-    r = linter.find_comments "x = [[1 --2]]\nprint x --[[ hmm ]]\na!"
+    r = linter.find_comments 'x = [[1 --2]]\nprint x --[[ hmm ]]\na!'
     expect =
-      * n: 1, line: 2, comment: '--[[ hmm ]]'
+      * n: 1
+        line: 2
+        comment: '--[[ hmm ]]'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
@@ -223,7 +286,9 @@ describe 'comment/string handling', ->
   it 'should deal with escapes (lol)', ->
     r = linter.find_comments "x = \"'\"\n--2\n"
     expect =
-      * n: 1, line: 2, comment: '--2'
+      * n: 1
+        line: 2
+        comment: '--2'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
@@ -231,9 +296,15 @@ describe 'comment/string handling', ->
 
     r = linter.find_comments "x = \"'\" --a\n-- b\n--cdefg"
     expect =
-      * n: 1, line: 1, comment: '--a'
-      * n: 1, line: 2, comment: '-- b'
-      * n: 1, line: 3, comment: '--cdefg'
+      * n: 1
+        line: 1
+        comment: '--a'
+      * n: 1
+        line: 2
+        comment: '-- b'
+      * n: 1
+        line: 3
+        comment: '--cdefg'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
@@ -246,14 +317,30 @@ describe 'comment/string handling', ->
   it 'should work on block strs', ->
     r = linter.find_comments fget '../spec/testdata/comments_badproc.yue'
     expect =
-      * n: 1, line: 1, comment: '--bad cmt'
-      * n: 1, line: 6, comment: '--[[comm\'ent1]]'
-      * n: 2, line: 6, comment: '--comm[[ent2'
-      * n: 1, line: 7, comment: '--bad cmt'
-      * n: 1, line: 8, comment: '-- adsdaksd'
-      * n: 1, line: 9, comment: '--adsad'
-      * n: 1, line: 10, comment: "--[[me too!\n]]"
-      * n: 1, line: 12, comment: '--this is at eof'
+      * n: 1
+        line: 1
+        comment: '--bad cmt'
+      * n: 1
+        line: 6
+        comment: '--[[comm\'ent1]]'
+      * n: 2
+        line: 6
+        comment: '--comm[[ent2'
+      * n: 1
+        line: 7
+        comment: '--bad cmt'
+      * n: 1
+        line: 8
+        comment: '-- adsdaksd'
+      * n: 1
+        line: 9
+        comment: '--adsad'
+      * n: 1
+        line: 10
+        comment: '--[[me too!\n]]'
+      * n: 1
+        line: 12
+        comment: '--this is at eof'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
@@ -262,18 +349,42 @@ describe 'comment/string handling', ->
   it 'should pass crude mix file', ->
     r = linter.find_comments fget '../spec/testdata/comments_nrc_wrc.yue'
     expect =
-      * n: 1, line: 1, comment: '-- 1-rc'
-      * n: 1, line: 2, comment: "-- '2-rc'"
-      * n: 1, line: 3, comment: "--[[ 3-rc\n]]"
-      * n: 1, line: 6, comment: '-- "4-rc\''
-      * n: 1, line: 9, comment: '-- 5-rc'
-      * n: 1, line: 10, comment: '-- 6-rc'
-      * n: 1, line: 11, comment: '--[[ \'7-rc ]]'
-      * n: 2, line: 11, comment: '-- 8-rc'
-      * n: 1, line: 12, comment: "--[[\n          '9-rc'\n  ]]"
-      * n: 1, line: 15, comment: '--[[ 10-rc ]]'
-      * n: 2, line: 15, comment: '--[[ \'11-rc\' ]]'
-      * n: 3, line: 15, comment: '-- 12-rc'
+      * n: 1
+        line: 1
+        comment: '-- 1-rc'
+      * n: 1
+        line: 2
+        comment: "-- '2-rc'"
+      * n: 1
+        line: 3
+        comment: '--[[ 3-rc\n]]'
+      * n: 1
+        line: 6
+        comment: '-- "4-rc\''
+      * n: 1
+        line: 9
+        comment: '-- 5-rc'
+      * n: 1
+        line: 10
+        comment: '-- 6-rc'
+      * n: 1
+        line: 11
+        comment: '--[[ \'7-rc ]]'
+      * n: 2
+        line: 11
+        comment: '-- 8-rc'
+      * n: 1
+        line: 12
+        comment: "--[[\n          '9-rc'\n  ]]"
+      * n: 1
+        line: 15
+        comment: '--[[ 10-rc ]]'
+      * n: 2
+        line: 15
+        comment: '--[[ \'11-rc\' ]]'
+      * n: 3
+        line: 15
+        comment: '-- 12-rc'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
@@ -283,7 +394,7 @@ describe 'rule_style_comment', ->
   linter.enabled_rules = { style_comment_space: true }
 
   it 'should pass a valid comment', ->
-    r = linter.lint_string "-- abcd\nprint 1"
+    r = linter.lint_string '-- abcd\nprint 1'
     assert.equal 0, #r
 
   it 'should return a table when a violation occurs', ->
@@ -305,16 +416,16 @@ describe 'rule_style_comment', ->
         line: 1
         col: 1
         message: 'multi-line comment should have space between -- and content'
-      }
+      },
       {
         type: 'WARN'
         line: 7
         col: 9
         message: 'multi-line comment should have space between -- and content'
-      }
+      },
     }, r
 
-    comments = linter.find_comments "--[[bad]]\n\n--[[bad\n\n]]\nprint 1"
+    comments = linter.find_comments '--[[bad]]\n\n--[[bad\n\n]]\nprint 1'
     r = {}
     for k in *comments.indices
       for v in *comments[k]
@@ -326,13 +437,13 @@ describe 'rule_style_comment', ->
         line: 1
         col: 1
         message: 'multi-line comment should have space between -- and content'
-      }
+      },
       {
         type: 'WARN'
         line: 3
         col: 1
         message: 'multi-line comment should have space between -- and content'
-      }
+      },
     }, r
 
 describe 'rule_zero_index', ->
@@ -343,7 +454,7 @@ describe 'rule_zero_index', ->
     assert.equal 0, #r
 
   it 'should warn for a zero-index', ->
-    r = linter.lint_string "print 1\nprint x[0]"
+    r = linter.lint_string 'print 1\nprint x[0]'
     assert.true #r > 0
     assert.same 2, r[1].line
     assert.same 7, r[1].col
@@ -352,23 +463,23 @@ describe 'rule_identical_exprs', ->
   linter.enabled_rules = { cond_identical_exprs: true }
 
   it 'should pass a valid expr set', ->
-    r = linter.lint_string "if 1 == 2\n  print 1"
+    r = linter.lint_string 'if 1 == 2\n  print 1'
     assert.equal 0, #r
 
   it 'should warn for an identical simple comparison', ->
-    r = linter.lint_string "if 1 == 1\n  print 1"
+    r = linter.lint_string 'if 1 == 1\n  print 1'
     assert.true #r > 0
     assert.same 1, r[1].line
     assert.same 4, r[1].col
 
   it 'should warn for an identical bool comparison', ->
-    r = linter.lint_string "if true == true\n  print 1"
+    r = linter.lint_string 'if true == true\n  print 1'
     assert.true #r > 0
     assert.same 1, r[1].line
     assert.same 4, r[1].col
 
   it 'should warn for an identical bool comparison', ->
-    r = linter.lint_string "if false == false\n  print 1"
+    r = linter.lint_string 'if false == false\n  print 1'
     assert.true #r > 0
     assert.same 1, r[1].line
     assert.same 4, r[1].col
@@ -377,37 +488,37 @@ describe 'rule_cond_impossible', ->
   linter.enabled_rules = { cond_impossible: true }
 
   it 'should ignore other conds', ->
-    r = linter.lint_string "if x == 1\n  print 1"
+    r = linter.lint_string 'if x == 1\n  print 1'
     assert.equal 0, #r
 
     -- [[ todo: write a simplify rule for this ]]
-    r = linter.lint_string "if true and (b == y)\n  print 1"
+    r = linter.lint_string 'if true and (b == y)\n  print 1'
     assert.equal 0, #r
 
   it 'should catch unless booleans', ->
-    r = linter.lint_string "unless false\n  print 1"
+    r = linter.lint_string 'unless false\n  print 1'
     assert.true #r > 0
     assert.same '`unless` expression literal `false` always executed', r[1].message
 
-    r = linter.lint_string "unless true\n  print 1"
+    r = linter.lint_string 'unless true\n  print 1'
     assert.true #r > 0
     assert.same '`unless` expression literal `true` never executed', r[1].message
 
   it 'should catch if booleans', ->
-    r = linter.lint_string "if false\n  print 1"
+    r = linter.lint_string 'if false\n  print 1'
     assert.true #r > 0
     assert.same '`if` expression literal `false` never executed', r[1].message
 
-    r = linter.lint_string "if true\n  print 1"
+    r = linter.lint_string 'if true\n  print 1'
     assert.true #r > 0
     assert.same '`if` expression literal `true` always executed', r[1].message
 
   it 'should catch number lit', ->
-    r = linter.lint_string "unless 1\n  print 1"
+    r = linter.lint_string 'unless 1\n  print 1'
     assert.true #r > 0
     assert.same '`unless` expression compared to number literal `1` never executed', r[1].message
 
-    r = linter.lint_string "if 1\n  print 1"
+    r = linter.lint_string 'if 1\n  print 1'
     assert.true #r > 0
     assert.same '`if` expression compared to number literal `1` always executed', r[1].message
 
@@ -430,7 +541,7 @@ describe 'rule_style_import_as_ident', ->
         message: 'import statement and variable use same name'
         line: 1
         col: 8
-      }
+      },
     }, r
 
 describe 'rule_unnecessary_doublestring', ->
@@ -463,7 +574,7 @@ describe 'rule_unnecessary_doublestring', ->
         message: 'double-quoted string where single-quoted would suffice'
         line: 2
         col: 5
-      }
+      },
     }, r
 
   it 'should work non-assignments', ->
@@ -475,7 +586,7 @@ describe 'rule_unnecessary_doublestring', ->
         message: 'double-quoted string where single-quoted would suffice'
         line: 1
         col: 3
-      }
+      },
     }, r
 
   it 'should work on concats', ->
@@ -487,28 +598,28 @@ describe 'rule_unnecessary_doublestring', ->
         message: 'double-quoted string where single-quoted would suffice'
         line: 1
         col: 3
-      }
+      },
       {
         type: 'WARN'
         message: 'double-quoted string where single-quoted would suffice'
         line: 1
         col: 10
-      }
+      },
     }, r
 
 describe 'rule_unreachable', ->
   linter.enabled_rules = { unreachable: true }
 
   it 'should be okay with no breaks', ->
-    r = linter.lint_string "repeat\n  print 1\n  print(a)\nuntil false"
+    r = linter.lint_string 'repeat\n  print 1\n  print(a)\nuntil false'
     assert.equal 0, #r
 
   it 'should be okay with a scoped break', ->
-    r = linter.lint_string "repeat\n  print 1\n  if false\n    break\n  print(a)\nuntil false"
+    r = linter.lint_string 'repeat\n  print 1\n  if false\n    break\n  print(a)\nuntil false'
     assert.same {}, r
 
   it 'should error on unreachable code', ->
-    r = linter.lint_string "repeat\n  print 1\n  break\n  print(a)\nuntil false"
+    r = linter.lint_string 'repeat\n  print 1\n  break\n  print(a)\nuntil false'
     assert.true #r > 0
     assert.same {
       {
@@ -516,7 +627,7 @@ describe 'rule_unreachable', ->
         message: 'unreachable code after break statement'
         line: 4
         col: 3
-      }
+      },
     }, r
 
 describe 'rule global_writes', ->
@@ -531,7 +642,7 @@ describe 'rule global_writes', ->
         message: 'discourage write to global (_G.dotchain)'
         line: 1
         col: 1
-      }
+      },
     }, r
 
   it 'should warn on global write by bracket', ->
@@ -543,7 +654,7 @@ describe 'rule global_writes', ->
         message: 'discourage write to global (_G.bracket)'
         line: 1
         col: 1
-      }
+      },
     }, r
 
   it 'should work on doublestring bracket too', ->
@@ -555,47 +666,66 @@ describe 'rule global_writes', ->
         message: 'discourage write to global (_G.bracket.double)'
         line: 1
         col: 1
-      }
+      },
     }, r
 
   it 'should handle globals.yue', ->
     r = linter.lint_string fget '../spec/testdata/globals.yue'
     expect =
-      * col: 1, line: 1, comment: 'discourage write to global (_G.a)'
-      * col: 1, line: 2, comment: 'discourage write to global (_G.x)'
-      * col: 1, line: 3, comment: 'discourage write to global (_G.1)'
-      * col: 1, line: 4, comment: 'discourage write to global (_G.a.x)'
-      * col: 1, line: 5, comment: 'discourage write to global (_G)'
-      * col: 1, line: 6, comment: 'discourage write to global (_G.a)'
-      * col: 1, line: 6, comment: 'discourage write to global (_G.b)'
-      * col: 1, line: 6, comment: 'discourage write to global (_G.c)'
-      * col: 1, line: 6, comment: 'discourage write to global (_G.d)'
-      * col: 1, line: 7, comment: 'discourage write to global (_G.$VAR{a})'
+      * col: 1
+        line: 1
+        comment: 'discourage write to global (_G.a)'
+      * col: 1
+        line: 2
+        comment: 'discourage write to global (_G.x)'
+      * col: 1
+        line: 3
+        comment: 'discourage write to global (_G.1)'
+      * col: 1
+        line: 4
+        comment: 'discourage write to global (_G.a.x)'
+      * col: 1
+        line: 5
+        comment: 'discourage write to global (_G)'
+      * col: 1
+        line: 6
+        comment: 'discourage write to global (_G.a)'
+      * col: 1
+        line: 6
+        comment: 'discourage write to global (_G.b)'
+      * col: 1
+        line: 6
+        comment: 'discourage write to global (_G.c)'
+      * col: 1
+        line: 6
+        comment: 'discourage write to global (_G.d)'
+      * col: 1
+        line: 7
+        comment: 'discourage write to global (_G.$VAR{a})'
     assert.true #r > 0
-    for i,v in ipairs expect
-      assert.same v.line, r[i].line, "wrong line"
-      assert.same v.col, r[i].col, "wrong col"
-      assert.same v.comment, r[i].message, "wrong message"
-
+    for i, v in ipairs expect
+      assert.same v.line, r[i].line, 'wrong line'
+      assert.same v.col, r[i].col, 'wrong col'
+      assert.same v.comment, r[i].message, 'wrong message'
 
 describe 'rule_style_conditionals', ->
   linter.enabled_rules = { style_conditionals: true }
 
   it 'should not warn on multiple exprs', ->
-    r = linter.lint_string "if not x and y == 1\n  print 1"
+    r = linter.lint_string 'if not x and y == 1\n  print 1'
     assert.equal 0, #r
 
   it 'should warn on simple if-not', ->
-    r = linter.lint_string "if not x\n  print 1"
-    assert.same {{
+    r = linter.lint_string 'if not x\n  print 1'
+    assert.same { {
       type: 'WARN'
       message: '`if not x` could be `unless x`'
       line: 1
       col: 1
-    }}, r
+    } }, r
 
   it 'should warn on a simple unless-not', ->
-    r = linter.lint_string "unless not x\n  print 1"
+    r = linter.lint_string 'unless not x\n  print 1'
     assert.true #r > 0
     assert.same {
       type: 'WARN'
@@ -610,11 +740,11 @@ describe 'rule_style_simplify_if_to_switch', ->
   linter.enabled_rules = { style_simplify_if_to_switch: true }
 
   it 'should ignore chains that use different vars', ->
-    r = linter.lint_string "if x == 1 or y == 2\n  print 1\nelseif x == 3\n  print 2\nelse\n  print 3"
+    r = linter.lint_string 'if x == 1 or y == 2\n  print 1\nelseif x == 3\n  print 2\nelse\n  print 3'
     assert.equal 0, #r
 
   it 'should warn on easy simplification', ->
-    r = linter.lint_string "if x == 1 or x == 2\n  print 1\nelseif x == 3\n  print 2\nelseif x == 3\n  print 3\nelseif x\n  print 9\nelse\n  print 4"
+    r = linter.lint_string 'if x == 1 or x == 2\n  print 1\nelseif x == 3\n  print 2\nelseif x == 3\n  print 3\nelseif x\n  print 9\nelse\n  print 4'
     assert.true #r > 0
     assert.same {
       type: 'WARN'
@@ -624,7 +754,7 @@ describe 'rule_style_simplify_if_to_switch', ->
     }, r[1]
 
   it 'should warn with multiple variables', ->
-    r = linter.lint_string "if x == 1 or y == 2\n  print 1\nelseif x == 3 or y == 1\n  print 2\nelseif x == 3 or y == 2\n  print 3\nelseif x or y\n  print 9\nelse\n  print 4"
+    r = linter.lint_string 'if x == 1 or y == 2\n  print 1\nelseif x == 3 or y == 1\n  print 2\nelseif x == 3 or y == 2\n  print 3\nelseif x or y\n  print 9\nelse\n  print 4'
     assert.true #r > 0
     assert.same {
       type: 'WARN'
@@ -641,11 +771,11 @@ describe 'rule_stdlib_usage', ->
     assert.equal 0, #r
 
   it 'should ignore correct os.clock call', ->
-    r = linter.lint_string "os.clock!\nprint 1"
+    r = linter.lint_string 'os.clock!\nprint 1'
     assert.same {}, r
 
   it 'should ignore a nolint os.clock call', ->
-    r = linter.lint_string "os.clock 1 -- yuecheck:ignore\nprint 1"
+    r = linter.lint_string 'os.clock 1 -- yuecheck:ignore\nprint 1'
     assert.same {}, r
 
   it 'should complain if more arguments are passed to a no-arg fn', ->
@@ -789,13 +919,13 @@ describe 'style_discourage_unnecessary_sb', ->
         message: "use `a:` instead of `['a']`"
         line: 2
         col: 4
-      }
+      },
       {
         type: 'WARN'
         message: "use `c:` instead of `['c']`"
         line: 3
         col: 4
-      }
+      },
     }, r
 
   it 'should ignore actual exprs', ->
@@ -826,7 +956,7 @@ describe 'basic_nilness', ->
 
     -- we should only be checking things at the top-level for now,
     -- until we can handle scoping
-    r = linter.lint_string "x = (b=true) ->\n  if something\n    b=1 if b == nil"
+    r = linter.lint_string 'x = (b=true) ->\n  if something\n    b=1 if b == nil'
     assert.same {}, r
 
   it 'should handle ifs at top level', ->
@@ -837,19 +967,19 @@ describe 'basic_nilness', ->
         message: '`scopearg_b` defaults to `true`; cond never occurs `if scopearg_b == nil`'
         line: 3
         col: 3
-      }
+      },
       {
         type: 'WARN'
         message: '`unless_never` defaults to `true`; cond never occurs `unless unless_never != nil`'
         line: 10
         col: 3
-      }
+      },
       {
         type: 'WARN'
         message: '`unless_always` defaults to `true`; cond always occurs `unless unless_always == nil`'
         line: 14
         col: 3
-      }
+      },
     }, r
 
   it 'should detect `if`-never', ->
@@ -915,19 +1045,19 @@ describe 'basic_nilness', ->
       col: 21
     }, r[1]
 
-    r = linter.lint_string 'x = (a, b = 1) -> 1 if b != nil'
+    r = linter.lint_string 'x = (a, b = 1) -> 1 if b != nil',
       type: 'WARN'
       message: '`b` defaults to `1`; cond always occurs `if b != nil`'
       line: 1
       col: 21
 
-    r = linter.lint_string 'x = (a, b = 1) -> 1 unless b == nil'
+    r = linter.lint_string 'x = (a, b = 1) -> 1 unless b == nil',
       type: 'WARN'
       message: '`b` defaults to `1`; cond always occurs `unless b == nil`'
       line: 1
       col: 21
 
-    r = linter.lint_string 'x = (a, b = 1) -> 1 unless b != nil'
+    r = linter.lint_string 'x = (a, b = 1) -> 1 unless b != nil',
       type: 'WARN'
       message: '`b` defaults to `1`; cond never occurs `unless b != nil`'
       line: 1
@@ -1090,10 +1220,10 @@ describe 'rule_nil_comparisons', ->
   linter.enabled_rules = nil_comparisons: true
 
   it 'should pass valid code', ->
-    r = linter.lint_string "if x == nil\n  print 1"
+    r = linter.lint_string 'if x == nil\n  print 1'
     assert.same {}, r
 
-    r = linter.lint_string "unless x != nil\n  print 1"
+    r = linter.lint_string 'unless x != nil\n  print 1'
     assert.same {}, r
 
     r = linter.lint_string 'x = 1 != nil'
@@ -1134,7 +1264,7 @@ describe 'rule_nil_comparisons', ->
       }, r[1]
 
   it 'should work on conds', ->
-    r = linter.lint_string "if x > nil\n  print 1"
+    r = linter.lint_string 'if x > nil\n  print 1'
     assert.same {
       type: 'ERROR'
       message: 'syntax error: `x > nil`'
@@ -1142,7 +1272,7 @@ describe 'rule_nil_comparisons', ->
       col: 4
     }, r[1]
 
-    r = linter.lint_string "unless x < nil\n  print 1"
+    r = linter.lint_string 'unless x < nil\n  print 1'
     assert.same {
       type: 'ERROR'
       message: 'syntax error: `x < nil`'
@@ -1154,14 +1284,30 @@ describe 'lpegrex grammar check', ->
   it 'should return comments', ->
     r = cmt.to_ast fget '../spec/testdata/comments_peg_simple.yue'
     expect =
-      * n: 1, line: 1, comment: '-- abc'
-      * n: 1, line: 2, comment: '--xyz'
-      * n: 1, line: 4, comment: "--[[\n--not a comment\n]]"
-      * n: 1, line: 8, comment: '-- print 2'
-      * n: 1, line: 9, comment: '--[[ --notacomment ]]'
-      * n: 1, line: 10, comment: '--[[ a ]]'
-      * n: 2, line: 10, comment: '--[[ b ]]'
-      * n: 3, line: 10, comment: '-- eol'
+      * n: 1
+        line: 1
+        comment: '-- abc'
+      * n: 1
+        line: 2
+        comment: '--xyz'
+      * n: 1
+        line: 4
+        comment: '--[[\n--not a comment\n]]'
+      * n: 1
+        line: 8
+        comment: '-- print 2'
+      * n: 1
+        line: 9
+        comment: '--[[ --notacomment ]]'
+      * n: 1
+        line: 10
+        comment: '--[[ a ]]'
+      * n: 2
+        line: 10
+        comment: '--[[ b ]]'
+      * n: 3
+        line: 10
+        comment: '-- eol'
 
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"

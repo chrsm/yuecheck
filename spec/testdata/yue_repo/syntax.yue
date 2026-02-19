@@ -766,23 +766,14 @@ hello 'comma',
   frick: you
 
 -- creates one table
-another hello,
-  one,
-  two,
-  three,
-  four,
-  yeah: man,
-
+another hello, one,
+  two, three, four, yeah: man,
     okay: yeah
     fine: alright
 
-another hello,
-  one,
-  two,
-  three,
-  four,
+another hello, one,
+  two, three, four,
   yeah: man, okay: yeah,
-
     * fine: alright
       okay: 1
     * fine: alright
@@ -900,9 +891,7 @@ do
 
   a = f2! - 1 |> f2
 
-  _1, _2, _3, _4 = 1, f 2,
-    3,
-    f 4,
+  _1, _2, _3, _4 = 1, f 2, 3, f 4,
       4
 
 do

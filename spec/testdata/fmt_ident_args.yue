@@ -1,0 +1,19 @@
+-- input
+it 'should handle a mix of required and optional', ->
+  r = linter.lint_string 'os.setlocale 1,2,3'
+  assert.same {
+    type: 'ERROR'
+    message: 'os.setlocale requires 1 argument, optionally accepts 1 argument'
+    line: 1
+    col: 1
+  }, r[1]
+
+-- expect
+it 'should handle a mix of required and optional', ->
+  r = linter.lint_string 'os.setlocale 1,2,3'
+  assert.same {
+    type: 'ERROR'
+    message: 'os.setlocale requires 1 argument, optionally accepts 1 argument'
+    line: 1
+    col: 1
+  }, r[1]

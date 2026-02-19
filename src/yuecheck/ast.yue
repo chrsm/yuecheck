@@ -68,8 +68,8 @@ build = (ast, parent = nil) ->
   node.typ = ntype
   node
 
--- Parse source string and return internal AST
--- Returns: ast_node or nil, error_message
+-- parse source string and return internal AST
+-- returns: ast_node or nil, error_message
 parse = (src) ->
   raw_ast, err = yue.to_ast src, 0
   unless raw_ast
