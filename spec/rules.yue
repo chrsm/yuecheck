@@ -1313,3 +1313,8 @@ describe 'lpegrex grammar check', ->
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
       assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
+
+  describe 'bugs', ->
+    it 'should handle classes with SelfItem args', ->
+      r = linter.lint_file '../spec/testdata/lint_class_bug.yue'
+      assert.same {}, r

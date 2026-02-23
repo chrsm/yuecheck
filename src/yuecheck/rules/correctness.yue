@@ -212,7 +212,7 @@ basic_nilness =
       -- @__name is SelfName, @@__name is SelfClassName.
       -- pretty.. self explanatory.
       -- don't think we need to worry about this here?
-      if arg\is types.SelfItem
+      if (arg\is types.SelfItem) or (arg.name\is types.SelfItem)
         continue
 
       if arg.defaultValue
