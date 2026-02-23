@@ -1,0 +1,25 @@
+-- input
+assert.same { {
+  type: 'FOO!'
+  message: 'oops!'
+  line: 1
+  col: 2
+} }, r
+
+assert.same { {
+  type: 'FOO2'
+  type2: 'FOO3'
+} }
+
+-- expect
+assert.same { {
+  type: 'FOO!'
+  message: 'oops!'
+  line: 1
+  col: 2
+} }, r
+
+assert.same { {
+  type: 'FOO2'
+  type2: 'FOO3'
+} }
