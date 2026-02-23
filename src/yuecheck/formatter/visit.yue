@@ -153,6 +153,38 @@ extract_simple_string = (exp_node) ->
 
   nil
 
+-- check if an Invoke has a single string/table arg that doesn't need parens
+-- in Yuescript, `f""`, `f''`, `f{}` are valid without parens
+is_single_noparen_arg = (item) ->
+  unless item and #item?.args == 1
+    return false
+
+  item.args[1]\is_any types.DoubleString,
+    types.SingleString,
+    types.TableLit
+
+-- check if first arg in invoke is a multiline table literal
+-- these tables handle their own indentation, so we shouldn't push extra indent
+is_first_arg_multiline_table = (invoke_node) ->
+  unless invoke_node?.args and #invoke_node.args > 0
+    return false
+
+  arg1 = invoke_node.args[1]
+  unless arg1 and arg1?\is types.TableLit
+    return false
+
+  -- check if the table would render as multiline
+  -- can't use render_to_string here (no state)
+  -- simple heuristic: if any value is not on the same line as opening brace,
+  -- it's multiline
+  tbl_start = arg1\g_src_line!
+  if arg1.values and #arg1.values > 0
+    for item in *arg1.values
+      if item\g_src_line! != tbl_start
+        return true
+
+  false
+
 visitors = {}
 
 -- Helper to visit a node (dispatches to appropriate visitor)
@@ -600,16 +632,6 @@ visitors.Value = (state, node, ctx) ->
 visitors.SimpleValue = (state, node, ctx) ->
   visit state, node.value, ctx
 
--- check if an Invoke has a single string/table arg that doesn't need parens
--- in Yuescript, `f""`, `f''`, `f{}` are valid without parens
-is_single_noparen_arg = (item) ->
-  unless item and #item?.args == 1
-    return false
-
-  item.args[1]\is_any types.DoubleString,
-    types.SingleString,
-    types.TableLit
-
 --[[ chain value: ugly as hell, sorry ]]
 visitors.ChainValue = (state, node, ctx) ->
   items = node.items
@@ -670,7 +692,12 @@ visitors.ChainValue = (state, node, ctx) ->
 
           state\write '('
           if is_multiline_invoke
-            state\push!
+            -- check if first arg is a multiline table that handles its own indentation
+            first_is_multiline_table = is_first_arg_multiline_table item
+            should_push = not first_is_multiline_table
+
+            if should_push
+              state\push!
             for j, arg in ipairs item.args
               state\newline!
               state\write_indent!
@@ -680,7 +707,8 @@ visitors.ChainValue = (state, node, ctx) ->
               write_eol_for_line state, ctx, arg\g_src_line!
               state\write ',' if j < #item.args
             state\newline!
-            state\pop!
+            if should_push
+              state\pop!
             state\write_indent!
           else
             for j, arg in ipairs item.args
@@ -768,7 +796,7 @@ visitors.InvokeArgs = (state, node, ctx) ->
     first_line = node.args[1]\g_src_line!
     last_line = node.args[#node.args]\g_src_line!
     is_multiline = first_line and last_line and last_line != first_line
-    
+
     -- check if first arg is a multiline table literal that handles its own indentation
     -- in that case, don't add extra push to avoid double-indentation
     first_is_multiline_table = false
@@ -782,32 +810,28 @@ visitors.InvokeArgs = (state, node, ctx) ->
           if val and val.item and val.item.is and (val.item\is types.SimpleValue)
             sv = val.item
             if sv.value and sv.value.is and (sv.value\is types.TableLit)
-              -- check if the table spans multiple lines by comparing item positions
-              tbl = sv.value
-              tbl_start = tbl\g_src_line!
-              if tbl.values and #tbl.values > 0
-                for item in *tbl.values
-                  if item\g_src_line! != tbl_start
-                    first_is_multiline_table = true
-                    break
-    
+              -- use render_to_string to check if this table would render as multiline
+              -- this is more reliable than checking line numbers
+              rendered, table_is_multiline = render_to_string state, sv.value, ctx
+              first_is_multiline_table = table_is_multiline
+
     -- push scope for multiline args, unless first arg is multiline table
     should_push = is_multiline and not first_is_multiline_table
     if should_push
       state\push!
-    
+
     for i, arg in ipairs node.args
       arg_line = arg\g_src_line!
       arg_col = arg\g_src_col!
-      
+
       if i > 1
         state\write ','
-        
+
         if is_multiline
           -- check if there's a comma before this arg on the same line
           -- this handles cases like `}, arg2` where prev arg ends on different line
           -- than where the comma and next arg are
-          should_newline = true  -- default to newline for multiline
+          should_newline = true -- default to newline for multiline
           if ctx.source_lines and arg_line and arg_col
             line_content = ctx.source_lines[arg_line]
             if line_content
@@ -817,7 +841,7 @@ visitors.InvokeArgs = (state, node, ctx) ->
               if has_comma_on_line
                 -- comma is on same line as this arg, keep together
                 should_newline = false
-          
+
           if should_newline
             state\newline!
             state\write_indent!
@@ -825,14 +849,14 @@ visitors.InvokeArgs = (state, node, ctx) ->
             state\write ' '
         else
           state\write ' '
-      
+
       visit state, arg, ctx
-      
+
       -- write EOL comments for args on different lines than statement start
       -- (statement-level EOL only handles the statement's line, not multiline args)
       if is_multiline and arg_line and arg_line != first_line
         write_eol_for_line state, ctx, arg_line
-    
+
     if should_push
       state\pop!
 
