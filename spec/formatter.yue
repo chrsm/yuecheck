@@ -680,4 +680,4 @@ describe 'formatter', ->
         src, expect = parse_td fget_yr f
 
         r = fmt.format src
-        assert.same r, expect
+        assert.same expect, r

@@ -38,6 +38,11 @@ all: generate test
 ## luarocks only
 build: generate
 
+.PHONY: clean
+clean:
+	cd src && find . -type f -name '*.lua' -delete
+	cd spec && find . -type f -name '*.lua' -delete
+
 .PHONY: install
 ## luarocks only
 install:

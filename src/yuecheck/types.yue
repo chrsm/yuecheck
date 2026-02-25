@@ -2521,13 +2521,13 @@ ast_nodes.ClassMemberList = ClassMemberList
 class ClassBlock extends Node
   @yue_name: 'ClassBlock'
   
-  -- @contents: _sel_list_t(true,ClassMemberList,Statement)
+  -- @contents: _sel_list_t(true,ClassMemberList,Statement,YueComment,EmptyLine)
   new: (contents = {}) =>
     @contents = contents
 
   from_table: (tbl) =>
     for i, v in ipairs tbl
-      if _in v\g_yue_name!, {'ClassMemberList','Statement'}
+      if _in v\g_yue_name!, {'ClassMemberList','Statement','YueComment','EmptyLine'}
         table.insert @contents, v
         continue
       _ = v
