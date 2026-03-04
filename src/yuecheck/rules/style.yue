@@ -18,6 +18,8 @@ style_comment_space =
       return
     elseif (node\is types.YueMultilineComment) and (node.v\match '%-%-%[%[%s+.+%s+%]%]')
       return
+    elseif node.v\match '^%-%-%-' -- LuaCATS
+      return
 
     typ = '???'
     if node\is types.YueLineComment
