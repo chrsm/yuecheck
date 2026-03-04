@@ -1,34 +1,14 @@
 -- comment association for the formatter
 -- associates parsed comments with AST nodes based on position
+-- then INJECTS comments directly into AST nodes as _comments property
 import 'yuecheck.types'
 
--- comment association types:
--- 'trailing' - after identifier, before next token on same line: `x --[[t]] = 1`
--- 'end_of_line' - at end of statement: `x = 1 -- comment`
--- 'above' - on line immediately before a statement
--- 'orphan' - standalone comment not attached to code (ex: eof comments)
-
-class CommentData
-  new: =>
-    @associations = {}
-    @node_comments = {}
-    @nodes_by_line = {}
-    @orphans = {}
-  get_comments: (node, assoc_type = nil) =>
-    id = tostring node
-    nc = @node_comments[id]
-    return {} unless nc
-
-    if assoc_type
-      nc[assoc_type] or {}
-    else
-      result = {}
-      for _, list in pairs nc
-        for c in *list
-          result[] = c
-
-      result
-
+-- Comment decoration structure on AST nodes:
+-- node._comments = {
+--   above: [Comment]      -- comments on lines immediately before node
+--   eol: Comment?         -- end-of-line comment (same line, after node)
+--   trailing: [Comment]   -- inline block comments (--[[x]] after identifier)
+-- }
 -- priority for node types; higher = more specific, prefer for trailing comments
 -- leaf nodes should be preferred over containers
 node_priority = {
@@ -57,18 +37,9 @@ node_priority = {
 get_priority = (node) ->
   node_priority[node\g_yue_name!] or 50
 
--- associate comments with AST nodes
--- takes: source string, AST root, parsed comments (from comments.to_ast)
--- returns: CommentData instance
-associate = (src, ast, comments) ->
-  data = CommentData!
-
-  unless comments?.indices? and #comments.indices > 0
-    return data
-
-  -- build a map of all AST nodes with their positions
-  node_list = {}
-  nodes_by_line = data.nodes_by_line
+-- Build nodes_by_line map from AST
+build_nodes_by_line = (ast) ->
+  nodes_by_line = {}
 
   collect_nodes = (node) ->
     unless node and node.is -- skip non-AST values
@@ -83,7 +54,6 @@ associate = (src, ast, comments) ->
     unless line and col
       return
 
-    node_list[] = node
     nodes_by_line[line] or= {}
     nodes_by_line[line][] = {
       node: node
@@ -99,7 +69,7 @@ associate = (src, ast, comments) ->
 
     -- walk children
     for k, v in pairs node
-      if k in ['is', 'typ', '_src_line', '_src_col']
+      if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments' ]
         continue
 
       if (type v) == 'table'
@@ -115,118 +85,370 @@ associate = (src, ast, comments) ->
   for line, nodes in pairs nodes_by_line
     table.sort nodes, (a, b) -> a.col < b.col
 
-  -- now associate each comment with a node
-  associations = data.associations
-  node_comments = data.node_comments
+  nodes_by_line
+
+-- Determine association type for a comment
+-- Returns: { node: best_node, type: assoc_type } or { node: nil, type: 'orphan' }
+determine_association = (comment, nodes_by_line) ->
+  comment_col = comment\g_src_col!
+  comment_line = comment\g_src_line!
+
+  best_node = nil
+  best_type = 'orphan'
+  best_priority = -1
+  best_col = -1
+
+  -- check for nodes on the same line (trailing or end_of_line comment)
+  same_line_nodes = nodes_by_line[comment_line]
+  is_end_of_line = false
+
+  if same_line_nodes and #same_line_nodes > 0
+    -- First, determine if this is an end-of-line comment (no more tokens after it)
+    multiline_containers = {
+      'TableBlock': true
+      'Block': true
+      'Body': true
+      'FunLit': true
+      'With': true
+      'Do': true
+    }
+    has_more = false
+    for entry in *same_line_nodes
+      if entry.col > comment_col
+        node_type = entry.node\g_yue_name!
+        unless multiline_containers[node_type]
+          has_more = true
+          break
+    is_end_of_line = not has_more
+
+    if is_end_of_line
+      -- For EOL comments, prefer nodes at the "statement/expression level".
+      -- We want to attach to Statement (priority 10) or item nodes like Exp (40),
+      -- not to overly broad containers like File (1) or Block (5), and not to
+      -- deep leaf nodes like SingleString (100).
+      -- Strategy: pick the lowest priority node with priority >= 10 (Statement level).
+      -- If no such node exists, fall back to the highest priority node.
+      MIN_EOL_PRIORITY = 10
+
+      -- First pass: find lowest priority >= MIN_EOL_PRIORITY
+      for entry in *same_line_nodes
+        if entry.col < comment_col
+          priority = get_priority entry.node
+
+          if priority >= MIN_EOL_PRIORITY
+            -- Among eligible nodes, prefer lower priority (outer containers)
+            -- On same priority, prefer leftmost (lower column)
+            if best_node == nil or priority < best_priority or
+               (priority == best_priority and entry.col < best_col)
+              best_node = entry.node
+              best_type = 'end_of_line'
+              best_priority = priority
+              best_col = entry.col
+
+      -- If no node found with priority >= MIN_EOL_PRIORITY, use fallback
+      -- (This handles edge cases where only File/Block nodes exist)
+      unless best_node
+        for entry in *same_line_nodes
+          if entry.col < comment_col
+            priority = get_priority entry.node
+            if best_node == nil or priority > best_priority
+              best_node = entry.node
+              best_type = 'end_of_line'
+              best_priority = priority
+              best_col = entry.col
+    else
+      -- For trailing comments (not at end of line), prefer most specific (highest priority)
+      for entry in *same_line_nodes
+        if entry.col < comment_col
+          priority = get_priority entry.node
+
+          -- prefer higher priority (more specific) nodes
+          -- on equal priority, prefer closer (higher column) nodes
+          if priority > best_priority or
+             (priority == best_priority and entry.col > best_col)
+            best_node = entry.node
+            best_type = 'trailing'
+            best_priority = priority
+            best_col = entry.col
+
+      -- If no node found BEFORE the comment, check for nodes AFTER it.
+      -- This handles "preceding" comments like --[[arg]] \func!
+      -- where the comment precedes code on the same line.
+      unless best_node
+        for entry in *same_line_nodes
+          if entry.col > comment_col
+            priority = get_priority entry.node
+            -- prefer highest priority (most specific), closest to comment
+            if best_node == nil or priority > best_priority or
+               (priority == best_priority and entry.col < best_col)
+              best_node = entry.node
+              best_type = 'above' -- treat as "above" (leading) comment
+              best_priority = priority
+              best_col = entry.col
+
+  -- special case: if the only/best node on this line is a Block,
+  -- and the comment appears to be indented content, treat as "above" for next line
+  if best_node and best_type == 'end_of_line'
+    if best_node\is_any types.Block, types.Body
+      -- look for the actual statement on the next line
+      found_next = false
+      next_line = comment_line + 1
+      while next_line <= comment_line + 50
+        if nodes_by_line[next_line] and #nodes_by_line[next_line] > 0
+          found_next = true
+          -- Only associate as "above" if comment is at same or lesser indentation
+          target_col = nodes_by_line[next_line][1].col
+          if comment_col <= target_col
+            best_node = nodes_by_line[next_line][1].node
+            best_type = 'above'
+          else
+            -- Comment is more indented - leave as orphan for Block to handle
+            best_node = nil
+            best_type = 'orphan'
+          break
+        next_line += 1
+      -- If no next-line nodes found, this is an orphan comment in an empty block
+      unless found_next
+        best_node = nil
+        best_type = 'orphan'
+
+  -- _if_ there isn't a same-line node, check if this is an 'above' comment
+  unless best_node
+    next_line = comment_line + 1
+    while next_line <= comment_line + 50
+      if nodes_by_line[next_line] and #nodes_by_line[next_line] > 0
+        -- Check indentation: only associate as "above" if the comment
+        -- is at same or lesser indentation than the target node.
+        -- Comments more indented than the target are likely inside a
+        -- sibling block (e.g., comment inside if-block before else).
+        target_node = nodes_by_line[next_line][1].node
+        target_col = nodes_by_line[next_line][1].col
+
+        if comment_col <= target_col
+          best_node = target_node
+          best_type = 'above'
+        -- else: leave as orphan (will be handled by Block generator)
+        break
+      next_line += 1
+
+  { node: best_node, type: best_type }
+
+-- inject a comment into a node's _comments structure
+inject_comment = (node, comment, assoc_type) ->
+  node._comments or= { above: {}, trailing: {}, eol: nil }
+
+  switch assoc_type
+    when 'above'
+      table.insert node._comments.above, comment
+    when 'trailing'
+      table.insert node._comments.trailing, comment
+    when 'end_of_line'
+      -- EOL is singular (last one wins if multiple, though rare)
+      node._comments.eol = comment
+
+-- get the end line of a node by recursively finding the maximum line among all children
+-- used for determining block line ranges for recursive descent containment checking
+get_node_end_line = (node) ->
+  return 0 unless node and (type node) == 'table' and node.is
+
+  max_line = node\g_src_line! or 0
+
+  -- check all properties for child nodes
+  for k, v in pairs node
+    continue if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos' ]
+    if (type v) == 'table'
+      if v.is -- It's a single node
+        child_end = get_node_end_line v
+        max_line = math.max max_line, child_end
+      else -- It's a list
+        for item in *v
+          if (type item) == 'table' and item.is
+            child_end = get_node_end_line item
+            max_line = math.max max_line, child_end
+
+  max_line
+
+-- get the content indentation level of a block, by looking at its first stmt col,
+-- or the block's own col otherwise
+get_block_content_col = (node) ->
+  unless node
+    return 1
+
+  if node\is types.Block
+    stmts = node.statementOrComments or {}
+    if #stmts > 0
+      first = stmts[1]
+      if first and first.is
+        col = first\g_src_col!
+        return col if col
+
+    -- empty block: use the block's own column + indent offset
+    block_col = node\g_src_col! or 1
+    return block_col + 2 -- assume 2-space indent (TODO: fixme kthx)
+  1
+
+-- find the containing Block for a given line number using recursive descent
+-- this ensures structural correctness: we drill down through the AST hierarchy
+-- to find the innermost Block that actually contains the comment's line
+--
+-- special handling: if comment appears after a block's last statement but has
+-- matching indentation, it still belongs to that block (e.g., trailing comment
+-- at end of a do block)
+find_containing_block = (ast, comment_line, comment_col) ->
+  best_strict = nil -- best block that strictly contains the comment
+  best_strict_start = 0 -- prefer block that starts LATEST (most specific)
+
+  best_indent = nil -- best block matched by indentation (for trailing comments)
+  best_indent_end = -1 -- prefer block that ends LATEST (closest to comment)
+
+  -- walk all blocks and finds the best match
+  find_in_node = (node) ->
+    return unless node and (type node) == 'table' and node.is
+
+    -- for Block nodes, check if comment is within this block's line range
+    if node\is types.Block
+      start_line = node\g_src_line!
+      end_line = get_node_end_line node
+
+      -- if comment is before this block starts, skip
+      if comment_line < start_line
+        return
+
+      -- first, always recurse into children to find nested blocks
+      for stmt in *(node.statementOrComments or {})
+        find_in_node stmt
+
+      -- check if THIS block strictly contains the comment
+      if comment_line <= end_line
+        -- for empty blocks, we can't reliably compute content_col.
+        -- for blocks with content, check if indentation matches.
+        content_col = get_block_content_col node
+        stmts = node.statementOrComments or {}
+        is_empty = #stmts == 0
+
+        -- accept if: a] block is empty (can't compute content_col), or
+        -- b] comment indentation matches block's content indentation
+        if is_empty or comment_col == content_col
+          -- prefer the block that starts LATEST (most specific)
+          if start_line > best_strict_start
+            best_strict = node
+            best_strict_start = start_line
+        return
+
+      -- comment is AFTER this block's last AST node.
+      -- check if indentation matches - if so, this might be a trailing comment.
+      content_col = get_block_content_col node
+      if comment_col == content_col
+        -- prefer the block that ends LATEST (closest to the comment)
+        if end_line > best_indent_end
+          best_indent = node
+          best_indent_end = end_line
+
+      return
+
+    -- for non-Block nodes, recursively check all children for nested Blocks
+    for k, v in pairs node
+      -- ugh, cleanup TODO kthx
+      continue if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos' ]
+
+      if (type v) == 'table'
+        if v.is
+          find_in_node v
+        else
+          for item in *v
+            if (type item) == 'table' and item.is
+              find_in_node item
+
+  find_in_node ast
+
+  -- prefer strict containment over indentation matching
+  -- if no strict match, use indentation match; jfinally, fall back to root block
+  best_strict or best_indent or ast.block
+
+-- check if a source line contains a keyword before the comment position.
+-- used to detect EOL comments on keyword-only lines like "else -- comment"
+-- where the keyword has no actual AST node
+is_keyword_eol_comment = (src, comment_line, comment_col) ->
+  line_num = 0
+  for line in src\gmatch '[^\n]*'
+    line_num += 1
+    if line_num == comment_line
+      -- check if the content before the comment is just whitespace + keyword
+      before_comment = line\sub 1, comment_col - 1
+      -- strip trailing whitespace
+      before_comment = before_comment\gsub '%s+$', ''
+      -- check if it ends with a keyword (else, elseif, then, do, etc.)
+      if (before_comment\match '%s*else$') or
+         (before_comment\match '%s*elseif$') or
+         (before_comment\match '%s*then$') or (before_comment\match '%s*do$')
+        return true
+      break
+  false
+
+-- inject comments into AST nodes
+-- takes: source string, AST root, parsed comments (from comments.to_ast)
+-- modifies AST in place by adding _comments properties to nodes
+-- returns: { orphans: [], eol_comments_by_line: {} }
+-- eol_comments_by_line maps source line numbers to their EOL comments
+-- (used for line-based lookup in control flow generators like While)
+inject = (src, ast, comments) ->
+  unless comments?.indices? and #comments.indices > 0
+    return { orphans: {}, eol_comments_by_line: {} }
+
+  nodes_by_line = build_nodes_by_line ast
+  orphans = {}
+  eol_comments_by_line = {}
 
   for line_idx in *comments.indices
     line_comments = comments[line_idx]
     continue unless line_comments
 
     for comment in *line_comments
-      comment_col = comment\g_src_col!
-      comment_line = comment\g_src_line!
+      assoc = determine_association comment, nodes_by_line
 
-      -- find the best node to attach this comment to
-      best_node = nil
-      best_type = 'orphan'
-      best_priority = -1
-
-      -- check for nodes on the same line (trailing or end_of_line comment)
-      same_line_nodes = nodes_by_line[comment_line]
-      best_col = -1
-      if same_line_nodes and #same_line_nodes > 0
-        -- find the most specific node that starts before the comment
-        -- priority: higher type priority wins; same priority → higher column wins
-        for entry in *same_line_nodes
-          if entry.col < comment_col
-            priority = get_priority entry.node
-
-            -- prefer higher priority (more specific) nodes
-            -- on equal priority, prefer closer (higher column) nodes
-            if priority > best_priority or (priority == best_priority and entry.col > best_col)
-              best_node = entry.node
-              best_type = 'trailing'
-              best_priority = priority
-              best_col = entry.col
-
-        -- _if_ we found a node, check if comment is truly at end of line
-        if best_node
-          -- check if there are more tokens after this comment on the line
-          -- exclude multiline container types that may have position on this line
-          -- but actual content on subsequent lines
-          multiline_containers = {
-            'TableBlock': true
-            'Block': true
-            'Body': true
-            'FunLit': true
-            'With': true
-            'Do': true
-          }
-          has_more = false
-          for entry in *same_line_nodes
-            if entry.col > comment_col
-              node_type = entry.node\g_yue_name!
-              unless multiline_containers[node_type]
-                has_more = true
-                break
-
-          unless has_more
-            best_type = 'end_of_line'
-
-      -- special case: if the only/best node on this line is a Block,
-      -- and the comment appears to be indented content, treat as "above" for next line
-      --[[
-	      this handles: 
-		    ```
-          if x
-            -- comment
-            actual_code
-        ```
-      ]]
-      if best_node and best_type == 'end_of_line'
-        if best_node\is_any types.Block, types.Body
-          -- look for the actual statement on the next line
-          next_line = comment_line + 1
-          while next_line <= comment_line + 50 -- arbitrary search 50 lines ahead
-            if nodes_by_line[next_line] and #nodes_by_line[next_line] > 0
-              best_node = nodes_by_line[next_line][1].node
-              best_type = 'above'
-              break
-
-            next_line += 1
-
-      -- _if_ there isn't a same-line node, check if this is an 'above' comment
-      unless best_node
-        -- look for first node on the next non-empty line
-        -- look ahead up to 50 lines (to handle multi-line comments and blank sections)
-        -- 50 is arbitrary, can be adjusted
-        next_line = comment_line + 1
-        while next_line <= comment_line + 50
-          if nodes_by_line[next_line] and #nodes_by_line[next_line] > 0
-            best_node = nodes_by_line[next_line][1].node
-            best_type = 'above'
-            break
-
-          next_line += 1
-
-      -- store the association
-      associations[comment] = {
-        node: best_node
-        type: best_type
-      }
-
-      -- also store reverse mapping: node -> comments
-      if best_node
-        id = tostring(best_node)
-        node_comments[id] or= { trailing: {}, end_of_line: {}, above: {} }
-        node_comments[id][best_type] or= {}
-        node_comments[id][best_type][] = comment
+      if assoc.node
+        inject_comment assoc.node, comment, assoc.type
+        -- also track EOL comments by line for line-based lookups
+        if assoc.type == 'end_of_line'
+          comment_line = comment\g_src_line!
+          eol_comments_by_line[comment_line] = comment
       else
-        data.orphans[] = comment
+        -- check if this orphan is actually an EOL comment on a keyword line
+        -- (e.g., "else -- comment" where 'else' has no AST node)
+        comment_line = comment\g_src_line!
+        comment_col = comment\g_src_col!
+        if is_keyword_eol_comment src, comment_line, comment_col
+          eol_comments_by_line[comment_line] = comment
+        else
+          orphans[] = comment
 
-  data
+  -- inject orphan comments into their containing Block.statementOrComments
+  if #orphans > 0
+    for comment in *orphans
+      comment_line = comment\g_src_line!
+      comment_col = comment\g_src_col!
+
+      -- find the innermost block that contains this comment using recursive descent
+      block = find_containing_block ast, comment_line, comment_col
+      continue unless block?.statementOrComments
+
+      -- create a YueComment wrapper node
+      yue_comment = types.YueComment { comment }
+      yue_comment\set_source comment_line, comment\g_src_col!
+
+      -- find insertion position based on line number
+      insert_pos = #block.statementOrComments + 1
+
+      for i, stmt in ipairs block.statementOrComments
+        stmt_line = stmt\g_src_line!
+        if stmt_line and stmt_line > comment_line
+          insert_pos = i
+          break
+
+      table.insert block.statementOrComments, insert_pos, yue_comment
+
+  { orphans: {}, :eol_comments_by_line }
 
 export default {
-  :associate
+  :inject
 }

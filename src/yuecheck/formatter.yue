@@ -2,9 +2,11 @@ import 'yuecheck.ast'
 import 'yuecheck.comments' as comment_parser
 import 'yuecheck.types'
 
+import 'yuecheck.formatter.codegen'
 import 'yuecheck.formatter.comments' as comment_assoc
-import 'yuecheck.formatter.state' as state
-import 'yuecheck.formatter.visit' as visit
+import 'yuecheck.formatter.layout'
+
+import 'yuecheck.internal.xstring'
 
 join_import = (inners) ->
   s = [inner.v for inner in *inners]
@@ -124,10 +126,10 @@ format = (src, opts = {}) ->
   -- sort top-level imports in ast before formatting
   sort_imports parsed_ast.block
 
+  -- inject comments as AST nodes (in node._comments; above/eol/trailing)
+  -- orphans are injected into Block.statementOrComments as YueComment nodes
   comments = comment_parser.to_ast src
-  comment_data = comment_assoc.associate src, parsed_ast, comments
-
-  fstate = state opts
+  inject_result = comment_assoc.inject src, parsed_ast, comments
 
   -- track source lines for comments and interpolated strings
   source_lines = {}
@@ -135,39 +137,20 @@ format = (src, opts = {}) ->
     table.insert source_lines, line
 
   ctx = {
-    :comment_data
     :source_lines
     table_spacing: opts.table_spacing ?? true
     source: src
+    emitted_eol_lines: {}
+    eol_comments_by_line: inject_result.eol_comments_by_line or {}
   }
 
-  -- visit all nodes, visitors write to fstate
-  visit fstate, parsed_ast, ctx
+  -- AST -> IR
+  doc = codegen parsed_ast, ctx
+  -- IR -> string
+  result = layout.layout doc, (opts.line_width ?? 84)
 
-  -- write orphaned comments (e.g., trailing comments at end of file)
-  --
-  -- NOTE(@chrsm): this is kinda ugly because it digs into the State, try to
-  -- push this into State instead
-  if comment_data.orphans and #comment_data.orphans > 0
-    for comment in *comment_data.orphans
-      continue if comment._emitted
-
-      -- flush current line if needed
-      fstate\newline! if #fstate.current_line > 0
-
-      -- preserve blank line before comment if source had one
-      comment_line = comment\g_src_line!
-      if comment_line and comment_line > 1
-        prev = source_lines[comment_line - 1]
-        if prev and prev\match '^%s*$'
-          last_output = fstate.output[#fstate.output]
-
-          unless last_output and last_output\match '^%s*$'
-            fstate\newline!
-
-      fstate\write comment.v
-
-  result = fstate\result!
+  if result
+    result = xstring.stripnl result
 
   if shebang
     result = "#{ shebang }\n#{ result }"

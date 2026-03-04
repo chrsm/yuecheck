@@ -234,7 +234,6 @@ f = ->
 
   do
     if success, result := try func 'abc', 123
-
       print result
 
     success, result = try func 'abc', 123
@@ -269,8 +268,7 @@ f = ->
     a, b, c = try? func!
 
   do
-    a = (try? func!
-    ) ?? 'default'
+    a = (try? func!) ?? 'default'
 
   do
     f try? func!
@@ -331,7 +329,6 @@ do
 
   do
     if success, result := try func 'abc', 123
-
       print result
 
     success, result = try func 'abc', 123
@@ -366,8 +363,7 @@ do
     a, b, c = try? func!
 
   do
-    a = (try? func!
-    ) ?? 'default'
+    a = (try? func!) ?? 'default'
 
   do
     f try? func!

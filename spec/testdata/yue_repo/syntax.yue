@@ -613,7 +613,7 @@ x = -hello world one two
 
 hi = -'herfef'
 
-x = -[x for x in x]
+x = -[ x for x in x ]
 
 print 'hello' if cool
 print 'hello' unless cool
@@ -706,7 +706,7 @@ hello =
 
 tb = {
   do: b
-  do :b,
+  do :b
 }
 
 div class: 'cool'

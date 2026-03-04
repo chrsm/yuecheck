@@ -1,0 +1,249 @@
+-- ir for Wadler-Lindig pretty-printing
+-- docs are plain Lua tables with a `_doc_type` string tag for fast dispatch.
+--
+-- pre-interned singleton constants for commonly used doc nodes.
+-- these avoid repeated table allocations for the same values in some cases.
+EMPTY = { _doc_type: 'empty' }
+HARDLINE = { _doc_type: 'hardline' }
+SPACE = { _doc_type: 'text', s: ' ' }
+COMMA = { _doc_type: 'text', s: ',' }
+
+-- empty doc: produces no output.
+empty = -> EMPTY
+
+-- literal string doc.
+text = (s) -> { _doc_type: 'text', s: tostring s }
+
+-- breakable separator: `alt` in flat mode, `\n`+indent in break mode.
+-- default alt = ' ' (space), use '' for softline behavior.
+line = (alt = ' ') -> { _doc_type: 'line', alt: alt }
+
+-- unconditional line break: always outputs `\n`+indent, forces enclosing group to break.
+hardline = -> HARDLINE
+
+-- literal line break: outputs `\n` without any indentation.
+-- used for preserving verbatim content (YAML multiline, Lua strings) where source
+-- indentation must be kept.
+literalline = -> { _doc_type: 'literalline' }
+
+-- sequential composition of a list of docs.
+concat = (docs) -> { _doc_type: 'concat', docs: docs }
+
+-- vararg convenience for concat.
+cat = (...) -> { _doc_type: 'concat', docs: { ... } }
+
+-- increase indent level by `n` for the contained doc.
+nest = (n, doc) -> { _doc_type: 'nest', n: n, doc: doc }
+
+-- layout choice: try flat if it fits within page_width, otherwise break.
+-- forced=true always chooses break mode (used when source was multiline).
+group = (doc, forced = false) -> { _doc_type: 'group', doc: doc, forced: forced }
+
+-- conditional: emit `a` in flat mode, `b` in break mode.
+ifflat = (a, b) -> { _doc_type: 'ifflat', flat: a, break_: b }
+
+-- softline: nothing in flat mode, newline in break mode.
+softline = -> line ''
+
+-- fill: greedy line-packing for items from the same source line.
+-- items are pre-built docs (each may include trailing comma)
+-- separator is inserted between items when they fit on the same line
+--
+-- when an item doesn't fit, a newline is started at the current indent
+fill = (sep, items) -> { _doc_type: 'fill', sep: sep, items: items }
+
+-- check if a doc tree contains any hardlines or forced groups.
+has_hardline = (doc) ->
+  return false unless doc and doc._doc_type
+  switch doc._doc_type
+    when 'hardline'
+      true
+    when 'literalline'
+      true
+    when 'group'
+      doc.forced or has_hardline doc.doc
+    when 'concat'
+      for d in *doc.docs
+        return true if has_hardline d
+      false
+    when 'nest'
+      has_hardline doc.doc
+    when 'ifflat'
+      has_hardline doc.break_
+    when 'fill'
+      for d in *doc.items
+        return true if has_hardline d
+      false
+    else
+      false
+
+-- join a list of docs with a separator doc between each pair
+join = (sep_doc, docs) ->
+  return empty! if #docs == 0
+  return docs[1] if #docs == 1
+
+  parts = {}
+  for i, d in ipairs docs
+    parts[] = d
+    parts[] = sep_doc if i < #docs
+  concat parts
+
+--[[ higher-level helpers for line-width-aware breaking ]]
+-- build a breakable binary operator chain.
+-- for operators that must stay at end of line (or, and, +, etc.)
+-- operands: list of operand docs
+-- operators: list of operator docs (one fewer than operands)
+-- indent: indentation for continuation lines
+-- returns doc where each line ends with operator (except last).
+--
+-- uses fill for greedy packing: fits as many operands per line as possible.
+-- each "item" for fill is "operand op " (operator stays with its left operand).
+--
+-- NOTE! if any operand contains hardlines (e.g., multiline fns),
+-- we fall back to simple concatenation to avoid unwanted breaking.
+-- this ensures `thing and -> ...` stays together.
+-- build a breakable argument list (for function calls, etc.)
+--
+-- flat:   arg1, arg2, arg3
+-- broken: arg1,
+--         arg2,
+--         arg3
+breakable_args = (args, indent = 0) ->
+  return EMPTY if #args == 0
+  return args[1] if #args == 1
+
+  any_hardlines = false
+  for arg in *args
+    if has_hardline arg
+      any_hardlines = true
+      break
+
+  -- if any arg has hardlines, use simple concatenation
+  if any_hardlines
+    parts = {}
+    for i, arg in ipairs args
+      parts[] = arg
+      if i < #args
+        parts[] = COMMA
+        parts[] = SPACE
+    return concat parts
+
+  -- no hardlines: use fill for greedy line-packing
+  -- each item is `arg, ` except last is just `arg`
+  items = {}
+  for i, arg in ipairs args
+    if i < #args
+      -- arg + comma + space (comma stays with arg when breaking)
+      items[] = cat arg, COMMA, SPACE
+    else
+      -- last arg, no trailing comma
+      items[] = arg
+
+  -- separator: empty when flat (space already in item), newline when broken
+  sep_doc = line ''
+
+  if indent > 0
+    nest indent, fill sep_doc, items
+  else
+    fill sep_doc, items
+
+breakable_binop_trailing = (operands, operators, indent = 0) ->
+  return EMPTY if #operands == 0
+  return operands[1] if #operands == 1
+
+  any_hardlines = false
+  for operand in *operands
+    if has_hardline operand
+      any_hardlines = true
+      break
+
+  -- if any operand has hardlines, use simple concatenation (no fill)
+  -- (prevents unwanted breaking when operands are multiline)
+  if any_hardlines
+    parts = {}
+    for i, operand in ipairs operands
+      parts[] = operand
+      if i < #operands
+        parts[] = SPACE
+        parts[] = operators[i]
+        parts[] = SPACE
+    return concat parts
+
+  -- no hardlines: use fill for greedy line-packing
+  -- build items for fill: each item is `operand op ` except last is just `operand`
+  items = {}
+  for i, operand in ipairs operands
+    if i < #operands
+      -- operand + space + operator + space (operator stays with operand)
+      items[] = cat operand, SPACE, operators[i], SPACE
+    else
+      -- last operand, no trailing operator
+      items[] = operand
+
+  -- separator: empty when flat (space already in item), newline when broken
+  sep_doc = line ''
+
+  if indent > 0
+    nest indent, fill sep_doc, items
+  else
+    fill sep_doc, items
+
+-- build a breakable method chain.
+-- segments: list of segment docs (first is base, rest start with .)
+-- indent: indentation for continuation lines (default 2)
+--
+-- flat:   base.method1!.method2!
+-- broken: base
+--           .method1!
+--           .method2!
+--
+-- Uses group with ifflat for all-or-nothing breaking.
+-- If any segment contains hardlines, falls back to simple concatenation.
+breakable_chain = (segments, indent = 2) ->
+  return EMPTY if #segments == 0
+  return segments[1] if #segments == 1
+
+  -- Check if any segment contains hardlines - fall back to simple concat
+  any_hardlines = false
+  for seg in *segments
+    if has_hardline seg
+      any_hardlines = true
+      break
+
+  if any_hardlines
+    return concat segments
+
+  -- build: base + ifflat(segment, newline + segment) for each remaining
+  -- in flat mode: just concatenate all segments
+  -- in break mode: newline before each segment after the first
+  parts = { segments[1] }
+  for i = 2, #segments
+    -- ifflat: flat=segment, break=newline+segment
+    parts[] = ifflat segments[i], cat(line(''), segments[i])
+
+  group nest(indent, concat(parts))
+
+export default {
+  :empty
+  :text
+  :line
+  :hardline
+  :literalline
+  :concat
+  :cat
+  :nest
+  :group
+  :ifflat
+  :softline
+  :fill
+  :join
+  :has_hardline
+  :breakable_args
+  :breakable_binop_trailing
+  :breakable_chain
+
+  :EMPTY
+  :HARDLINE
+  :SPACE
+  :COMMA
+}

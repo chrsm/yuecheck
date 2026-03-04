@@ -1,6 +1,10 @@
 stripq = (str) -> str\gsub "[\"']", ''
 
-stripnl = (str) -> str\gsub '(.+)\n+', '%1'
+stripnl = (str) ->
+  -- don't do match, greedy+slow
+  while #str > 0 and str\sub(-1) == '\n'
+    str = str\sub 1, -2
+  str
 
 match_any = (str, pats) ->
   for p in *pats

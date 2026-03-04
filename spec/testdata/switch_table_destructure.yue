@@ -9,7 +9,7 @@ do
 -- expect
 do
   switch tb
-    when [ [item,], ]
+    when [ [ item, ], ]
       print item
-    when [a = 1, b = 'abc']
+    when [ a = 1, b = 'abc' ]
       print a, b

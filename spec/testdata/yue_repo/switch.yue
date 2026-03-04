@@ -392,7 +392,6 @@ do
             print 'Object A'
           when ClassB
             print 'Object B'
-
       when <>: mt
         print 'A table with metatable'
       else
@@ -453,18 +452,18 @@ do
 
 do
   switch tb
-    when [ [item,], ]
+    when [ [ item, ], ]
       print item
-    when [a = 1, b = 'abc']
+    when [ a = 1, b = 'abc' ]
       print a, b
 
 do
   switch tb
-    when [1, 2, 3]
+    when [ 1, 2, 3 ]
       print '1, 2, 3'
-    when [1, b, 3]
+    when [ 1, b, 3 ]
       print "1, #{b}, 3"
-    when [1, 2, b = 3]
+    when [ 1, 2, b = 3 ]
       print "1, 2, #{b}"
 
 do
@@ -491,7 +490,7 @@ do
       { a: 1, b: 2 },
       { a: 3, b: 4 },
       { a: 5, b: 6 },
-      fourth,
+      fourth
     ]
       print 'matched', fourth
 
@@ -499,7 +498,7 @@ do
     when [
       { c: 1, d: 2 },
       { c: 3, d: 4 },
-      { c: 5, d: 6 },
+      { c: 5, d: 6 }
     ]
       print 'OK'
     when [
@@ -508,7 +507,7 @@ do
       { a: 1, b: 2 },
       { a: 3, b: 4 },
       { a: 5, b: 6 },
-      sixth,
+      sixth
     ]
       print 'matched', sixth
 
@@ -518,14 +517,14 @@ do
       print 'matched hello'
     else
       print 'not matched'
--- output: matched hello
+  -- output: matched hello
 
 do
   f = -> 'ok'
   switch val := f!
     when 'ok'
       print "it's ok"
--- output: it's ok
+  -- output: it's ok
 
 do
   g = -> 42
@@ -536,7 +535,7 @@ do
       print 'life universe everything'
     else
       print "other #{result}"
--- output: life universe everything
+  -- output: life universe everything
 
 do
   check = ->
@@ -550,7 +549,7 @@ do
       print 'affirmative'
     else
       print 'negative'
--- output: affirmative
+  -- output: affirmative
 
 do
   t = ():tb ->
@@ -564,9 +563,9 @@ do
       print 'not matched'
 
 do
-  clientData = ['Meta', 'CUST_1001', 'CHK123']
+  clientData = [ 'Meta', 'CUST_1001', 'CHK123' ]
   switch clientData
-    when [...metadata, customerId, checksum]
+    when [ ...metadata, customerId, checksum ]
       print metadata -- {"Meta"}
       print customerId -- "CUST_1001"
       print checksum -- "CHK123"
@@ -574,10 +573,10 @@ do
 do
   handlePath = (segments) ->
     switch segments
-      when [..._, resource, action]
+      when [ ..._, resource, action ]
         print 'Resource:', resource
         print 'Action:', action
 
-  handlePath ['admin', 'logs', 'view']
+  handlePath [ 'admin', 'logs', 'view' ]
 
 nil

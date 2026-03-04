@@ -289,11 +289,11 @@ do
   { :hello, :world } = value
 
 do
-  x, [a, b] = f!
+  x, [ a, b ] = f!
   print x, a, b
 
 do
-  list = [ [1, 2], [3, 4] ]
+  list = [ [ 1, 2 ], [ 3, 4 ] ]
   { x, y }, list = lume.first(list), lume.slice list, 2
 
 do
@@ -328,7 +328,7 @@ do
       name: 'F.T. Marinetti'
       address: {
         'Via Roma 42R',
-        'Bellagio, Italy 22021',
+        'Bellagio, Italy 22021'
       }
 
   do { poet: { :name, address: { street, city } } } = futurists
@@ -370,7 +370,7 @@ do
   for { x, y } in *thing
     print x, y
 
-  for [x, y] in *thing
+  for [ x, y ] in *thing
     print x, y
 
 --
@@ -425,11 +425,11 @@ do
 do
   { :a, :b } = { a: 'Hello', b: 'World' } if true
 
-  { days, hours, mins, secs } = [tonumber a for a in *{
-    string.match '1 2 3 4', '(.+)%s(.+)%s(.+)%s(.+)',
-  }]
+  { days, hours, mins, secs } = [ tonumber a for a in *{
+    string.match '1 2 3 4', '(.+)%s(.+)%s(.+)%s(.+)'
+  } ]
 
-  { :one, :two, :three } = {w, true for w in foo\gmatch('%S+')}
+  { :one, :two, :three } = { w, true for w in foo\gmatch('%S+') }
 
   { :a }, b = a\if(123) + t, 123
 
@@ -469,14 +469,14 @@ do
   for { left = 'null', right = false } in *tuples
     print left, right
 
-  for [left = 'null', right = false] in *tuples
+  for [ left = 'null', right = false ] in *tuples
     print left, right
 
 do
   { _, a, _, b } = tb -- list placeholder
 
 do
-  [a, _, b, _] = tb -- list placeholder
+  [ a, _, b, _ ] = tb -- list placeholder
 
 do
   { x: a.b = 1, y: a.c = 2 } = x.x.x
@@ -512,36 +512,41 @@ do
 
 do
   { a: { :<add> = addFunc }, b: { <[fieldName]>: field = 123 } } = tb
-  { <'abc'>: meta_field = 'def', <[[any string]]>: abc = 123, <'str'>: def = {} } = tb
+  {
+    <'abc'>: meta_field = 'def', <[[any string]]>: abc = 123, <'str'>: def = {}
+  } = tb
 
   switch tb
     when { a: { :<add> = addFunc }, b: { <[fieldName]>: field = 123 } }
       print add, field
   switch tb
-    when { c: { <'abc'>: meta_field = 'def' }, <[[any string]]>: { d: abc = 123 }, <'str'>: { e: def = {} } }
+    when {
+      c: { <'abc'>: meta_field = 'def' }, <[[any string]]>: { d: abc = 123 },
+      <'str'>: { e: def = {} }
+    }
       print meta_field, abc, def
 
 do
-  clients = ['VIP_Alice', 'User_Bob', 'User_Clara', 'VIP_Eva']
-  [vipStart, ...regulars, vipEnd] = clients
+  clients = [ 'VIP_Alice', 'User_Bob', 'User_Clara', 'VIP_Eva' ]
+  [ vipStart, ...regulars, vipEnd ] = clients
   print vipStart -- "VIP_Alice"
   print regulars -- {"User_Bob", "User_Clara"}
   print vipEnd -- "VIP_Eva"
 
 do
   setupMeeting = (participants) ->
-    [chair, ..._, secretary] = participants
+    [ chair, ..._, secretary ] = participants
     print chair, secretary
 
-  setupMeeting ['Alice', 'Bob', 'Charlie', 'David']
--- Output: Alice David
+  setupMeeting [ 'Alice', 'Bob', 'Charlie', 'David' ]
+  -- Output: Alice David
 
 do
   getTransactions = ->
     {
       { id: 'T1', amount: 100 },
       { id: 'T2', amount: 200 },
-      { id: 'T3', amount: 300 },
+      { id: 'T3', amount: 300 }
     }
 
   :id, :amount = getTransactions![#]
@@ -552,7 +557,7 @@ do
   [
     _,
     ...middle,
-    _,
+    _
   ] = tb
 
 do

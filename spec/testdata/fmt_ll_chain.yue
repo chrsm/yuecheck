@@ -1,0 +1,9 @@
+-- input
+result = some_object.first_long_method_name().second_long_method_name().third_long_method_name().fourth_long_method_name()
+
+-- expect
+result = some_object
+  .first_long_method_name!
+  .second_long_method_name!
+  .third_long_method_name!
+  .fourth_long_method_name!

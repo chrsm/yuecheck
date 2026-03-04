@@ -224,7 +224,7 @@ do
   print a, b, c, d
 
 do
-  x, [a, b], tb.<>, c[] = 1, if cond
+  x, [ a, b ], tb.<>, c[] = 1, if cond
     f!
   print x, a, b
 

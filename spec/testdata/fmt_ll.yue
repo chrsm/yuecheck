@@ -1,0 +1,8 @@
+-- input
+if (before_comment\match '%s*else$') or (before_comment\match '%s*elseif$') or (before_comment\match '%s*then$') or (before_comment\match '%s*do$')
+    br!
+
+-- expect
+if (before_comment\match '%s*else$') or (before_comment\match '%s*elseif$') or
+   (before_comment\match '%s*then$') or (before_comment\match '%s*do$')
+  br!

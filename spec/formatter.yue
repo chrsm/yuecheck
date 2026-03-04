@@ -102,6 +102,11 @@ describe 'formatter', ->
       r = fmt.format input
       assert.same input, r
 
+    it 'should handle neq', ->
+      input = 'x = 1 ~= 0'
+      r = fmt.format input
+      assert.same 'x = 1 != 0', r
+
   describe 'inline comment preservation', ->
     it 'should preserve inline comment on variable', ->
       r = fmt.format 'b --[[ x ]] = 2'
@@ -360,8 +365,9 @@ describe 'formatter', ->
 
   describe 'macros', ->
     it 'should handle macros (including `)', ->
-      r = fmt.format 'macro NumAndStr2 = (num`Num, str`SingleString) -> |\n  [#{num}, #{str}]'
-      assert.same 'macro NumAndStr2 = (num`Num, str`SingleString) -> |\n  [#{num}, #{str}]', r
+      input = 'macro NumAndStr2 = (num`Num, str`SingleString) -> |\n  [#{num}, #{str}]'
+      r = fmt.format input
+      assert.same input, r
 
     it 'should handle macro call', ->
       input = '$ ->\n  "a!"'
@@ -485,7 +491,7 @@ describe 'formatter', ->
   describe 'comprehension arrays', ->
     it 'should format inline presupplied array', ->
       r = fmt.format "x = ['a', 'b', 'c']"
-      assert.same "x = ['a', 'b', 'c']", r
+      assert.same "x = [ 'a', 'b', 'c' ]", r
 
     it 'should respect one-per-line array formatting', ->
       input = "x = [\n  'a',\n  'b',\n]"
@@ -515,7 +521,8 @@ describe 'formatter', ->
     it 'should handle multi-line function in table', ->
       input = "x = {\n  require('x')\n  ->\n    y = 1\n}"
       r = fmt.format input
-      assert.same "x = {\n  require('x'),\n  ->\n    y = 1,\n}", r
+      -- No trailing comma after lambda body since source didn't have one
+      assert.same "x = {\n  require('x'),\n  ->\n    y = 1\n}", r
 
     it 'should handle key-value pair with TableBlock value', ->
       input = "x = {\n  args: \n    * '--stdin'\n  key: true\n}"
@@ -538,6 +545,25 @@ describe 'formatter', ->
       input = '(|\n  1\n  2\n  3\n) |> print'
       r = fmt.format input
       assert.same input, r
+
+  describe 'line_width', ->
+    it 'should try to fit to line_width', ->
+      src, expect = parse_td fget 'fmt_ll'
+
+      r = fmt.format src, { line_width: 81 }
+      assert.same expect, r
+
+    it 'should break function args at line_width', ->
+      src, expect = parse_td fget 'fmt_ll_args'
+
+      r = fmt.format src, { line_width: 81 }
+      assert.same expect, r
+
+    it 'should break method chains at line_width', ->
+      src, expect = parse_td fget 'fmt_ll_chain'
+
+      r = fmt.format src, { line_width: 81 }
+      assert.same expect, r
 
   -- TODO: add some more thorough test cases
   -- mostly adding these as i work on stuff and dogfood the formatter
@@ -669,6 +695,12 @@ describe 'formatter', ->
 
     it 'should not weirdly format table indentation', ->
       src, expect = parse_td fget 'fmt_mtable'
+      r = fmt.format src
+      assert.same expect, r
+
+    it 'should not move else eol comments', ->
+      -- i swear to god i feel like i keep running into this one
+      src, expect = parse_td fget 'fmt_comment_else'
       r = fmt.format src
       assert.same expect, r
 

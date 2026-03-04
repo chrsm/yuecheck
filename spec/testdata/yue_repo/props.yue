@@ -79,7 +79,6 @@ class Props
         elseif item := rawget c, name
           rawset cls, name, item -- cache base member to class
           return item
-
   __newindex: (name, value) =>
     cls = @.<>
     if item := cls.__setter?[name] -- access properties

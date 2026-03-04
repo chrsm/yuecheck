@@ -10,6 +10,7 @@ import 'yue'
 
 import 'yuecheck.formatter'
 import 'yuecheck.internal.fs'
+import 'yuecheck.internal.sys'
 
 argp = argparse!
   name: 'yuefmt'
@@ -36,12 +37,23 @@ with argp
 
   \mutex d, f, dof, stdin
 
+  -- formatter opts
+  ll = \option '-ll --line-length', 'max line length'
+  ll\default 84
+
+  tspace = \option '-ts --table-spacing', 'table spacing'
+  tspace\default true
+
 args = argp\parse!
+
+opts =
+  line_width: args.ll ?? 84
+  table_spacing: args.ts ?? true
 
 if args.stdin
   src = io.read 'a*'
 
-  ret, err = formatter.format src
+  ret, err = formatter.format src, opts
   if err
     io.stderr\write err
     os.exit 1
@@ -69,7 +81,8 @@ else
 for file in *files
   src = fs.read_file file
 
-  ret, err = formatter.format src
+  ret, err = formatter.format src, opts
+
   if err
     io.stderr\write err
     os.exit 1

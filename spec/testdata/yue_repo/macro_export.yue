@@ -105,7 +105,7 @@ export macro copy = (src, dst, ...) ->
     'copy targets can not be _src_ or _dst_'
   )
   copyFields = table.concat(
-    ["_dst_.#{field} = _src_.#{field}" for field in *{ ... }],
+    [ "_dst_.#{field} = _src_.#{field}" for field in *{ ... } ],
     '\n\t\t\t'
   )
   |
@@ -117,8 +117,8 @@ export macro copy = (src, dst, ...) ->
 
 export macro enum = (...) ->
   items = { ... }
-  items = [item\gsub('"', '') for item in *items]
-  itemSet = {item, true for item in *items}
+  items = [ item\gsub('"', '') for item in *items ]
+  itemSet = { item, true for item in *items }
   (...) ->
     count = select '#', ...
     if 1 < count

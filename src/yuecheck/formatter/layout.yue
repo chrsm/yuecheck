@@ -1,0 +1,292 @@
+-- Wadler-Lindig layout engine.
+-- Renders a Doc IR tree to a string with a given page width.
+
+-- Cache for indent strings to avoid repeated string.rep allocations.
+indent_cache = {}
+get_indent = (n) ->
+  cached = indent_cache[n]
+  return cached if cached
+  s = string.rep ' ', n
+  indent_cache[n] = s
+  s
+
+-- Compute the flat (single-line) rendering width of a doc.
+-- Returns math.huge if the doc contains a hardline (can never be flat).
+-- Results are memoized on the doc node itself via _flat_width.
+flat_width = (doc) ->
+  cached = doc._flat_width
+  return cached if cached ~= nil
+
+  result = switch doc._doc_type
+    when 'empty'
+      0
+    when 'text'
+      #doc.s
+    when 'line'
+      #doc.alt
+    when 'hardline'
+      math.huge
+    when 'literalline'
+      math.huge
+    when 'concat'
+      total = 0
+      for d in *doc.docs
+        w = flat_width d
+        if w == math.huge
+          total = math.huge
+          break
+        total += w
+      total
+    when 'nest'
+      flat_width doc.doc
+    when 'group'
+      flat_width doc.doc
+    when 'ifflat'
+      flat_width doc.flat
+    when 'fill'
+      -- flat width of all items + separators between them
+      sep_w = flat_width doc.sep
+      if sep_w == math.huge
+        math.huge
+      else
+        total = 0
+        for i, item in ipairs doc.items
+          w = flat_width item
+          if w == math.huge
+            total = math.huge
+            break
+          total += if i > 1 then sep_w + w else w
+        total
+    else
+      0
+
+  doc._flat_width = result
+  result
+
+-- Check if doc (in flat mode) + remaining stack items fit in w chars.
+-- stack_rest: the main stack at the time of the group check (items after current group).
+fits = (w, doc, stack_rest) ->
+  -- Build a local check stack: doc_to_check on top (processed first), then stack_rest.
+  -- LIFO: last element = first processed.
+  cs = {}
+  -- Add stack_rest in original order (processed after doc_to_check).
+  -- Mark these as 'rest' so that hardlines/lines in them mean end-of-line (return true).
+  for frame in *stack_rest
+    cs[] = { d: frame.doc, rest: true }
+  -- doc_to_check on top (processed first)
+  cs[] = { d: doc, rest: false }
+
+  while w >= 0 and #cs > 0
+    frame = table.remove cs
+    d = frame.d
+    is_rest = frame.rest
+
+    switch d._doc_type
+      when 'empty'
+        -- skip
+      when 'text'
+        w -= #d.s
+      when 'line'
+        if is_rest
+          return true  -- line in remaining context = end of current line, fits
+        -- in fits() we check flat mode: use alt string
+        w -= #d.alt
+      when 'hardline'
+        if is_rest
+          return true  -- hardline in remaining context = end of current line, fits
+        return false  -- hardline in the doc itself = can never be flat
+      when 'literalline'
+        if is_rest
+          return true
+        return false
+      when 'concat'
+        for j = #d.docs, 1, -1
+          cs[] = { d: d.docs[j], rest: is_rest }
+      when 'nest'
+        cs[] = { d: d.doc, rest: is_rest }
+      when 'group'
+        -- nested group: always try flat in fits()
+        cs[] = { d: d.doc, rest: is_rest }
+      when 'ifflat'
+        -- flat mode: use flat branch
+        cs[] = { d: d.flat, rest: is_rest }
+      when 'fill'
+        -- flat: all items + separators
+        sep_w = flat_width d.sep
+        if sep_w == math.huge
+          return false if not is_rest
+          return true
+        for j, item in ipairs d.items
+          iw = flat_width item
+          if iw == math.huge
+            return false if not is_rest
+            return true
+          w -= if j > 1 then sep_w + iw else iw
+
+  w >= 0
+
+-- Render a doc flat (single-line) to an output buffer.
+-- Used by the fill handler to efficiently render items that fit on current line.
+render_flat = (doc, output) ->
+  switch doc._doc_type
+    when 'text'
+      output[] = doc.s
+    when 'line'
+      output[] = doc.alt
+    when 'empty'
+      -- nothing
+    when 'hardline'
+      -- shouldn't happen in fill items; skip
+    when 'literalline'
+      -- shouldn't happen in fill items; skip
+    when 'concat'
+      for d in *doc.docs
+        render_flat d, output
+    when 'nest'
+      render_flat doc.doc, output
+    when 'group'
+      render_flat doc.doc, output
+    when 'ifflat'
+      render_flat doc.flat, output
+    when 'fill'
+      -- nested fill: render flat with separator between items
+      for j, item in ipairs doc.items
+        if j > 1
+          render_flat doc.sep, output
+        render_flat item, output
+    else
+      -- unknown: skip
+
+-- Strip trailing spaces from the last element in an output buffer.
+strip_trailing_output = (output) ->
+  if #output > 0
+    last = output[#output]
+    output[#output] = last\gsub ' +$', ''
+
+-- Render a Doc to a string.
+-- doc: the root Doc
+-- page_width: maximum line width (default 84)
+layout = (doc, page_width = 84) ->
+  output = {}
+  col = 0
+  stack = { { indent: 0, mode: 'break', doc: doc } }
+
+  while #stack > 0
+    frame = table.remove stack  -- LIFO pop
+    i, m, d = frame.indent, frame.mode, frame.doc
+
+    switch d._doc_type
+      when 'empty'
+        -- nothing
+
+      when 'text'
+        output[] = d.s
+        col += #d.s
+
+      when 'line'
+        if m == 'flat'
+          output[] = d.alt
+          col += #d.alt
+        else
+          -- break mode: newline + indent
+          strip_trailing_output output
+          output[] = '\n'
+          output[] = get_indent i
+          col = i
+
+      when 'hardline'
+        strip_trailing_output output
+        output[] = '\n'
+        output[] = get_indent i
+        col = i
+
+      when 'literalline'
+        strip_trailing_output output
+        output[] = '\n'
+        col = 0
+
+      when 'concat'
+        -- push children in reverse order (LIFO → first child processed first)
+        for j = #d.docs, 1, -1
+          stack[] = { indent: i, mode: m, doc: d.docs[j] }
+
+      when 'nest'
+        stack[] = { indent: i + d.n, mode: m, doc: d.doc }
+
+      when 'group'
+        if d.forced
+          stack[] = { indent: i, mode: 'break', doc: d.doc }
+        else
+          -- try flat: does d.doc + remaining stack fit from current col?
+          remaining = page_width - col
+          if fits remaining, d.doc, stack
+            stack[] = { indent: i, mode: 'flat', doc: d.doc }
+          else
+            stack[] = { indent: i, mode: 'break', doc: d.doc }
+
+      when 'ifflat'
+        chosen = if m == 'flat' then d.flat else d.break_
+        stack[] = { indent: i, mode: m, doc: chosen }
+
+      when 'fill'
+        -- Greedy fill: eagerly process items to pack them on lines.
+        -- This breaks the normal stack-based flow but is necessary for fill semantics.
+        sep = d.sep
+        sep_w = flat_width sep
+        local_i = i
+
+        for j, item_doc in ipairs d.items
+          item_w = flat_width item_doc
+
+          if j > 1
+            if item_w < math.huge and sep_w < math.huge and col + sep_w + item_w <= page_width
+              -- item + separator fits on current line: render sep flat, then item flat
+              render_flat sep, output
+              col += sep_w
+              render_flat item_doc, output
+              col += item_w
+            else
+              -- doesn't fit: start new line
+              strip_trailing_output output
+              output[] = '\n'
+              output[] = get_indent local_i
+              col = local_i
+              if item_w < math.huge
+                render_flat item_doc, output
+                col += item_w
+              else
+                -- item has hardlines (e.g., multiline value): push to stack for normal processing
+                -- This handles edge cases like multiline values inside fill rows
+                stack[] = { indent: local_i, mode: m, doc: item_doc }
+                -- We can't continue eagerly after this; break out
+                -- Remaining fill items need to be handled after stack processes item_doc
+                -- Simple approach: push remaining items as a new fill node
+                if j < #d.items
+                  remaining_items = {}
+                  for k = j + 1, #d.items
+                    remaining_items[] = d.items[k]
+                  stack[] = { indent: local_i, mode: m, doc: { _doc_type: 'fill', sep: sep, items: remaining_items } }
+                break
+          else
+            -- first item
+            if item_w < math.huge
+              render_flat item_doc, output
+              col += item_w
+            else
+              stack[] = { indent: local_i, mode: m, doc: item_doc }
+              -- remaining items as fill
+              if #d.items > 1
+                remaining_items = {}
+                for k = 2, #d.items
+                  remaining_items[] = d.items[k]
+                stack[] = { indent: local_i, mode: m, doc: { _doc_type: 'fill', sep: sep, items: remaining_items } }
+              break
+
+  result = table.concat output, ''
+  -- strip trailing whitespace per line
+  result = result\gsub '([^\n]*) +\n', '%1\n'
+  -- strip trailing whitespace at end
+  result = result\gsub ' +$', ''
+  result
+
+export default { :layout, :flat_width, :fits }

@@ -1,0 +1,23 @@
+-- input
+f = ->
+  -- c1
+  for k, v in pairs t
+    if v == 'table'
+      if v.is -- c2
+        branch!
+      else -- c3
+        branch!
+
+  ret
+
+-- expect
+f = ->
+  -- c1
+  for k, v in pairs t
+    if v == 'table'
+      if v.is -- c2
+        branch!
+      else -- c3
+        branch!
+
+  ret

@@ -268,10 +268,10 @@ if itemB? and itemB in listB
   print 'itemB in listB'
 
 -- 9. spread table
-func [...listA, ...listB]
+func [ ...listA, ...listB ]
 
 -- 10. comprehension
-func [i for i = 1, 10], [k for k in pairs tb]
+func [ i for i = 1, 10 ], [ k for k in pairs tb ]
 
 -- 11. for expr
 func for i = 1, 10
@@ -279,7 +279,7 @@ func for i = 1, 10
 
 -- 12. for each expr
 func for k, v in pairs tb
-  [k, v]
+  [ k, v ]
 
 -- 13. class declaration expr
 func class
@@ -291,7 +291,7 @@ func with tb
   \func 'a'
 
 -- 15. table comprehension expr
-func {"#{k}-post-fix", v * 2 for k, v in pairs tb}
+func { "#{k}-post-fix", v * 2 for k, v in pairs tb }
 
 -- 16. do expr
 func do
@@ -358,10 +358,10 @@ GameEngine\onUpdate (deltaTime) ->
     print 'item in list'
 
   -- 9. spread table
-  func [...listA, ...listB]
+  func [ ...listA, ...listB ]
 
   -- 10. comprehension
-  func [i for i = 1, 10], [k for k in pairs tb]
+  func [ i for i = 1, 10 ], [ k for k in pairs tb ]
 
   -- 11. for expr
   func for i = 1, 10
@@ -369,7 +369,7 @@ GameEngine\onUpdate (deltaTime) ->
 
   -- 12. for each expr
   func for k, v in pairs tb
-    [k, v]
+    [ k, v ]
 
   -- 13. class declaration expr
   func class
@@ -381,7 +381,7 @@ GameEngine\onUpdate (deltaTime) ->
     \func 'a'
 
   -- 15. table comprehension expr
-  func {"#{k}-post-fix", v * 2 for k, v in pairs tb}
+  func { "#{k}-post-fix", v * 2 for k, v in pairs tb }
 
   -- 16. do expr
   func do

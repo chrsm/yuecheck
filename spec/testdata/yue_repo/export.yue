@@ -143,10 +143,10 @@ f if a then b
 f do 123
 f switch a
   when b then c
-f [i for i = 1, 10]
+f [ i for i = 1, 10 ]
 f for i = 1, 10
   i
-f {k, v for k, v in pairs tb}
+f { k, v for k, v in pairs tb }
 f for k, v in pairs tb
   { k, v }
 f while a

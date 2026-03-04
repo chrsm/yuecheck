@@ -393,7 +393,9 @@ do
   i = ({ a: ax = 0, b: by = 0 }) -> print ax, by
   j = (name, { id: uid = 'n/a', :role = 'guest' }) -> print name, uid, role
   m = ({ user: { :name, :age }, meta: { :ver = 1 } }) -> print name, age, ver
-  m1 = ({ user: { :name, :age }, :meta = {} }) -> print name, age, meta and meta.ver or 'nil'
+  m1 = ({
+    user: { :name, :age }, :meta = {}
+  }) -> print name, age, meta and meta.ver or 'nil'
   new = ({ :name = 'anon', :age = 0 }) =>
     @name = name
     @age = age

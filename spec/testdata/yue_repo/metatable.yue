@@ -106,7 +106,9 @@ do
 
 do
   local *
-  x, { :new, :var, :<close>, <close>: closeA }, :num, :<add>, :<sub> = 123, a.b.c, func!
+  x, {
+    :new, :var, :<close>, <close>: closeA
+  }, :num, :<add>, :<sub> = 123, a.b.c, func!
 
 x.abc, a.b.<> = 123, {}
 func!.<> = mt --, extra

@@ -448,7 +448,7 @@ class Wowha extends Thing
       super!
       _ = super.hello
       super\hello!
-      super\hello,
+      super\hello
   }
 
 do

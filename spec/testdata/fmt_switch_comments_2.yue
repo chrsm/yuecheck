@@ -38,7 +38,8 @@ while i + 1 <= #nodes
     i += 1
     visit state, nodes[i], ctx -- visit the IfCond
     -- Statement for the elseif body
-    if i + 1 <= #nodes and (nodes[i + 1]\is types.Statement) and nodes[i + 1]\g_src_line! == cond_line
+    if i + 1 <= #nodes and (nodes[i + 1]\is types.Statement) and
+       nodes[i + 1]\g_src_line! == cond_line
       state\write ' then '
       i += 1
       visit state, nodes[i], ctx

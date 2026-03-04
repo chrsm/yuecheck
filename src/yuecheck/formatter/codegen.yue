@@ -1,0 +1,2429 @@
+-- convert AST -> Doc IR (wadler-lindig)
+import 'yuecheck.ast'
+import 'yuecheck.formatter.ir'
+import 'yuecheck.types'
+
+import 'dkjson' as json
+
+-- reserved keywords, cannot be used as simple identifiers
+reserved_keywords = {
+  -- lua keywords
+  'and', 'break', 'do', 'else', 'elseif',
+  'end', 'false', 'for', 'function', 'goto',
+  'if', 'in', 'local', 'nil', 'not',
+  'or', 'repeat', 'return', 'then', 'true',
+  'until', 'while',
+  -- yue keywords
+  'as', 'class', 'continue', 'export', 'extends',
+  'from', 'global', 'import', 'macro', 'switch',
+  'try', 'unless', 'using', 'when', 'with',
+}
+
+-- check if a string is a valid identifier (can be used as simple table key)
+is_valid_identifier = (str) ->
+  unless str and #str > 0
+    return false
+  first = str\sub 1, 1
+  unless first\match '[a-zA-Z_]'
+    return false
+  if str\match '[^a-zA-Z0-9_]'
+    return false
+  if str in reserved_keywords
+    return false
+  true
+
+is_stupid_luastring = (item) ->
+  item.pipeExprs?[1]?.expos?[1]?.item?.items?[1]?.str?\is types.LuaString
+
+-- check if source has trailing comma before closing bracket
+has_trailing_comma = (node, ctx, open_char = '[', close_char = ']') ->
+  return false unless ctx.source_lines
+  src_line = node\g_src_line!
+  src_col = node\g_src_col!
+  return false unless src_line and src_col
+  depth = 0
+  last_nonspace = nil
+  in_string = false
+  string_char = nil
+  for ln = src_line, #ctx.source_lines
+    line_content = ctx.source_lines[ln]
+    continue unless line_content
+    start_col = if ln == src_line then src_col else 1
+    for idx = start_col, #line_content
+      c = line_content\sub idx, idx
+      if in_string
+        if c == '\\' and idx < #line_content
+          continue
+        if c == string_char
+          in_string = false
+          last_nonspace = c
+        continue
+      if c == '"' or c == "'"
+        in_string = true
+        string_char = c
+      elseif c == '-' and idx < #line_content and
+         line_content\sub(idx + 1, idx + 1) == '-'
+        break -- rest of line is a comment
+      elseif c == open_char
+        depth += 1
+      elseif c == close_char
+        depth -= 1
+        if depth == 0
+          return last_nonspace == ','
+      elseif c != ' ' and c != '\t'
+        last_nonspace = c
+  false
+
+-- extract a simple string value from an Exp node if it's a plain string literal
+extract_simple_string = (exp_node) ->
+  unless exp_node and exp_node\is types.Exp
+    return nil
+  pipe_exprs = exp_node.pipeExprs
+  unless pipe_exprs and #pipe_exprs == 1
+    return nil
+  if exp_node.opValues and #exp_node.opValues > 0
+    return nil
+  unary = pipe_exprs[1]
+  unless unary and unary\is types.UnaryExp
+    return nil
+  if unary.ops and #unary.ops > 0
+    return nil
+  expos = unary.expos
+  unless expos and #expos == 1
+    return nil
+  value = expos[1]
+  unless value and value\is types.Value
+    return nil
+  inner = value.item
+  unless inner
+    return nil
+  if inner\is types.ChainValue
+    items = inner.items
+    unless items and #items == 1
+      return nil
+    str_node = items[1]
+    unless str_node\is types.String
+      return nil
+    str_content = str_node.str
+    unless str_content
+      return nil
+    switch true
+      when str_content\is types.DoubleString
+        segments = str_content.segments
+        unless segments and #segments == 1
+          return nil
+        inner_content = segments[1]
+        unless inner_content\is types.DoubleStringContent
+          return nil
+        inner_str = inner_content.content
+        unless inner_str and inner_str\is types.DoubleStringInner
+          return nil
+        return inner_str.v
+      when str_content\is types.SingleString
+        return str_content.v
+  nil
+
+-- check if an Invoke has a single string/table arg that doesn't need parens
+is_single_noparen_arg = (item) ->
+  unless item and #item?.args == 1
+    return false
+  item.args[1]\is_any types.DoubleString, types.SingleString, types.TableLit
+
+-- check if first arg in invoke is a multiline table literal
+is_first_arg_multiline_table = (invoke_node) ->
+  unless invoke_node?.args and #invoke_node.args > 0
+    return false
+  arg1 = invoke_node.args[1]
+  unless arg1 and arg1?\is types.TableLit
+    return false
+  tbl_start = arg1\g_src_line!
+  if arg1.values and #arg1.values > 0
+    for item in *arg1.values
+      if item\g_src_line! != tbl_start
+        return true
+  false
+
+-- extract a TableLit from a wrapped expression, if present
+-- handles NormalDef, TableValue, Exp, Value, SimpleValue wrappers
+extract_table_lit = (node) ->
+  return nil unless node
+  return node if node.is and (node\is types.TableLit)
+
+  -- try common wrapper paths
+  -- NormalDef.item -> Exp -> UnaryExp -> Value -> SimpleValue -> TableLit
+  -- TableValue.value -> (same chain)
+  inner = node.item or node.value
+
+  -- Unwrap Exp -> UnaryExp/pipeExprs
+  if inner?.is and (inner\is types.Exp)
+    if inner.pipeExprs and #inner.pipeExprs > 0
+      inner = inner.pipeExprs[1]
+
+  -- Unwrap UnaryExp -> expos
+  if inner?.expos and #inner.expos > 0
+    inner = inner.expos[1]
+
+  -- Unwrap Value -> item
+  if inner?.item
+    inner = inner.item
+
+  -- Unwrap SimpleValue -> value
+  if inner?.is and (inner\is types.SimpleValue)
+    inner = inner.value
+
+  return inner if inner?.is and (inner\is types.TableLit)
+  nil
+
+-- check if a table (or any nested table within it) spans multiple lines.
+-- used to force outer tables to expand when they contain multiline nested tables.
+table_spans_multiple_lines = (node) ->
+  unless node?.is and (node\is types.TableLit)
+    return false
+
+  tbl_start = node\g_src_line!
+  unless node.values and #node.values > 0
+    return false
+
+  for val in *node.values
+    -- check if this value is on a different line
+    val_line = val\g_src_line!
+    if val_line and tbl_start and val_line != tbl_start
+      return true
+
+    -- recursively check nested tables
+    inner = extract_table_lit val
+    if inner and table_spans_multiple_lines inner
+      return true
+
+  false
+
+-- check if an item is a key-value pair type
+is_pair_type = (item) ->
+  unless item?.g_yue_name
+    return false
+  (string.find item\g_yue_name!, 'Pair') != nil
+
+--[[ comment helpers ]]
+-- get 'above' comments as a Doc (with hardlines).
+-- returns empty doc if no unread above comments.
+-- NOTE: above_doc always contains hardlines, so it forces the enclosing group to break.
+get_above_doc = (node, ctx) ->
+  comments = node._comments?.above
+  return ir.EMPTY unless comments and #comments > 0
+
+  -- Filter already emitted comments
+  active = [ c for c in *comments when not c._emitted ]
+  return ir.EMPTY if #active == 0
+
+  parts = {}
+  -- blank line before first comment?
+  first_line = active[1]\g_src_line!
+  if first_line and first_line > 1 and ctx.source_lines
+    prev = ctx.source_lines[first_line - 1]
+    if prev and prev\match '^%s*$'
+      parts[] = ir.HARDLINE
+
+  for c in *active
+    c._emitted = true
+    parts[] = ir.text c.v
+    parts[] = ir.HARDLINE
+
+  -- blank line between last comment and node?
+  last_line = active[#active]\g_src_line!
+  node_line = node\g_src_line!
+  if last_line and node_line and node_line > last_line + 1 and ctx.source_lines
+    between = ctx.source_lines[last_line + 1]
+    if between and between\match '^%s*$'
+      parts[] = ir.HARDLINE
+
+  ir.concat parts
+
+-- get "preceding" comments (inline block comments that appear before code on same line)
+-- these should be emitted with just a trailing space, not hardline
+get_preceding_doc = (node, ctx) ->
+  comments = node._comments?.above
+  return ir.EMPTY unless comments and #comments > 0
+
+  node_line = node\g_src_line!
+  return ir.EMPTY unless node_line
+
+  -- filter to only inline preceding comments (same line as node)
+  parts = {}
+  for c in *comments
+    comment_line = c\g_src_line!
+    if comment_line and comment_line == node_line and not c._emitted
+      c._emitted = true
+      parts[] = ir.text c.v
+      parts[] = ir.SPACE
+
+  ir.concat parts
+
+-- get preceding comments from a node or its descendants (recursive)
+-- used for container items where preceding comment may be on a nested node
+get_preceding_doc_recursive = (node) ->
+  return ir.EMPTY unless node and (type node) == 'table'
+
+  node_line = node\g_src_line!
+  return ir.EMPTY unless node_line
+
+  -- Check the node itself first
+  if node._comments?.above and #node._comments.above > 0
+    for c in *node._comments.above
+      comment_line = c\g_src_line!
+      if comment_line and comment_line == node_line and not c._emitted
+        c._emitted = true
+        return ir.cat ir.text(c.v), ir.SPACE
+
+  -- some nodes are not actually ast nodes so double-check (TODO: this is gettin' ridic, fix kthx)
+  return ir.EMPTY unless node.is
+
+  for k, v in pairs node
+    if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos' ]
+      continue
+    if (type v) == 'table'
+      if v.is -- it's a node
+        result = get_preceding_doc_recursive v
+        return result if result._doc_type != 'empty'
+      else -- it's an table
+        for item in *v
+          if (type item) == 'table' and item.is
+            result = get_preceding_doc_recursive item
+            return result if result._doc_type != 'empty'
+
+  ir.EMPTY
+
+-- check if a node's content is a block-containing construct (While, If, For, etc.)
+-- these need special handling for EOL comments - the comment should appear after
+-- the condition line, not after the entire block.
+is_block_containing = (node) ->
+  unless node
+    return false
+
+  node\is_any types.While,
+    types.For,
+    types.ForEach,
+    types.If,
+    types.Switch,
+    types.With,
+    types.Do,
+    types.Try,
+    types.ClassDecl
+
+-- Get EOL comment for a node as a text Doc.
+-- Returns empty doc if no EOL comment or already emitted.
+-- Reads from node._comments.eol (injected during association phase)
+get_eol_doc_for_node = (node) ->
+  comment = node._comments?.eol
+  return ir.EMPTY unless comment and not comment._emitted
+
+  comment._emitted = true
+  -- strip trailing whitespace from comment text
+  comment_text = comment.v\gsub '%s+$', ''
+  ir.cat ir.SPACE, ir.text(comment_text)
+
+-- Get EOL comment from a node or any of its descendants (depth-first).
+-- Used for container items (like table rows) where the EOL comment may be
+-- associated with a nested node rather than the item itself.
+get_eol_doc_recursive = (node) ->
+  return ir.EMPTY unless node and (type node) == 'table'
+
+  -- check the node itself first
+  if node._comments?.eol
+    comment = node._comments.eol
+    unless comment._emitted
+      comment._emitted = true
+      comment_text = comment.v\gsub '%s+$', ''
+      return ir.cat ir.SPACE, ir.text(comment_text)
+
+  return ir.EMPTY unless node.is
+
+  for k, v in pairs node
+    if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos' ]
+      continue
+    if (type v) == 'table'
+      if v.is -- it's a node
+        result = get_eol_doc_recursive v
+        return result if result._doc_type != 'empty'
+      else -- it's an array
+        for item in *v
+          if (type item) == 'table' and item.is
+            result = get_eol_doc_recursive item
+            return result if result._doc_type != 'empty'
+
+  ir.EMPTY
+
+-- get EOL comment for a specific source line as a text Doc (legacy).
+-- this is needed for cases where we don't have direct node access.
+-- returns empty doc if no unread EOL comments for that line.
+get_eol_doc = (line_num, ctx) ->
+  return ir.EMPTY unless line_num
+  ctx.emitted_eol_lines = ctx.emitted_eol_lines or {}
+  if ctx.emitted_eol_lines[line_num]
+    return ir.EMPTY
+
+  -- walk the nodes_by_line to find EOL comment for this line
+  -- since comments are now on nodes, we need to find the node with EOL comment for this line
+  -- this is a fallback - prefer get_eol_doc_for_node when possible
+  if ctx.eol_comments_by_line?[line_num]
+    comment = ctx.eol_comments_by_line[line_num]
+    unless comment._emitted
+      ctx.emitted_eol_lines[line_num] = true
+      comment._emitted = true
+      comment_text = comment.v\gsub '%s+$', ''
+      return ir.cat ir.SPACE, ir.text(comment_text)
+
+  ir.EMPTY
+
+-- get trailing comments for a node (inline block comments like --[[t]]).
+-- reads from node._comments.trailing (injected during association phase)
+get_trailing_doc = (node, ctx) ->
+  comments = node._comments?.trailing
+  return ir.EMPTY unless comments and #comments > 0
+
+  parts = {}
+  for c in *comments
+    unless c._emitted
+      c._emitted = true
+      parts[] = ir.SPACE
+      parts[] = ir.text c.v
+  ir.concat parts
+
+-- group items by source line number.
+-- returns list of groups, each group is a list of items from the same source line.
+group_items_by_line = (items) ->
+  groups = {}
+  cur_group = nil
+  cur_line = nil
+  for item in *items
+    item_line = item\g_src_line!
+    if item_line == cur_line and cur_group
+      cur_group[] = item
+    else
+      cur_group = { item }
+      groups[] = cur_group
+      cur_line = item_line
+  groups
+
+-- Check if there's a blank line gap between two consecutive items in source.
+has_blank_gap = (item_a, item_b, ctx) ->
+  return false unless ctx.source_lines
+  la = item_a\g_src_line!
+  lb = item_b\g_src_line!
+  return false unless la and lb and lb > la + 1
+  for ln = la + 1, lb - 1
+    src = ctx.source_lines[ln]
+    if src and src\match '^%s*$'
+      return true
+  false
+
+-- Build doc for a single "row" (items from the same source line).
+-- Uses fill for greedy packing within the row.
+-- is_last_row: true if this is the last row of items (affects trailing comma)
+-- trailing_comma: whether source had trailing comma on last item
+-- is_pair_row: whether items are key-value pairs (affects comma placement)
+build_row_doc = (gen, row_items, ctx, is_last_row, trailing_comma, is_pair_row, forced) ->
+  item_docs = {}
+  for j, item in ipairs row_items
+    is_last_in_row = j == #row_items
+    is_truly_last = is_last_row and is_last_in_row
+
+    item_doc = gen item, ctx
+
+    -- Get EOL comment for the last item in row
+    -- In forced mode, we emit it unconditionally (not wrapped in ifflat)
+    -- because fill uses render_flat which would drop ifflat comments.
+    -- Try recursive lookup first, then fall back to line-based lookup
+    -- (comment may be associated with a sibling on the same line).
+    eol_doc = ir.EMPTY
+    has_eol = false
+    if is_last_in_row and forced
+      -- First try recursive lookup on this item
+      eol_doc = get_eol_doc_recursive item
+      if eol_doc._doc_type == 'empty'
+        -- Fall back to line-based lookup for this row's line
+        item_line = item\g_src_line!
+        if item_line
+          eol_doc = get_eol_doc item_line, ctx
+      has_eol = eol_doc._doc_type != 'empty'
+
+    if is_truly_last
+      -- last item overall: preserve author's trailing comma choice
+      if trailing_comma
+        -- source had trailing comma: keep it
+        item_docs[] = ir.cat item_doc, ir.COMMA, eol_doc
+      elseif forced or is_pair_row
+        -- forced multiline or pair row without trailing comma: no comma
+        item_docs[] = ir.cat item_doc, eol_doc
+      else
+        -- may be flat: add trailing comma only in break mode
+        item_docs[] = ir.cat item_doc, ir.ifflat(ir.EMPTY, ir.COMMA), eol_doc
+    elseif is_last_in_row and not is_pair_row
+      -- last in non-pair row but not last overall: comma always (continuation)
+      -- EOL comment emitted unconditionally
+      item_docs[] = ir.cat item_doc, ir.COMMA, eol_doc
+    elseif is_last_in_row and is_pair_row
+      -- last in pair row but not last overall: comma in flat, none in break
+      item_docs[] = ir.cat item_doc, ir.ifflat(ir.COMMA, ir.EMPTY), eol_doc
+    elseif not is_pair_row
+      -- middle item in non-pair row: comma always
+      item_docs[] = ir.cat item_doc, ir.COMMA
+    else
+      -- middle item in pair row: comma in flat, none in break
+      item_docs[] = ir.cat item_doc, ir.ifflat(ir.COMMA, ir.EMPTY)
+
+  if #item_docs == 1
+    return item_docs[1]
+
+  -- use fill for same-line items
+  ir.fill ir.SPACE, item_docs
+
+-- Build the inner doc for container items (tables, arrays).
+-- Handles: above comments, blank gaps, row grouping, fill packing.
+-- forced output (caller wraps in group with forced flag based on this)
+build_container_items_doc = (gen_fn, items, ctx, trailing_comma, has_eol_for_opening, forced) ->
+  return ir.EMPTY if #items == 0
+
+  -- group items by source line
+  rows = group_items_by_line items
+
+  -- determine if any item has above comments (forces group break)
+  -- Now using node._comments.above directly
+  has_above_comments = false
+  for item in *items
+    aboves = item._comments?.above
+    if aboves and #aboves > 0
+      for c in *aboves
+        unless c._emitted
+          has_above_comments = true
+          break
+    break if has_above_comments
+
+  parts = {}
+  is_pair_row = false
+
+  for r, row in ipairs rows
+    is_last_row = r == #rows
+    first_item = row[1]
+
+    -- check if this row contains pairs
+    is_pair_row = is_pair_type first_item
+
+    -- above comments for first item of row (reads from node._comments.above)
+    above_doc = get_above_doc first_item, ctx
+    has_this_above = false
+    -- check if above_doc has content by checking if it's non-empty
+    -- (it returns ir.EMPTY which has _doc_type 'empty')
+    if above_doc._doc_type != 'empty'
+      has_this_above = true
+
+    -- blank gap before this row?
+    -- (unless the next row has above comments, which handle their own blank lines)
+    if r > 1 and not has_this_above
+      prev_row = rows[r - 1]
+      prev_item = prev_row[#prev_row]
+      if has_blank_gap prev_item, first_item, ctx
+        parts[] = ir.HARDLINE
+
+    -- above comments (may include extra hardline for blank before comment)
+    if has_this_above
+      parts[] = above_doc -- already has hardline at end
+
+    -- build the row doc
+    row_doc = build_row_doc gen_fn, row, ctx, is_last_row, trailing_comma, is_pair_row, forced
+    parts[] = row_doc
+
+    -- separator between rows (except after last row)
+    unless is_last_row
+      parts[] = ir.line ' '
+
+  ir.concat parts
+
+-- build a container doc: open + [spacing] + items + [spacing] + close.
+-- items_doc: the pre-built inner items doc
+-- forced: whether group should always break
+-- table_spacing: whether to add spaces around inline content
+gen_container_with_doc = (open, items_doc, close, forced, table_spacing) ->
+  open_space = if table_spacing then ir.line ' ' else ir.line ''
+  close_space = if table_spacing then ir.line ' ' else ir.line ''
+
+  ir.cat(
+    ir.text(open),
+    ir.group(
+      ir.cat(
+        ir.nest(2, ir.cat(open_space, items_doc)),
+        close_space
+      ),
+      forced
+    ),
+    ir.text(close)
+  )
+
+generators = {}
+
+-- generate a Doc from an AST node.
+-- node: root AST node (typically File)
+-- ctx: context table with comment_data, source_lines, table_spacing, emitted_eol_lines
+gen = (node, ctx) ->
+  return ir.EMPTY unless node
+
+  -- handle raw strings/values (leaf nodes that are just strings)
+  unless node.is
+    return ir.text tostring node
+
+  typ = node\g_yue_name!
+  generator = generators[typ]
+
+  if generator
+    generator node, ctx, gen
+  else
+    if node.v
+      ir.text node.v
+    elseif typ
+      error "unhandled node type #{ typ }"
+    else
+      ir.EMPTY
+
+--[[ leaf node generators ]]
+generators.Num = (node, ctx) ->
+  ir.cat ir.text(node.v), get_trailing_doc(node, ctx)
+
+generators.Name = (node, ctx) ->
+  ir.cat ir.text(node.v), get_trailing_doc(node, ctx)
+
+generators.UnicodeName = (node, ctx) ->
+  ir.cat ir.text(node.v), get_trailing_doc(node, ctx)
+
+generators.Self = (node, ctx) ->
+  ir.cat ir.text('@'), get_trailing_doc(node, ctx)
+
+generators.ConstValue = (node, ctx) ->
+  ir.cat ir.text(node.v), get_trailing_doc(node, ctx)
+
+generators.VarArg = (node, ctx) ->
+  ir.text '...'
+
+generators.VarArgDef = (node, ctx) ->
+  ir.text '...'
+
+generators.UnaryOperator = (node, ctx) ->
+  ir.text node.v
+
+generators.BinaryOperator = (node, ctx) ->
+  op = node.v
+  op = '!=' if op == '~='
+  ir.text op
+
+generators.ExistentialOp = (node, ctx) ->
+  ir.text '?'
+
+generators.TableAppendingOp = (node, ctx) ->
+  ir.text '[]'
+
+generators.Break = (node, ctx) ->
+  ir.text 'break'
+
+generators.Continue = (node, ctx) ->
+  ir.text 'continue'
+
+generators.IfType = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.WhileType = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.In = (node, ctx) ->
+  ir.text 'in'
+
+generators.NotIn = (node, ctx) ->
+  ir.text 'not in'
+
+generators.StatementSep = (node, ctx) ->
+  ir.text ';'
+
+generators.BlockEnd = (node, ctx) ->
+  ir.EMPTY
+
+generators.FmtWhitespace = (node, ctx) ->
+  ir.EMPTY
+
+generators.EmptyLine = (node, ctx) ->
+  ir.HARDLINE
+
+generators.GlobalOp = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.LocalFlag = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.ConstAttrib = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.CloseAttrib = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.FnArrow = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.FnArrowBack = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.ExportDefault = (node, ctx) ->
+  ir.text 'default'
+
+generators.Metatable = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.ImportAllMacro = (node, ctx) ->
+  ir.text '$'
+
+generators.ImportAllGlobal = (node, ctx) ->
+  ir.text '*'
+
+generators.ImportLiteralInner = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.LuaStringOpen = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.LuaStringContent = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.LuaStringClose = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.YueComment = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.YueLineComment = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.YueMultilineComment = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.MacroName = (node, ctx, gen) ->
+  ir.cat ir.text('$'), gen(node.name, ctx)
+
+generators.Metamethod = (node, ctx, gen) ->
+  if node.item\is types.Exp
+    ir.cat ir.text('<['), gen(node.item, ctx), ir.text(']>')
+  else
+    ir.cat ir.text('<'), gen(node.item, ctx), ir.text('>')
+
+generators.MetaVariablePair = (node, ctx, gen) ->
+  ir.cat ir.text(':<'), gen(node.name, ctx), ir.text('>')
+
+generators.MetaVariablePairDef = (node, ctx, gen) ->
+  pair_doc = gen node.pair, ctx
+  if node.defVal
+    ir.cat pair_doc, ir.text(' = '), gen(node.defVal, ctx)
+  else
+    pair_doc
+
+--[[ string generators ]]
+generators.SingleString = (node, ctx) ->
+  v = node.v
+  -- normalize to single quotes if possible
+  if v\match "^'" or v\match '^"'
+    ir.text v
+  else
+    ir.cat ir.text("'"), ir.text(v), ir.text("'")
+
+generators.LuaString = (node, ctx, gen) ->
+  open_doc = gen node.open, ctx
+
+  open_line = node.open\g_src_line!
+  close_line = node.close\g_src_line!
+  source_lines = ctx.source_lines
+
+  -- multiline: extract content from source to preserve indentation
+  if source_lines and open_line and close_line and close_line > open_line
+    parts = { open_doc }
+    for ln = open_line, close_line
+      src = source_lines[ln]
+      if ln == open_line
+        open_col = node.open\g_src_col!
+        open_len = #node.open.v
+        after_open = src\sub(open_col + open_len)
+        parts[] = ir.text after_open if #after_open > 0
+      elseif ln == close_line
+        close_col = node.close\g_src_col!
+        before_close = src\sub(1, close_col - 1)
+        parts[] = ir.literalline!
+        parts[] = ir.text before_close if #before_close > 0
+      else
+        parts[] = ir.literalline!
+        parts[] = ir.text src
+    parts[] = gen node.close, ctx
+    return ir.concat parts
+  elseif node.content
+    unless open_line == node.content\g_src_line!
+      return ir
+        .cat open_doc, ir
+            .literalline!, ir.text(node.content.v), gen(node.close, ctx)
+    return ir.cat open_doc, ir.text(node.content.v), gen(node.close, ctx)
+
+  ir.cat open_doc, gen(node.close, ctx)
+
+generators.DoubleString = (node, ctx) ->
+  -- yue ast does not preserve interpolated strings or leading/trailing whitespace.
+  -- extract from source when possible.
+  src_line = node\g_src_line!
+  src_col = node\g_src_col!
+
+  if src_line and src_col and ctx.source_lines
+    line = ctx.source_lines[src_line]
+    if line
+      str_start = line\find '"', src_col
+      if str_start
+        current_line = src_line
+        pos = str_start + 1
+        found = false
+        original_str = nil
+
+        until found
+          current_line_text = ctx.source_lines[current_line]
+          break unless current_line_text
+
+          if current_line > src_line
+            pos = 1
+
+          while pos <= #current_line_text
+            ch = current_line_text\sub pos, pos
+            if ch == '\\'
+              pos += 2
+            elseif ch == '"'
+              found = true
+              if current_line == src_line
+                original_str = line\sub str_start, pos
+              else
+                original_str = line\sub str_start
+                for ln = src_line + 1, current_line - 1
+                  original_str ..= '\n' .. ctx.source_lines[ln]
+                original_str ..= '\n' .. current_line_text\sub 1, pos
+              break
+            else
+              pos += 1
+
+          unless found
+            if pos > #current_line_text
+              current_line += 1
+              pos = 1
+            else
+              break
+
+        if found and original_str
+          is_multiline = current_line > src_line
+          content = original_str\sub 2, -2
+          unless is_multiline or (original_str\find '#{', 1, true) or
+             (content\find "'", 1, true)
+            return ir.cat ir.text("'"), ir.text(content), ir.text("'")
+          else
+            -- multiline string: preserve with hardlines
+            if is_multiline
+              parts = {}
+              lines = {}
+              -- split original_str into lines
+              for ln in original_str\gmatch '[^\n]*'
+                lines[] = ln
+              for i, ln in ipairs lines
+                if i == 1
+                  parts[] = ir.text ln
+                else
+                  parts[] = ir.literalline!
+                  parts[] = ir.text ln
+              return ir.concat parts
+            return ir.text original_str
+
+  -- fallback: use AST content
+  content = ''
+  if node.segments
+    for seg in *node.segments
+      if seg.content and seg.content.v
+        content ..= seg.content.v
+
+  if content\find "'", 1, true
+    ir.cat ir.text('"'), ir.text(content), ir.text('"')
+  else
+    ir.cat ir.text("'"), ir.text(content), ir.text("'")
+
+generators.DoubleStringContent = (node, ctx, gen) ->
+  gen node.content, ctx
+
+generators.DoubleStringInner = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.Interpolation = (node, ctx, gen) ->
+  ir.cat ir.text('#{'), gen(node.value, ctx), ir.text('}')
+
+generators.String = (node, ctx, gen) ->
+  gen node.str, ctx
+
+--[[ ident generators ]]
+generators.Variable = (node, ctx, gen) ->
+  ir.cat gen(node.name, ctx), get_trailing_doc(node, ctx)
+
+generators.SelfName = (node, ctx, gen) ->
+  ir.cat ir.text('@'), gen(node.name, ctx)
+
+generators.SelfItem = (node, ctx, gen) ->
+  gen node.name, ctx
+
+generators.SelfClass = (node, ctx) ->
+  ir.text '@@'
+
+generators.SelfClassName = (node, ctx, gen) ->
+  ir.cat ir.text('@@'), gen(node.name, ctx)
+
+generators.KeyName = (node, ctx, gen) ->
+  gen node.name, ctx
+
+--[[ expression generators ]]
+-- Helper to build a single pipe chain doc (handles |> between pipeExprs)
+-- For now, keep pipes simple (rigid concatenation) to preserve existing behavior.
+-- Line-width-aware pipe breaking can be added later.
+build_pipe_chain = (pipe_exprs, ctx, gen) ->
+  return ir.EMPTY if #pipe_exprs == 0
+  return gen pipe_exprs[1], ctx if #pipe_exprs == 1
+
+  -- Simple concatenation for pipes (original behavior)
+  parts = {}
+  for i, pipe in ipairs pipe_exprs
+    parts[] = ir.text ' |> ' if i > 1
+    parts[] = gen pipe, ctx
+  ir.concat parts
+
+generators.Exp = (node, ctx, gen) ->
+  -- First, build the initial pipe chain
+  first_operand = build_pipe_chain node.pipeExprs, ctx, gen
+
+  -- If no binary operators, just return the pipe chain
+  unless node.opValues and #node.opValues > 0
+    -- Handle nil coalescing if present
+    if node.nilCoalesed
+      return ir.cat first_operand, ir.text(' ?? '), gen(node.nilCoalesed, ctx)
+    return first_operand
+
+  -- Collect all operands and operators for binary expression
+  operands = { first_operand }
+  operators = {}
+
+  for op_val in *node.opValues
+    operators[] = gen op_val.op, ctx -- get formatted operator doc
+    -- Build the operand (which may itself be a pipe chain)
+    operand_doc = build_pipe_chain op_val.pipeExprs, ctx, gen
+    operands[] = operand_doc
+
+  -- Use breakable_binop_trailing: operators stay at end of line when broken
+  result = ir.breakable_binop_trailing operands, operators, 3
+
+  -- Handle nil coalescing if present
+  if node.nilCoalesed
+    result = ir.cat result, ir.text(' ?? '), gen(node.nilCoalesed, ctx)
+
+  result
+
+generators.UnaryExp = (node, ctx, gen) ->
+  parts = {}
+  if node.ops
+    for op in *node.ops
+      parts[] = gen op, ctx
+      parts[] = ir.SPACE if op.v == 'not'
+
+  for i, val in ipairs node.expos
+    parts[] = ir.text '^' if i > 1
+    parts[] = gen val, ctx
+
+  if node.inExp
+    parts[] = ir.text ' in '
+    parts[] = gen node.inExp.value, ctx
+
+  ir.concat parts
+
+generators.ExpOpValue = (node, ctx, gen) ->
+  gen node.op, ctx
+
+generators.Value = (node, ctx, gen) ->
+  gen node.item, ctx
+
+generators.SimpleValue = (node, ctx, gen) ->
+  gen node.value, ctx
+
+generators.PlainItem = (node, ctx, gen) ->
+  if node.item then gen node.item, ctx else ir.EMPTY
+
+generators.UnaryValue = (node, ctx, gen) ->
+  if node.value then gen node.value, ctx else ir.EMPTY
+
+generators.StarExp = (node, ctx, gen) ->
+  ir.cat ir.text('*'), gen(node.value, ctx)
+
+generators.SpreadExp = (node, ctx, gen) ->
+  ir.cat ir.text('...'), gen(node.exp, ctx)
+
+generators.SpreadListExp = (node, ctx, gen) ->
+  ir.cat ir.text('...'), gen(node.exp, ctx)
+
+-- helper to generate doc for a single chain item
+gen_chain_item = (item, ctx, gen) ->
+  parts = {}
+  switch true
+    when item\is types.Callable
+      parts[] = gen item, ctx
+    when item\is types.DotChainItem
+      -- check for preceding comments on the name (handles --[[comment]] .x)
+      prec_doc = get_preceding_doc item.name, ctx
+      if prec_doc._doc_type != 'empty'
+        parts[] = prec_doc
+      parts[] = ir.text '.'
+      parts[] = gen item.name, ctx
+    when item\is types.ColonChainItem
+      -- check for preceding comments on the name (handles --[[comment]] \x!)
+      prec_doc = get_preceding_doc item.name, ctx
+      if prec_doc._doc_type != 'empty'
+        parts[] = prec_doc
+      parts[] = ir.text '\\'
+      parts[] = gen item.name, ctx
+    when item\is types.Invoke
+      is_empty_call = false
+      if item.args and #item.args == 1
+        arg = item.args[1]
+        if (arg\is types.SingleString) and arg.v == '!'
+          is_empty_call = true
+      if is_empty_call
+        parts[] = ir.text '!'
+      elseif is_single_noparen_arg item
+        parts[] = gen item.args[1], ctx
+      elseif item.args and #item.args > 0
+        invoke_first_line = item.args[1]\g_src_line!
+        invoke_last_line = item.args[#item.args]\g_src_line!
+        is_multiline_invoke = invoke_first_line and invoke_last_line and
+           invoke_last_line != invoke_first_line
+
+        parts[] = ir.text '('
+        if is_multiline_invoke
+          first_is_multiline_table = is_first_arg_multiline_table item
+          should_nest = not first_is_multiline_table
+          arg_parts = {}
+          for j, arg in ipairs item.args
+            -- Get preceding inline comments (--[[x]] before arg on same line)
+            pre_inline = get_preceding_doc_recursive arg
+            eol_d = get_eol_doc arg\g_src_line!, ctx
+            arg_doc = ir.cat pre_inline, gen(arg, ctx), eol_d
+            if j < #item.args
+              arg_doc = ir.cat arg_doc, ir.COMMA
+            arg_parts[] = arg_doc
+          inner = ir.join ir.HARDLINE, arg_parts
+          if should_nest
+            parts[] = ir.nest 2, ir.cat(ir.HARDLINE, inner)
+          else
+            parts[] = ir.cat ir.HARDLINE, inner
+          parts[] = ir.HARDLINE
+        else
+          -- Use breakable_args for line-width-aware breaking
+          arg_docs = [ gen(arg, ctx) for arg in *item.args ]
+          parts[] = ir.breakable_args arg_docs
+        parts[] = ir.text ')'
+      else
+        parts[] = ir.text '!'
+    when item\is types.InvokeArgs
+      parts[] = gen item, ctx
+    when item\is types.Slice
+      parts[] = gen item, ctx
+    when item\is types.Exp
+      -- brackets: x[expr]
+      parts[] = ir.text '['
+      if is_stupid_luastring item
+        parts[] = ir.SPACE
+      parts[] = gen item, ctx
+      if is_stupid_luastring item
+        parts[] = ir.SPACE
+      parts[] = ir.text ']'
+    when item\is types.String
+      parts[] = gen item, ctx
+    when item\is types.ExistentialOp
+      parts[] = ir.text '?'
+    when item\is types.TableAppendingOp
+      parts[] = ir.text '[]'
+    when item\is types.ReversedIndex
+      parts[] = gen item, ctx
+    else
+      parts[] = gen item, ctx
+  ir.concat parts
+
+generators.ChainValue = (node, ctx, gen) ->
+  items = node.items
+
+  -- detect multiline chains: chain items on different source lines
+  first_line = items[1] and items[1]\g_src_line!
+  is_multiline_chain = false
+  if first_line
+    for i = 2, #items
+      item_line = items[i]\g_src_line!
+      if item_line and item_line != first_line
+        if items[i]\is_any types.DotChainItem, types.ColonChainItem
+          is_multiline_chain = true
+          break
+
+  -- for multiline source chains, preserve the original formatting with HARDLINE
+  if is_multiline_chain
+    parts = {}
+    did_nest = false
+    for i, item in ipairs items
+      if i > 1 and item\is_any types.DotChainItem, types.ColonChainItem
+        item_line = item\g_src_line!
+        prev_line = items[i - 1]\g_src_line!
+        if item_line and prev_line and item_line != prev_line
+          unless did_nest
+            did_nest = true
+          parts[] = ir.HARDLINE
+      parts[] = gen_chain_item item, ctx, gen
+    inner = ir.concat parts
+    return ir.nest 2, inner
+
+  -- for single-line source chains, use breakable_chain for line-width-aware breaking
+  -- group items into segments: a new segment starts at each DotChainItem or ColonChainItem
+  segments = {}
+  current_segment = {}
+
+  for i, item in ipairs items
+    -- start new segment at DotChainItem or ColonChainItem (except for first item)
+    if i > 1 and item\is_any types.DotChainItem, types.ColonChainItem
+      -- finish current segment
+      if #current_segment > 0
+        segments[] = ir
+          .concat [ gen_chain_item(it, ctx, gen) for it in *current_segment ]
+      current_segment = { item }
+    else
+      current_segment[] = item
+
+  -- Don't forget the last segment
+  if #current_segment > 0
+    segments[] = ir
+      .concat [ gen_chain_item(it, ctx, gen) for it in *current_segment ]
+
+  -- Use breakable_chain for line-width-aware breaking
+  ir.breakable_chain segments
+
+generators.Callable = (node, ctx, gen) ->
+  gen node.item, ctx
+
+generators.Invoke = (node, ctx, gen) ->
+  -- Invoke without parens (standalone)
+  if node.args and #node.args == 1
+    arg = node.args[1]
+    if (arg\is types.SingleString) and arg.v == '!'
+      return ir.text '!'
+
+  if is_single_noparen_arg node
+    return gen node.args[1], ctx
+
+  if node.args and #node.args > 0
+    arg_docs = [ gen(arg, ctx) for arg in *node.args ]
+    -- Use breakable_args for line-width-aware breaking
+    -- When broken, format as: func(arg1,
+    --                              arg2,
+    --                              arg3)
+    inner = ir.breakable_args arg_docs
+    return ir.cat ir.text('('), inner, ir.text(')')
+  else
+    ir.text '!'
+
+generators.InvokeArgs = (node, ctx, gen) ->
+  parts = {}
+
+  unless node.args?[1]?\is types.TableBlock
+    parts[] = ir.SPACE
+
+  if node.args
+    first_line = node.args[1]\g_src_line!
+    last_line = node.args[#node.args]\g_src_line!
+    is_multiline = first_line and last_line and last_line != first_line
+
+    -- check if first arg is a multiline table
+    first_is_multiline_table = false
+    if node.args[1] and node.args[1].is
+      arg1 = node.args[1]
+      if (arg1\is types.Exp) and arg1.pipeExprs
+        unary = arg1.pipeExprs[1]
+        if unary and unary.expos
+          val = unary.expos[1]
+          if val and val.item and val.item.is and (val.item\is types.SimpleValue)
+            sv = val.item
+            if sv.value and sv.value.is and (sv.value\is types.TableLit)
+              tbl = sv.value
+              tbl_start = tbl\g_src_line!
+              if tbl.values and #tbl.values > 0
+                for tval in *tbl.values
+                  if tval\g_src_line! != tbl_start
+                    first_is_multiline_table = true
+                    break
+              -- also check if the table spans multiple lines via nested content
+              -- (e.g., { { type: 'FOO!' ... } } where inner table is multiline)
+              unless first_is_multiline_table
+                if #node.args > 1
+                  next_arg_line = node.args[2]\g_src_line!
+                  if next_arg_line and tbl_start and next_arg_line > tbl_start + 1
+                    first_is_multiline_table = true
+                elseif last_line and tbl_start and last_line > tbl_start
+                  first_is_multiline_table = true
+
+    should_nest = is_multiline and not first_is_multiline_table
+    if should_nest
+      arg_parts = {}
+      for i, arg in ipairs node.args
+        arg_line = arg\g_src_line!
+        arg_col = arg\g_src_col!
+
+        if i > 1
+          arg_parts[] = ir.COMMA
+
+          if is_multiline
+            should_newline = true
+            if ctx.source_lines and arg_line and arg_col
+              line_content = ctx.source_lines[arg_line]
+              if line_content
+                before_arg = line_content\sub 1, arg_col - 1
+                has_comma_on_line = before_arg\match ','
+                if has_comma_on_line
+                  should_newline = false
+
+            if should_newline
+              arg_parts[] = ir.HARDLINE
+            else
+              arg_parts[] = ir.SPACE
+          else
+            arg_parts[] = ir.SPACE
+
+        arg_parts[] = gen arg, ctx
+
+        if is_multiline and arg_line and arg_line != first_line
+          arg_parts[] = get_eol_doc arg_line, ctx
+
+      parts[] = ir.nest 2, ir.concat(arg_parts)
+    else
+      for i, arg in ipairs node.args
+        parts[] = ir.COMMA if i > 1
+        parts[] = ir.SPACE if i > 1
+        parts[] = gen arg, ctx
+
+  ir.concat parts
+
+generators.DotChainItem = (node, ctx, gen) ->
+  ir.cat ir.text('.'), gen(node.name, ctx)
+
+generators.ColonChainItem = (node, ctx, gen) ->
+  ir.cat ir.text('\\'), gen(node.name, ctx)
+
+generators.ReversedIndex = (node, ctx, gen) ->
+  parts = { ir.text '[#' }
+  if node.modifier
+    parts[] = ir.text ' - '
+    parts[] = gen node.modifier, ctx
+  parts[] = ir.text ']'
+  ir.concat parts
+
+--[[ assignment generators ]]
+generators.ExpListAssign = (node, ctx, gen) ->
+  parts = { gen(node.expList, ctx) }
+  if node.action
+    parts[] = ir.SPACE
+    parts[] = gen node.action, ctx
+  ir.concat parts
+
+generators.ExpList = (node, ctx, gen) ->
+  parts = {}
+  for i, expr in ipairs node.exprs
+    parts[] = gen expr, ctx
+    parts[] = ir.text ', ' if i < #node.exprs
+  ir.concat parts
+
+generators.ExpListLow = (node, ctx, gen) ->
+  parts = {}
+  for i, exp in ipairs node.exprs
+    parts[] = gen exp, ctx
+    parts[] = ir.text ', ' if i < #node.exprs
+  ir.concat parts
+
+generators.Assign = (node, ctx, gen) ->
+  op = if ctx?.walrus_assign
+    ':='
+  else
+    node.op?.v or '='
+
+  parts = {
+    ir.text op,
+    ir.SPACE,
+  }
+
+  if node.values
+    for i, val in ipairs node.values
+      parts[] = gen val, ctx
+      parts[] = ir.text ', ' if i < #node.values
+  ir.concat parts
+
+generators.Update = (node, ctx, gen) ->
+  ir.cat (gen node.op, ctx), (ir.text '= '), (gen node.value, ctx)
+
+generators.UpdateOp = (node, ctx) ->
+  ir.text node.v
+
+generators.NameList = (node, ctx, gen) ->
+  parts = {}
+  for i, n in ipairs node.names
+    parts[] = gen n, ctx
+    parts[] = ir.text ', ' if i < #node.names
+  ir.concat parts
+
+generators.AssignableNameList = (node, ctx, gen) ->
+  parts = {}
+  for i, n in ipairs node.items
+    parts[] = gen n, ctx
+    parts[] = ir.text ', ' if i < #node.items
+  ir.concat parts
+
+generators.NameOrDestructure = (node, ctx, gen) ->
+  gen node.item, ctx
+
+generators.AssignableChain = (node, ctx, gen) ->
+  parts = {}
+  for i, item in ipairs node.items
+    if item\is types.DotChainItem
+      parts[] = ir.text '.' if i > 1
+      parts[] = gen item.name, ctx
+    elseif item\is types.Exp
+      parts[] = ir.text '['
+      parts[] = gen item, ctx
+      parts[] = ir.text ']'
+    else
+      parts[] = gen item, ctx
+  ir.concat parts
+
+generators.Assignable = (node, ctx, gen) ->
+  gen node.item, ctx
+
+generators.Assignment = (node, ctx, gen) ->
+  parts = {}
+  parts[] = gen node.expList, ctx if node.expList
+  parts[] = gen node.assign, ctx
+  ir.concat parts
+
+generators.ChainAssign = (node, ctx, gen) ->
+  parts = {}
+  for i, expr in ipairs node.exprs
+    parts[] = gen expr, ctx
+    parts[] = ir.text ' = ' if i < #node.exprs
+  parts[] = ir.SPACE
+  parts[] = gen node.assign, ctx
+  ir.concat parts
+
+generators.Backcall = (node, ctx, gen) ->
+  parts = {}
+  if node.argsDef
+    parts[] = ir.text '('
+    parts[] = gen node.argsDef, ctx
+    parts[] = ir.text ') '
+  parts[] = gen node.arrow, ctx
+  parts[] = ir.SPACE
+  parts[] = gen node.value, ctx
+  ir.concat parts
+
+generators.SubBackcall = (node, ctx, gen) ->
+  ir.cat gen(node.arrow, ctx), ir.SPACE, gen(node.value, ctx)
+
+--[[ table generators ]]
+generators.TableLit = (node, ctx, gen) ->
+  table_line = node\g_src_line!
+  -- Check if this table or any nested table spans multiple lines
+  is_source_multiline = table_spans_multiple_lines node
+
+  -- check for above/eol comments that force break
+  has_forced_comment = false
+  if ctx?.comment_data and node.values
+    for val in *node.values
+      aboves = ctx.comment_data\get_comments val, 'above'
+      for c in *aboves
+        unless c._emitted
+          has_forced_comment = true
+          break
+      break if has_forced_comment
+
+  trailing_comma = has_trailing_comma node, ctx, '{', '}'
+  forced = is_source_multiline or has_forced_comment
+
+  if not node.values or #node.values == 0
+    return ir.text '{}'
+
+  -- EOL comment on opening brace line (for multiline tables)
+  eol_open_doc = if is_source_multiline then get_eol_doc table_line, ctx else ir
+    .EMPTY
+
+  items_doc = build_container_items_doc gen, node
+      .values, ctx, trailing_comma, is_source_multiline, forced
+  table_spacing = ctx?.table_spacing ?? true
+
+  result = gen_container_with_doc '{', items_doc, '}', forced, table_spacing
+
+  if is_source_multiline and eol_open_doc._doc_type != 'empty'
+    -- insert EOL comment after opening brace: {<eol>\n  items\n}
+    -- this is done by inserting eol_open_doc before the items group.
+    -- we rebuild the container with the EOL on the opening line
+    ir.cat(
+      ir.text('{'),
+      eol_open_doc,
+      ir.group(
+        ir.cat(
+          ir.nest(2, ir.cat(ir.line(''), items_doc)),
+          ir.line('')
+        ),
+        forced
+      ),
+      ir.text('}')
+    )
+  else
+    result
+
+generators.TableValue = (node, ctx, gen) ->
+  gen node.value, ctx
+
+generators.KeyValue = (node, ctx, gen) ->
+  ir.cat (gen node.key, ctx), (ir.text ': '), (gen node.value, ctx)
+
+generators.NormalDef = (node, ctx, gen) ->
+  parts = { gen(node.item, ctx) }
+  if node.defVal
+    parts[] = ir.text ' = '
+    parts[] = gen node.defVal, ctx
+  ir.concat parts
+
+generators.NormalPairDef = (node, ctx, gen) ->
+  parts = { gen(node.pair, ctx) }
+  if node.defVal
+    parts[] = ir.text ' = '
+    parts[] = gen node.defVal, ctx
+  ir.concat parts
+
+generators.NormalPair = (node, ctx, gen) ->
+  key = node.key
+  value_is_multiline = node.value and
+     node.value\is_any types.TableBlock, types.FunLit
+
+  -- EOL comment is on the NormalPair node itself
+  eol_or_space = if value_is_multiline
+    eol_doc = get_eol_doc_for_node node
+    if eol_doc.t != 'empty' then eol_doc else ir.text '\n'
+  else
+    ir.SPACE
+
+  if key?\is types.Exp
+    simple_str = extract_simple_string key
+    if simple_str and is_valid_identifier simple_str
+      return ir
+        .cat ir.text(simple_str), ir.text(':'), eol_or_space, gen(node.value, ctx)
+
+    -- non-simplifiable key with brackets
+    bracket_parts = { ir.text '[' }
+    if is_stupid_luastring key
+      bracket_parts[] = ir.SPACE
+    bracket_parts[] = gen key, ctx
+    if is_stupid_luastring key
+      bracket_parts[] = ir.SPACE
+    bracket_parts[] = ir.text ']:'
+    bracket_parts[] = eol_or_space
+    bracket_parts[] = gen node.value, ctx
+    return ir.concat bracket_parts
+
+  -- default: key is KeyName
+  ir.cat (gen key, ctx), (ir.text ':'), eol_or_space, (gen node.value, ctx)
+
+generators.VariablePair = (node, ctx, gen) ->
+  ir.cat (ir.text ':'), (gen node.name, ctx)
+
+generators.VariablePairDef = (node, ctx, gen) ->
+  parts = { gen(node.pair, ctx) }
+  if node.defVal
+    parts[] = ir.text ' = '
+    parts[] = gen node.defVal, ctx
+  ir.concat parts
+
+generators.MetaNormalPair = (node, ctx, gen) ->
+  parts = { ir.text '<' }
+  if node.key and node.value
+    if node.key\is types.Exp
+      parts[] = ir.text '['
+      parts[] = gen node.key, ctx
+      parts[] = ir.text ']'
+    else
+      parts[] = gen node.key, ctx
+    parts[] = ir.text '>: '
+    parts[] = gen node.value, ctx
+  elseif node.key
+    parts[] = ir.text '>: '
+    parts[] = gen node.key, ctx
+  else
+    parts[] = ir.text '>: '
+    parts[] = gen node.value, ctx
+  ir.concat parts
+
+generators.MetaNormalPairDef = (node, ctx, gen) ->
+  parts = { gen(node.pair, ctx) }
+  if node.defVal
+    parts[] = ir.text ' = '
+    parts[] = gen node.defVal, ctx
+  ir.concat parts
+
+generators.SimpleTable = (node, ctx, gen) ->
+  parts = {}
+  for i, pair in ipairs node.pairs
+    parts[] = gen pair, ctx
+    parts[] = ir.text ', ' if i < #node.pairs
+  ir.concat parts
+
+generators.TableBlock = (node, ctx, gen) ->
+  -- indented table syntax: * item or key: value
+  parts = { ir.HARDLINE }
+  for i, val in ipairs node.values
+    above_doc = get_above_doc val, ctx
+    if above_doc._doc_type != 'empty'
+      parts[] = above_doc
+
+    unless is_pair_type val
+      parts[] = ir.text '* '
+
+    parts[] = gen val, ctx
+    eol = get_eol_doc val\g_src_line!, ctx
+    parts[] = eol if eol._doc_type != 'empty'
+
+    parts[] = ir.HARDLINE if i < #node.values
+
+  ir.nest 2, ir.concat(parts)
+
+generators.TableBlockIndent = (node, ctx, gen) ->
+  parts = {}
+  for i, val in ipairs node.values
+    if i > 1
+      parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(val, ctx))
+    else
+      parts[] = gen val, ctx
+  ir.concat parts
+
+--[[ function generators ]]
+generators.FunLit = (node, ctx, gen) ->
+  defList = node.argsDef?.defList
+  shadowOption = node.argsDef?.shadowOption
+
+  has_defs = false
+  if defList?.definitions and #defList.definitions > 0
+    for def in *defList.definitions
+      continue unless def.name
+      typ = def.name.typ
+      if typ == 'SelfItem' or typ == 'TableLit' or typ == 'SimpleTable'
+        has_defs = true
+        break
+      elseif typ == 'Variable' and def.name.name?.v and def.name.name.v != ''
+        has_defs = true
+        break
+
+  has_vararg = defList?.varArg
+  has_args = has_defs or has_vararg
+  has_using = shadowOption != nil
+  has_explicit_parens = node.argsDef != nil and not has_args and not has_using
+
+  parts = {}
+  if has_args or has_using or has_explicit_parens
+    parts[] = ir.text '('
+    parts[] = gen defList, ctx if has_args
+    if has_using
+      parts[] = ir.SPACE if has_args
+      parts[] = gen shadowOption, ctx
+    parts[] = ir.text ')'
+
+  if node.defaultReturn
+    parts[] = ir.text ':'
+    parts[] = gen node.defaultReturn, ctx
+
+  if has_args or has_using or has_explicit_parens or node.defaultReturn
+    parts[] = ir.SPACE
+
+  arrow = node.arrow?.v or '->'
+  parts[] = ir.text arrow
+
+  if node.body
+    content = node.body.content
+    is_inline = content and content\is types.Statement
+    if is_inline
+      parts[] = ir.SPACE
+      parts[] = gen content, ctx
+    else
+      parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+
+  ir.concat parts
+
+generators.FnArgDefList = (node, ctx, gen) ->
+  has_defs = node.definitions and #node.definitions > 0
+  has_vararg = node.varArg
+
+  parts = {}
+  if has_defs
+    for i, arg in ipairs node.definitions
+      parts[] = gen arg, ctx
+      parts[] = get_trailing_doc arg, ctx
+      parts[] = ir.text ', ' if i < #node.definitions or has_vararg
+
+  if has_vararg
+    parts[] = gen node.varArg, ctx
+
+  ir.concat parts
+
+generators.FnArgDef = (node, ctx, gen) ->
+  parts = { gen(node.name, ctx) }
+  if node.name
+    parts[] = get_trailing_doc node.name, ctx
+
+  if node.label
+    parts[] = ir.text '`'
+    parts[] = gen node.label, ctx
+
+  if node.defaultValue
+    parts[] = ir.text ' = '
+    parts[] = gen node.defaultValue, ctx
+
+  ir.concat parts
+
+generators.DefaultValue = (node, ctx, gen) ->
+  gen node.value, ctx
+
+generators.FnArgsDef = (node, ctx, gen) ->
+  parts = {}
+  parts[] = gen node.defList, ctx if node.defList
+  parts[] = gen node.shadowOption, ctx if node.shadowOption
+  ir.concat parts
+
+generators.OuterVarShadow = (node, ctx, gen) ->
+  if node.varList
+    ir.cat ir.text('using '), gen(node.varList, ctx)
+  else
+    ir.text 'using nil'
+
+generators.IfLine = (node, ctx, gen) ->
+  ir.cat ir.text(node.type.v), ir.SPACE, gen(node.condition, ctx)
+
+generators.WhileLine = (node, ctx, gen) ->
+  ir.cat ir.text(node.type.v), ir.SPACE, gen(node.condition, ctx)
+
+generators.If = (node, ctx, gen) ->
+  nodes = node.nodes or {}
+  iftyp = node.type?.v or 'if'
+
+  i = 1
+  first = true
+  parts = {}
+
+  while i <= #nodes
+    item = nodes[i]
+    if item\is types.IfCond
+      if first
+        parts[] = ir.text iftyp
+        parts[] = ir.SPACE
+        first = false
+      else
+        above_doc = get_above_doc item, ctx
+        if above_doc._doc_type != 'empty'
+          parts[] = above_doc
+        parts[] = ir.text 'elseif '
+
+      parts[] = gen item, ctx
+
+      cond_line = item\g_src_line!
+      next_node = i + 1 <= #nodes and nodes[i + 1] or nil
+      is_inline = next_node and (next_node\is types.Statement) and
+         next_node\g_src_line! == cond_line
+
+      if is_inline
+        -- inline ternary form
+        parts[] = ir.text ' then '
+        i += 1
+        parts[] = gen nodes[i], ctx
+
+        while i + 1 <= #nodes
+          next_item = nodes[i + 1]
+          if (next_item\is types.IfCond) and next_item\g_src_line! == cond_line
+            parts[] = ir.text ' elseif '
+            i += 1
+            parts[] = gen nodes[i], ctx
+            if i + 1 <= #nodes and (nodes[i + 1]\is types.Statement) and
+               nodes[i + 1]\g_src_line! == cond_line
+              parts[] = ir.text ' then '
+              i += 1
+              parts[] = gen nodes[i], ctx
+          elseif (next_item\is types.Statement) and next_item\g_src_line! ==
+             cond_line
+            parts[] = ir.text ' else '
+            i += 1
+            parts[] = gen nodes[i], ctx
+            break
+          elseif next_item\is types.Block
+            parts[] = ir.text ' else'
+            i += 1
+            parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(nodes[i], ctx))
+            break
+          else
+            break
+      else
+        -- block form
+        eol = get_eol_doc cond_line, ctx
+        parts[] = eol if eol._doc_type != 'empty'
+        i += 1
+        if i <= #nodes
+          parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(nodes[i], ctx))
+          if i < #nodes and nodes[i + 1] != nil
+            parts[] = ir.HARDLINE
+    elseif item\is_any types.Block, types.Statement
+      -- else block: check for 'else if' → 'elseif' conversion
+      nested_if = nil
+      if item\is types.Statement
+        content = item.content
+        if content?\is types.ExpListAssign
+          expList = content.expList
+          if expList?.exprs and #expList.exprs == 1
+            exp = expList.exprs[1]
+            unaryExp = exp.pipeExprs?[1]
+            val = unaryExp.expos?[1]
+            if (val.item?\is types.SimpleValue) and val.item.value?\is types.If
+              nested_if = val.item.value
+
+      if nested_if
+        table.remove nodes, i
+        insert_pos = i
+        for nested_node in *(nested_if.nodes or {})
+          continue if nested_node\is types.IfType
+          table.insert nodes, insert_pos, nested_node
+          insert_pos += 1
+        continue
+      else
+        above_doc = get_above_doc item, ctx
+        if above_doc._doc_type != 'empty'
+          parts[] = above_doc
+        parts[] = ir.text 'else'
+        -- Get EOL comment for the 'else' line (line before block content)
+        else_line = item\g_src_line! - 1
+        eol = get_eol_doc else_line, ctx
+        parts[] = eol if eol._doc_type != 'empty'
+        parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(item, ctx))
+
+    i += 1
+
+  ir.concat parts
+
+generators.IfCond = (node, ctx, gen) ->
+  parts = { gen(node.condition, ctx) }
+  if node.assignment
+    if node.assignment.expList
+      parts[] = ir.text ', '
+      parts[] = gen node.assignment.expList, ctx
+    parts[] = ir.text ' := '
+    assign = node.assignment.assign
+    if assign and assign.values
+      for i, val in ipairs assign.values
+        parts[] = gen val, ctx
+        parts[] = ir.text ', ' if i < #assign.values
+  ir.concat parts
+
+generators.Unless = (node, ctx, gen) ->
+  eol = get_eol_doc node.condition\g_src_line!, ctx
+  ir.cat(
+    ir.text('unless '),
+    gen(node.condition, ctx),
+    eol,
+    ir.nest(2, ir.cat(ir.HARDLINE, gen(node.body, ctx)))
+  )
+
+generators.Switch = (node, ctx, gen) ->
+  parts = {
+    ir.text 'switch ',
+    gen node.target, ctx,
+  }
+
+  if node.assignment
+    walrus_ctx = { k, v for k, v in pairs ctx }
+    walrus_ctx.walrus_assign = true
+    parts[] = ir.SPACE
+    parts[] = gen node.assignment, walrus_ctx
+
+  branch_parts = {}
+  for branch in *node.branches
+    branch_parts[] = gen branch, ctx
+
+  if node.lastBranch
+    else_doc = if node.lastBranch\is types.Statement
+      ir.cat ir.text('else '), gen(node.lastBranch.content, ctx)
+    else
+      ir
+        .cat ir
+            .text('else'), ir
+            .nest(2, ir.cat(ir.HARDLINE, gen(node.lastBranch, ctx)))
+    branch_parts[] = else_doc
+
+  parts[] = ir.nest 2, ir.cat(ir.HARDLINE, ir.join(ir.HARDLINE, branch_parts))
+  ir.concat parts
+
+generators.SwitchCase = (node, ctx, gen) ->
+  above_doc = get_above_doc node, ctx
+  eol = get_eol_doc node.condition\g_src_line!, ctx
+
+  body_doc = if node.body\is types.Statement
+    ir.cat ir.text(' then '), gen(node.body.content, ctx)
+  else
+    ir.nest(2, ir.cat(ir.HARDLINE, gen(node.body, ctx)))
+
+  parts = {}
+  if above_doc._doc_type != 'empty'
+    parts[] = above_doc
+  parts[] = ir.text 'when '
+  parts[] = gen node.condition, ctx
+  parts[] = eol if eol._doc_type != 'empty'
+  parts[] = body_doc
+  ir.concat parts
+
+generators.SwitchList = (node, ctx, gen) ->
+  parts = {}
+  for i, expr in ipairs node.exprs
+    parts[] = gen expr, ctx
+    parts[] = ir.text ', ' if i < #node.exprs
+  ir.concat parts
+
+generators.For = (node, ctx, gen) ->
+  gen node.forLoop, ctx
+
+generators.ForStepValue = (node, ctx, gen) ->
+  gen node.value, ctx
+
+generators.ForNum = (node, ctx, gen) ->
+  parts = {
+    ir.text 'for ',
+    gen node.varName, ctx,
+    ir.text ' = ',
+    gen node.startValue, ctx,
+    ir.text ', ',
+    gen node.stopValue, ctx,
+  }
+
+  if node.stepValue
+    parts[] = ir.text ', '
+    parts[] = gen node.stepValue.value, ctx
+
+  parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+  ir.concat parts
+
+generators.ForEach = (node, ctx, gen) ->
+  parts = {
+    ir.text 'for ',
+    gen node.nameList, ctx,
+    ir.text ' in ',
+    gen node.loopValue, ctx,
+  }
+
+  parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+  ir.concat parts
+
+generators.While = (node, ctx, gen) ->
+  parts = {
+    gen node.type, ctx,
+    ir.SPACE,
+    gen node.condition, ctx,
+  }
+
+  if node.assignment
+    if node.assignment.expList
+      parts[] = ir.text ', '
+      parts[] = gen node.assignment.expList, ctx
+    parts[] = ir.text ' := '
+    assign = node.assignment.assign
+    if assign and assign.values
+      for i, val in ipairs assign.values
+        parts[] = gen val, ctx
+        parts[] = ir.text ', ' if i < #assign.values
+
+  -- EOL comment handling: line-based lookup for the condition line
+  eol = get_eol_doc node.condition\g_src_line!, ctx
+  parts[] = eol if eol._doc_type != 'empty'
+  parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+  ir.concat parts
+
+generators.Repeat = (node, ctx, gen) ->
+  ir.cat(
+    ir.text('repeat'),
+    ir.nest(2, ir.cat(ir.HARDLINE, gen(node.body, ctx))),
+    ir.HARDLINE,
+    ir.text('until '),
+    gen(node.condition, ctx)
+  )
+
+generators.Do = (node, ctx, gen) ->
+  do_line = node\g_src_line!
+  content_line = node.body and node.body.content and node.body.content\g_src_line!
+  if content_line and do_line and content_line == do_line
+    return ir.cat ir.text('do '), gen(node.body, ctx)
+
+  ir.cat(
+    ir.text('do'),
+    ir.nest(2, ir.cat(ir.HARDLINE, gen(node.body, ctx)))
+  )
+
+generators.With = (node, ctx, gen) ->
+  parts = { ir.text 'with' }
+  parts[] = ir.text '?' if node.eop
+  parts[] = ir.SPACE
+  parts[] = gen node.valueList, ctx
+
+  if node.assign
+    parts[] = ir.text ' :'
+    parts[] = gen node.assign, ctx
+
+  parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+  ir.concat parts
+
+generators.Try = (node, ctx, gen) ->
+  parts = { ir.text 'try' }
+  if node.eop
+    parts[] = gen node.eop, ctx
+
+  try_line = node\g_src_line!
+  func_line = node.func and node.func\g_src_line!
+  is_inline = func_line and func_line == try_line
+
+  if is_inline
+    parts[] = ir.SPACE
+    parts[] = gen node.func, ctx
+  else
+    parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.func, ctx))
+
+  if node.catchBlock
+    parts[] = ir.HARDLINE
+    parts[] = gen node.catchBlock, ctx
+
+  ir.concat parts
+
+generators.CatchBlock = (node, ctx, gen) ->
+  ir.cat(
+    ir.text('catch '),
+    gen(node.err, ctx),
+    ir.nest(4, ir.cat(ir.HARDLINE, gen(node.block, ctx)))
+  )
+
+--[[ class generators ]]
+generators.ClassDecl = (node, ctx, gen) ->
+  parts = { ir.text 'class ' }
+  parts[] = gen node.name, ctx if node.name
+
+  if node.mixes
+    parts[] = ir.SPACE if node.name
+    parts[] = ir.text 'using '
+    parts[] = gen node.mixes, ctx
+
+  if node.extend
+    parts[] = ir.SPACE if node.name
+    parts[] = ir.text 'extends '
+    parts[] = gen node.extend, ctx
+
+  if node.body
+    parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+
+  ir.concat parts
+
+generators.ClassBlock = (node, ctx, gen) ->
+  contents = node.contents or {}
+  parts = {}
+  for i, item in ipairs contents
+    if i > 1
+      parts[] = ir.HARDLINE
+    above_doc = get_above_doc item, ctx
+    if above_doc._doc_type != 'empty'
+      parts[] = above_doc
+    parts[] = gen item, ctx
+    eol = get_eol_doc item\g_src_line!, ctx
+    parts[] = eol if eol._doc_type != 'empty'
+  ir.concat parts
+
+generators.ClassMemberList = (node, ctx, gen) ->
+  values = node.values or {}
+  parts = {}
+  for i, val in ipairs values
+    parts[] = ir.HARDLINE if i > 1
+    parts[] = gen val, ctx
+  ir.concat parts
+
+--[[ block / statement generators ]]
+generators.Block = (node, ctx, gen) ->
+  stmts = node.statementOrComments or {}
+  source_lines = ctx.source_lines
+
+  -- empty block: check for comment-only lines
+  if #stmts == 0 and source_lines
+    block_line = node\g_src_line!
+    if block_line
+      src = source_lines[block_line]
+      if src and src\match '^%s*%-%-'
+        return ir.cat ir.text(src\match '^%s*(.-)%s*$'), ir.EMPTY
+    return ir.EMPTY
+
+  parts = {}
+  for i, stmt in ipairs stmts
+    src_line = stmt\g_src_line!
+    stmt_type = stmt\g_yue_name!
+
+    -- Handle standalone YueComment nodes (orphan comments injected into Block)
+    if stmt_type == 'YueComment'
+      -- Blank line before comment if source had one
+      if i > 1 and src_line and src_line > 1 and source_lines
+        prev_line_content = source_lines[src_line - 1]
+        if prev_line_content and prev_line_content\match '^%s*$'
+          parts[] = ir.HARDLINE
+
+      -- Emit the comment(s)
+      for comment in *(stmt.comments or {})
+        parts[] = ir.text comment.v
+        parts[] = ir.HARDLINE if i < #stmts
+      continue
+
+    -- blank line before this statement?
+    -- Check for above comments using node._comments.above
+    has_above = false
+    above_comments = stmt._comments?.above
+    if above_comments and #above_comments > 0
+      for c in *above_comments
+        unless c._emitted
+          has_above = true
+          break
+
+    if i > 1 and src_line and src_line > 1 and not has_above and source_lines
+      prev_line_content = source_lines[src_line - 1]
+      if prev_line_content and prev_line_content\match '^%s*$'
+        -- add blank hardline only if previous part doesn't end in hardline already
+        parts[] = ir.HARDLINE
+
+    above_doc = get_above_doc stmt, ctx
+    if above_doc._doc_type != 'empty'
+      parts[] = above_doc
+
+    -- build statement doc first, then check for EOL comments.
+    -- statement generators (While, Unless, etc.) may consume EOL comments
+    -- for their condition line; if so, get_eol_doc_for_node will return empty.
+    stmt_doc = gen stmt, ctx
+    eol_doc = get_eol_doc_for_node stmt
+    parts[] = ir.cat stmt_doc, eol_doc
+
+    -- separator between statements (hardline)
+    if i < #stmts
+      parts[] = ir.HARDLINE
+
+  ir.concat parts
+
+generators.Body = (node, ctx, gen) ->
+  gen node.content, ctx
+
+generators.Statement = (node, ctx, gen) ->
+  parts = { gen(node.content, ctx) }
+  if node.appendix
+    parts[] = ir.SPACE
+    parts[] = gen node.appendix, ctx
+  ir.concat parts
+
+generators.StatementAppendix = (node, ctx, gen) ->
+  gen node.item, ctx
+
+generators.File = (node, ctx, gen) ->
+  gen node.block, ctx
+
+--[[ comprehension generators ]]
+-- Check if a NormalDef item starts with a nested Comprehension (bracket)
+first_item_is_bracket = (item) ->
+  return false unless item\is types.NormalDef
+  exp = item.item
+  return false unless exp and exp\is types.Exp
+  return false unless exp.pipeExprs and #exp.pipeExprs > 0
+  unary = exp.pipeExprs[1]
+  return false unless unary and unary\is types.UnaryExp
+  return false unless unary.expos and #unary.expos > 0
+  val = unary.expos[1]
+  return false unless val and val\is types.Value
+  sv = val.item
+  return false unless sv and sv\is types.SimpleValue
+  sv.value and sv.value\is types.Comprehension
+
+generators.Comprehension = (node, ctx, gen) ->
+  table_spacing = ctx?.table_spacing ?? true
+
+  has_comp_for = false
+  for item in *node.items
+    if item\is types.CompFor
+      has_comp_for = true
+      break
+
+  if has_comp_for
+    -- real comprehension: [value for x in items]
+    parts = { ir.text '[' }
+    if table_spacing
+      parts[] = ir.SPACE
+    for i, item in ipairs node.items
+      if item\is types.CompFor
+        parts[] = ir.SPACE
+      parts[] = gen item, ctx
+    if table_spacing
+      parts[] = ir.SPACE
+    parts[] = ir.text ']'
+    return ir.concat parts
+
+  -- presupplied array: [ 'a', 'b', 'c' ]
+  comp_line = node\g_src_line!
+  is_multiline = false
+  if #node.items > 0
+    for item in *node.items
+      item_line = item\g_src_line!
+      if item_line and comp_line and item_line != comp_line
+        is_multiline = true
+        break
+
+  -- need extra spacing if first item is a bracket (to avoid [[ long string syntax)
+  needs_bracket_spacing = #node.items > 0 and first_item_is_bracket node.items[1]
+  trailing_comma = has_trailing_comma node, ctx
+
+  parts = { ir.text '[' }
+  if #node.items > 0
+    if is_multiline
+      items_doc = build_container_items_doc gen,
+        node.items, ctx, trailing_comma, false, is_multiline
+      if needs_bracket_spacing
+        -- add space only in flat mode to avoid [[ being parsed as long string
+        items_doc = ir.cat ir.ifflat(ir.SPACE, ir.EMPTY), items_doc
+      open_space = if table_spacing then ir.line ' ' else ir.line ''
+      close_space = if table_spacing then ir.line ' ' else ir.line ''
+      parts[] = ir.group(
+        ir.cat(ir.nest(2, ir.cat(open_space, items_doc)), close_space),
+        true
+      )
+    else
+      if table_spacing or needs_bracket_spacing
+        parts[] = ir.SPACE
+      for i, item in ipairs node.items
+        parts[] = gen item, ctx
+        parts[] = ir.text ', ' if i < #node.items
+      parts[] = ir.COMMA if trailing_comma
+      if table_spacing or needs_bracket_spacing
+        parts[] = ir.SPACE
+  parts[] = ir.text ']'
+  ir.concat parts
+
+generators.TblComprehension = (node, ctx, gen) ->
+  table_spacing = ctx?.table_spacing ?? true
+
+  parts = { ir.text '{' }
+  if table_spacing
+    parts[] = ir.SPACE
+  parts[] = gen node.key, ctx
+  if node.value
+    parts[] = ir.text ', '
+    parts[] = gen node.value, ctx
+  parts[] = ir.SPACE
+  parts[] = gen node.forLoop, ctx
+  if table_spacing
+    parts[] = ir.SPACE
+  parts[] = ir.text '}'
+  ir.concat parts
+
+generators.CompValue = (node, ctx, gen) ->
+  gen node.value, ctx
+
+generators.CompFor = (node, ctx, gen) ->
+  parts = {}
+  for i, item in ipairs node.items
+    switch true
+      when item\is types.CompForNum
+        parts[] = ir.text 'for ' if i == 1
+        parts[] = gen item, ctx
+      when item\is types.CompForEach
+        parts[] = ir.text 'for ' if i == 1
+        parts[] = gen item, ctx
+      when item\is types.Exp
+        parts[] = ir.text ' when '
+        parts[] = gen item, ctx
+  ir.concat parts
+
+generators.CompForNum = (node, ctx, gen) ->
+  parts = {
+    gen node.varName, ctx,
+    ir.text ' = ',
+    gen node.startValue, ctx,
+    ir.text ', ',
+    gen node.stopValue, ctx,
+  }
+  if node.stepValue
+    parts[] = ir.text ', '
+    parts[] = gen node.stepValue, ctx
+  ir.concat parts
+
+generators.CompForEach = (node, ctx, gen) ->
+  ir.cat gen(node.nameList, ctx), ir.text(' in '), gen(node.loopValue, ctx)
+
+--[[ ret/local/global generators ]]
+generators.Return = (node, ctx, gen) ->
+  if node.valueList
+    ir.cat ir.text('return '), gen(node.valueList, ctx)
+  else
+    ir.text 'return'
+
+generators.BreakLoop = (node, ctx, gen) ->
+  parts = { gen(node.type, ctx) }
+  if node.valueList
+    parts[] = ir.SPACE
+    parts[] = gen node.valueList, ctx
+  ir.concat parts
+
+generators.Local = (node, ctx, gen) ->
+  ir.cat ir.text('local '), gen(node.item, ctx)
+
+generators.LocalValues = (node, ctx, gen) ->
+  parts = { gen(node.nameList, ctx) }
+  if node.valueList
+    parts[] = ir.text ' = '
+    parts[] = gen node.valueList, ctx
+  ir.concat parts
+
+generators.LocalAttrib = (node, ctx, gen) ->
+  parts = {
+    gen node.attrib, ctx,
+    ir.SPACE,
+  }
+
+  for i, var_ in ipairs node.leftList
+    parts[] = gen var_, ctx
+    parts[] = ir.text ', ' if i < #node.leftList
+  if node.assign
+    parts[] = ir.SPACE
+    parts[] = gen node.assign, ctx
+  ir.concat parts
+
+generators.PipeBody = (node, ctx, gen) ->
+  parts = {}
+  for i, val in ipairs node.values
+    parts[] = ir.text '  ' if i == 1 -- single extra indent for first item
+    parts[] = ir.text '|> '
+    parts[] = gen val, ctx
+    parts[] = ir.HARDLINE if i < #node.values
+  ir.nest 2, ir.concat(parts)
+
+generators.Global = (node, ctx, gen) ->
+  ir.cat ir.text('global '), gen(node.item, ctx)
+
+generators.GlobalValues = (node, ctx, gen) ->
+  parts = { gen(node.nameList, ctx) }
+  if node.valueList
+    parts[] = ir.text ' = '
+    parts[] = gen node.valueList, ctx
+  ir.concat parts
+
+generators.Label = (node, ctx, gen) ->
+  ir.cat ir.text('::'), gen(node.label, ctx), ir.text('::')
+
+generators.Goto = (node, ctx, gen) ->
+  ir.cat ir.text('goto '), gen(node.label, ctx)
+
+generators.Slice = (node, ctx, gen) ->
+  parts = { ir.text '[' }
+  if node.startValue and not node.startValue\is types.DefaultValue
+    parts[] = gen node.startValue, ctx
+  parts[] = ir.COMMA
+  if node.stopValue and not node.stopValue\is types.DefaultValue
+    parts[] = gen node.stopValue, ctx
+  if node.stepValue and not node.stepValue\is types.DefaultValue
+    parts[] = ir.COMMA
+    parts[] = gen node.stepValue, ctx
+  parts[] = ir.text ']'
+  ir.concat parts
+
+--[[ import/export generators ]]
+generators.Import = (node, ctx, gen) ->
+  if node.content?\is types.FromImport
+    gen node.content, ctx
+  else
+    ir.cat ir.text('import '), gen(node.content, ctx)
+
+generators.ImportAs = (node, ctx, gen) ->
+  parts = { gen(node.literal, ctx) }
+  if node.target
+    parts[] = ir.text ' as '
+    parts[] = gen node.target, ctx
+  ir.concat parts
+
+generators.ImportLiteral = (node, ctx, gen) ->
+  if node.inners and #node.inners > 0
+    parts = { ir.text "'" }
+    for i, inner in ipairs node.inners
+      parts[] = ir.text '.' if i > 1
+      parts[] = ir.text inner.v if inner.v
+    parts[] = ir.text "'"
+    return ir.concat parts
+  ir.EMPTY
+
+generators.ImportFrom = (node, ctx, gen) ->
+  parts = {}
+  for i, name in ipairs node.names
+    parts[] = gen name, ctx
+    parts[] = ir.text ', ' if i < #node.names
+  parts[] = ir.text ' from '
+  parts[] = gen node.item, ctx
+  ir.concat parts
+
+generators.Export = (node, ctx, gen) ->
+  parts = { ir.text 'export ' }
+  parts[] = ir.text 'default ' if node.def
+  parts[] = gen node.target, ctx
+  if node.assign
+    parts[] = ir.SPACE
+    parts[] = gen node.assign, ctx
+  ir.concat parts
+
+generators.FromImport = (node, ctx, gen) ->
+  parts = {
+    ir.text 'from ',
+    gen node.item, ctx,
+    ir.text ' import ',
+  }
+
+  for i, name in ipairs node.names
+    parts[] = gen name, ctx
+    parts[] = ir.text ', ' if i < #node.names
+
+  ir.concat parts
+
+generators.ColonImportName = (node, ctx, gen) ->
+  ir.cat (ir.text ':'), (gen node.name, ctx)
+
+generators.ImportTabLit = (node, ctx, gen) ->
+  parts = { ir.text '{ ' }
+
+  items = node.items ?? {}
+  for i, item in ipairs items
+    parts[] = gen item, ctx
+    parts[] = ir.text ', ' if i < #items
+
+  parts[] = ir.text ' }'
+  ir.concat parts
+
+generators.ImportGlobal = (node, ctx, gen) ->
+  if node.name then gen node.name, ctx else ir.EMPTY
+
+--[[ macro generators ]]
+generators.Macro = (node, ctx, gen) ->
+  ir.cat ir.text('macro '), gen(node.name, ctx), ir.text(' = '), gen(node.decl, ctx)
+
+generators.MacroInPlace = (node, ctx, gen) ->
+  ir.cat(
+    ir.text('$ ->'),
+    ir.nest(2, ir.cat(ir.HARDLINE, gen(node.body, ctx)))
+  )
+
+generators.MacroLit = (node, ctx, gen) ->
+  parts = {}
+  if node.argsDef
+    parts[] = ir.text '('
+    parts[] = gen node.argsDef, ctx
+    parts[] = ir.text ') '
+  parts[] = ir.text '->'
+
+  if node.body
+    content = node.body.content
+    is_inline = content and content\is types.Statement
+    if is_inline
+      parts[] = ir.SPACE
+      parts[] = gen content, ctx
+    else
+      parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+
+  ir.concat parts
+
+generators.MacroFunc = (node, ctx, gen) ->
+  ir.cat gen(node.name, ctx), gen(node.invoke, ctx)
+
+generators.MacroNamePair = (node, ctx, gen) ->
+  ir.cat gen(node.key, ctx), ir.text(': '), gen(node.value, ctx)
+
+generators.ShortTabAppending = (node, ctx, gen) ->
+  ir.cat ir.text('[] '), gen(node.assign, ctx)
+
+generators.Parens = (node, ctx, gen) ->
+  inner_doc = gen(node.expr, ctx)
+  -- Only break closing paren to new line if inner doc has hardlines.
+  -- Content starts immediately after '(' (no extra indent or newline).
+  if ir.has_hardline inner_doc
+    ir.cat ir.text('('), inner_doc, ir.HARDLINE, ir.text(')')
+  else
+    ir.cat ir.text('('), inner_doc, ir.text(')')
+
+--[[ yaml generators ]]
+generators.YAMLLine = (node, ctx, gen) ->
+  parts = {}
+  parts[] = gen node.indent, ctx if node.indent
+  for seg in *(node.segments or {})
+    parts[] = gen seg, ctx
+  ir.concat parts
+
+generators.YAMLLineContent = (node, ctx, gen) ->
+  if node.content then gen node.content, ctx else ir.EMPTY
+
+generators.YAMLLineInner = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.YAMLIndent = (node, ctx) ->
+  if node.v then ir.text node.v else ir.EMPTY
+
+generators.YAMLMultiline = (node, ctx) ->
+  -- YAML multiline strings - extract from source to preserve
+  src_line = node\g_src_line!
+  src_col = node\g_src_col!
+
+  if src_line and ctx.source_lines
+    line = ctx.source_lines[src_line]
+    if line
+      pipe_pos = line\find '|', src_col
+      if pipe_pos
+        base_indent = #(line\match '^%s*' or '')
+        result = line\sub pipe_pos
+        current_line = src_line + 1
+        while ctx.source_lines[current_line]
+          next_line = ctx.source_lines[current_line]
+          line_indent = #(next_line\match '^%s*' or '')
+          if next_line == '' or line_indent > base_indent
+            result ..= '\n' .. next_line
+            current_line += 1
+          else
+            break
+        -- build as concat of lines with literallines (no indent added by layout)
+        -- normalize tab indentation to spaces
+        parts = {}
+        lines = {}
+        for ln in result\gmatch '[^\n]*'
+          lines[] = ln
+        -- trim trailing empty lines (blank lines at end belong to block separator, not content)
+        while #lines > 1 and lines[#lines] == ''
+          table.remove lines
+        for i, ln in ipairs lines
+          parts[] = ir.literalline! if i > 1
+          if i == 1
+            parts[] = ir.text ln
+          else
+            -- normalize all tabs to spaces
+            normalized = ln\gsub '\t', '  '
+            parts[] = ir.text normalized
+        return ir.concat parts
+
+  -- fallback
+  parts = { ir.text '|' }
+  for line in *(node.lines or {})
+    parts[] = ir.HARDLINE
+    parts[] = gen line, ctx
+  ir.concat parts
+
+generators.LuaKeyword = (node, ctx, gen) ->
+  if node.name then gen node.name, ctx else ir.EMPTY
+
+export default gen

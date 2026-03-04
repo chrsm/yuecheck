@@ -1,0 +1,6 @@
+-- input
+result = some_function(first_argument, second_argument, third_argument, fourth_argument, fifth_argument)
+
+-- expect
+result = some_function(first_argument, second_argument, third_argument,
+fourth_argument, fifth_argument)

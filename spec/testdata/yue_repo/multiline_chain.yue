@@ -102,8 +102,7 @@ nil
 x = a
   .b
   .c
-  .d
---[[chain item]]
+  --[[chain item]] .d
 
 x
   .y = a
@@ -135,9 +134,9 @@ tb = f1{}
   .a
   |> f2? 'abc', _
 
-f = -> [a
+f = -> [ a
   .b
-  \c 123 for { a } in *vals]
+  \c 123 for { a } in *vals ]
 
 f1 = -> x, a
   \b 123

@@ -12,14 +12,18 @@ assert.same { {
 } }
 
 -- expect
-assert.same { {
-  type: 'FOO!'
-  message: 'oops!'
-  line: 1
-  col: 2
-} }, r
+assert.same {
+  {
+    type: 'FOO!'
+    message: 'oops!'
+    line: 1
+    col: 2
+  }
+}, r
 
-assert.same { {
-  type: 'FOO2'
-  type2: 'FOO3'
-} }
+assert.same {
+  {
+    type: 'FOO2'
+    type2: 'FOO3'
+  }
+}
