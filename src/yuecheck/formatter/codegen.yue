@@ -1351,6 +1351,22 @@ generators.TableLit = (node, ctx, gen) ->
   forced = is_source_multiline or has_forced_comment
 
   if not node.values or #node.values == 0
+    -- check for inner comments (extracted from raw TableLit in ast.yue)
+    if node._inner_comments and #node._inner_comments > 0
+      -- empty table with comments inside - emit as multiline block
+      parts = {}
+      for i, comment in ipairs node._inner_comments
+        parts[] = gen comment, ctx
+        -- add hardline between comments, but not after the last one
+        if i < #node._inner_comments
+          parts[] = ir.HARDLINE
+
+      n = ir.concat parts
+        |> ir.cat ir.HARDLINE, _
+        |> ir.nest 2, _
+
+      return ir.cat ir.text'{', n, ir.HARDLINE, ir.text'}'
+
     return ir.text '{}'
 
   -- EOL comment on opening brace line (for multiline tables)

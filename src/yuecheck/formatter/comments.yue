@@ -385,6 +385,45 @@ is_keyword_eol_comment = (src, comment_line, comment_col) ->
       break
   false
 
+-- collect TableLit nodes that span multiple lines (have _end_line from ast.yue)
+-- these are empty tables that may contain comments
+collect_multiline_tablelits = (ast) ->
+  tablelits = {}
+
+  walk = (node) ->
+    return unless node and (type node) == 'table'
+    return unless node.is and (type node.is) == 'function'
+
+    -- check if this is a multiline TableLit (has _end_line set by ast.yue)
+    if node\g_yue_name! == 'TableLit' and node._end_line
+      start_line = node\g_src_line!
+      tablelits[] = {
+        node: node
+        start: start_line
+        finish: node._end_line
+      }
+
+    for k, v in pairs node
+      continue if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', '_inner_comments', '_raw_content', '_end_line', 'pos' ]
+      if (type v) == 'table'
+        if v.is and (type v.is) == 'function'
+          walk v
+        else
+          for item in *v
+            if (type item) == 'table' and item.is and (type item.is) == 'function'
+              walk item
+
+  walk ast
+  tablelits
+
+-- find the TableLit that contains a comment at the given line
+find_containing_tablelit = (comment_line, tablelits) ->
+  for entry in *tablelits
+    -- Comment must be strictly inside (not on the opening/closing brace lines)
+    if comment_line > entry.start and comment_line < entry.finish
+      return entry.node
+  nil
+
 -- inject comments into AST nodes
 -- takes: source string, AST root, parsed comments (from comments.to_ast)
 -- modifies AST in place by adding _comments properties to nodes
@@ -398,6 +437,10 @@ inject = (src, ast, comments) ->
   nodes_by_line = build_nodes_by_line ast
   orphans = {}
   eol_comments_by_line = {}
+
+  -- collect multiline TableLit nodes (empty tables that may contain comments, eg `t = {\n--abc\n}` have the comment as
+  -- a psuedo-node now (probably from some of the comment updates pre-0.33.9; didn't dig into git)
+  multiline_tablelits = collect_multiline_tablelits ast
 
   for line_idx in *comments.indices
     line_comments = comments[line_idx]
@@ -422,13 +465,19 @@ inject = (src, ast, comments) ->
         else
           orphans[] = comment
 
-  -- inject orphan comments into their containing Block.statementOrComments
   if #orphans > 0
     for comment in *orphans
       comment_line = comment\g_src_line!
       comment_col = comment\g_src_col!
 
-      -- find the innermost block that contains this comment using recursive descent
+      -- check if this comment belongs inside a multiline TableLit
+      tablelit = find_containing_tablelit comment_line, multiline_tablelits
+      if tablelit
+        tablelit._inner_comments or= {}
+        tablelit._inner_comments[] = comment
+        continue
+
+      -- otherwise, inject into the containing Block.statementOrComments
       block = find_containing_block ast, comment_line, comment_col
       continue unless block?.statementOrComments
 

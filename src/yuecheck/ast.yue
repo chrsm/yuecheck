@@ -35,9 +35,19 @@ build = (ast, parent = nil) ->
     else
       -- Handle various AST simplifications from yue.to_ast
       if ntype == 'TableLit' and string.sub(ast[4], 1, 1) == '{'
-        n = types.SingleString ast[4]
-        n\set_source ln, col
-        arg[] = n
+        -- raw table literal string (e.g., "{\n\t-- comment\n}")
+        -- this happens when the table contains only comments (no actual values)
+        -- store the raw content and line span so comment association can work correctly
+        raw = ast[4]
+        newline_count = xstring.count_nl raw
+        if newline_count > 0
+          -- multiline raw table - store end line for comment association
+          arg._raw_content = raw
+          arg._end_line = ln + newline_count
+        else
+          n = types.SingleString raw
+          n\set_source ln, col
+          arg[] = n
       elseif ast[4] == '' and ntype == 'FnArgDefList'
         arg[] = types.FnArgDef types.Variable types.Name ''
       elseif ntype == 'Return' and ast[4] == 'return'
@@ -45,7 +55,9 @@ build = (ast, parent = nil) ->
       elseif ast[4] == '' and ntype == 'DefaultValue'
         arg[] = types.DefaultValue ''
       elseif ntype == 'DoubleString'
-        arg[] = types.DoubleString { types.DoubleStringContent types.DoubleStringInner '' }
+        arg[] = types.DoubleStringInner ''
+          |> types.DoubleStringContent
+          |> types.DoubleString
       elseif ntype == 'Block' and ast[4] == ''
         _ = nil -- empty files; just comments
       elseif ntype == 'Comprehension' and ast[4] == '[]'
@@ -66,6 +78,13 @@ build = (ast, parent = nil) ->
   node\from_table arg
   node\set_source ln, col
   node.typ = ntype
+
+  -- attach metadata for TableLit nodes with raw multiline content
+  -- this allows comment association to properly handle comments inside empty tables
+  -- (TODO: cleanup, this is bad.jpeg)
+  if arg._raw_content
+    node._raw_content = arg._raw_content
+    node._end_line = arg._end_line
   node
 
 -- parse source string and return internal AST
@@ -188,7 +207,7 @@ extract.name_list = (node) ->
   unless node\is types.NameList
     return {}
 
-  [n.name.v for n in *node.names]
+  [ n.name.v for n in *node.names ]
 
 -- Extract simple value from an Exp node
 -- Returns the raw value (string, number, etc) or nil if complex

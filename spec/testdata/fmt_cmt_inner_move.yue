@@ -1,0 +1,36 @@
+-- input
+export _ = {
+  -- comment
+  person: {
+    notes: ''
+  }
+  -- another
+  thing: {
+    notes: 'long string'
+    members: {
+      -- names TBD
+      -- { name: nil, formerClass: 'warrior' }
+      -- { name: nil, formerClass: 'mage' }
+      -- { name: nil, formerClass: 'hunter' }
+    }
+  }
+}
+
+
+-- expect
+export _ = {
+  -- comment
+  person: {
+    notes: ''
+  }
+  -- another
+  thing: {
+    notes: 'long string'
+    members: {
+      -- names TBD
+      -- { name: nil, formerClass: 'warrior' }
+      -- { name: nil, formerClass: 'mage' }
+      -- { name: nil, formerClass: 'hunter' }
+    }
+  }
+}

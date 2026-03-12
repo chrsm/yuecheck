@@ -11,8 +11,16 @@ match_any = (str, pats) ->
     if str\match p
       return p
 
+-- count newlines in a string to determine line span
+count_nl = (str) ->
+  n = 0
+  for _ in str\gmatch '\n'
+    n += 1
+  n
+
 export default {
   :stripnl
   :stripq
   :match_any
+  :count_nl
 }

@@ -704,6 +704,11 @@ describe 'formatter', ->
       r = fmt.format src
       assert.same expect, r
 
+    it 'should not move inner comments on empty block', ->
+      src, expect = parse_td fget 'fmt_cmt_inner_move'
+      r = fmt.format src
+      assert.same expect, r
+
   describe 'yuescript repo inputs', ->
     inputs = find_yue_files '../spec/testdata/yue_repo', 'yue'
 
