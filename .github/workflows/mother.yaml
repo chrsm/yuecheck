@@ -1,10 +1,6 @@
 name: build-test
 
-on:
-  push:
-    branches: [ "mother" ]
-  pull_request:
-    branches: [ "mother" ]
+on: [push, pull_request]
 
 jobs:
   build:
@@ -25,7 +21,12 @@ jobs:
         sudo make && \
         sudo make install
     - name: get YueScript
-      run: sudo luarocks install yuescript
+      # run: sudo luarocks install yuescript
+      run: |
+        cd /tmp && \
+          git clone https://github.com/IppClub/YueScript && \
+          cd YueScript && \
+          sudo luarocks make
     - name: install yuecheck
       run: sudo make rock-actions
     - name: run tests
