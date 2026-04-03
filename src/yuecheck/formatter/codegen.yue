@@ -136,12 +136,7 @@ is_first_arg_multiline_table = (invoke_node) ->
   arg1 = invoke_node.args[1]
   unless arg1 and arg1?\is types.TableLit
     return false
-  tbl_start = arg1\g_src_line!
-  if arg1.values and #arg1.values > 0
-    for item in *arg1.values
-      if item\g_src_line! != tbl_start
-        return true
-  false
+  arg1\g_end_line! != arg1\g_src_line!
 
 -- extract a TableLit from a wrapped expression, if present
 -- handles NormalDef, TableValue, Exp, Value, SimpleValue wrappers
@@ -180,17 +175,14 @@ table_spans_multiple_lines = (node) ->
   unless node?.is and (node\is types.TableLit)
     return false
 
-  tbl_start = node\g_src_line!
+  if node\g_end_line! != node\g_src_line!
+    return true
+
+  -- even if single-line, check if it spans lines
   unless node.values and #node.values > 0
     return false
 
   for val in *node.values
-    -- check if this value is on a different line
-    val_line = val\g_src_line!
-    if val_line and tbl_start and val_line != tbl_start
-      return true
-
-    -- recursively check nested tables
     inner = extract_table_lit val
     if inner and table_spans_multiple_lines inner
       return true
@@ -407,7 +399,7 @@ group_items_by_line = (items) ->
 -- Check if there's a blank line gap between two consecutive items in source.
 has_blank_gap = (item_a, item_b, ctx) ->
   return false unless ctx.source_lines
-  la = item_a\g_src_line!
+  la = item_a\g_end_line!
   lb = item_b\g_src_line!
   return false unless la and lb and lb > la + 1
   for ln = la + 1, lb - 1
@@ -1071,8 +1063,8 @@ generators.ChainValue = (node, ctx, gen) ->
     for i, item in ipairs items
       if i > 1 and item\is_any types.DotChainItem, types.ColonChainItem
         item_line = item\g_src_line!
-        prev_line = items[i - 1]\g_src_line!
-        if item_line and prev_line and item_line != prev_line
+        prev_end = items[i - 1]\g_end_line!
+        if item_line and prev_end and item_line != prev_end
           unless did_nest
             did_nest = true
           parts[] = ir.HARDLINE
@@ -1150,22 +1142,7 @@ generators.InvokeArgs = (node, ctx, gen) ->
           if val and val.item and val.item.is and (val.item\is types.SimpleValue)
             sv = val.item
             if sv.value and sv.value.is and (sv.value\is types.TableLit)
-              tbl = sv.value
-              tbl_start = tbl\g_src_line!
-              if tbl.values and #tbl.values > 0
-                for tval in *tbl.values
-                  if tval\g_src_line! != tbl_start
-                    first_is_multiline_table = true
-                    break
-              -- also check if the table spans multiple lines via nested content
-              -- (e.g., { { type: 'FOO!' ... } } where inner table is multiline)
-              unless first_is_multiline_table
-                if #node.args > 1
-                  next_arg_line = node.args[2]\g_src_line!
-                  if next_arg_line and tbl_start and next_arg_line > tbl_start + 1
-                    first_is_multiline_table = true
-                elseif last_line and tbl_start and last_line > tbl_start
-                  first_is_multiline_table = true
+              first_is_multiline_table = sv.value\g_end_line! != sv.value\g_src_line!
 
     should_nest = is_multiline and not first_is_multiline_table
     if should_nest
@@ -2090,14 +2067,7 @@ generators.Comprehension = (node, ctx, gen) ->
     return ir.concat parts
 
   -- presupplied array: [ 'a', 'b', 'c' ]
-  comp_line = node\g_src_line!
-  is_multiline = false
-  if #node.items > 0
-    for item in *node.items
-      item_line = item\g_src_line!
-      if item_line and comp_line and item_line != comp_line
-        is_multiline = true
-        break
+  is_multiline = node\g_end_line! != node\g_src_line!
 
   -- need extra spacing if first item is a bracket (to avoid [[ long string syntax)
   needs_bracket_spacing = #node.items > 0 and first_item_is_bracket node.items[1]
