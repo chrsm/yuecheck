@@ -278,7 +278,7 @@ get_preceding_doc_recursive = (node) ->
   return ir.EMPTY unless node.is
 
   for k, v in pairs node
-    if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos' ]
+    if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos', 'end_pos' ]
       continue
     if (type v) == 'table'
       if v.is -- it's a node
@@ -338,7 +338,7 @@ get_eol_doc_recursive = (node) ->
   return ir.EMPTY unless node.is
 
   for k, v in pairs node
-    if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos' ]
+    if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos', 'end_pos' ]
       continue
     if (type v) == 'table'
       if v.is -- it's a node

@@ -8,83 +8,79 @@ import 'yuecheck.types'
 
 -- Build internal AST representation from yue.to_ast output
 build = (ast, parent = nil) ->
-  -- self = { 1, 2, 3 }
-  -- 4+ beyond = child nodes
-  { ntype, ln, col } = ast
+  -- 6+ beyond = child nodes
+  { ntype, ln, col, end_ln, end_col } = ast
 
   -- process children first
   arg = {}
-  if #ast > 3
-    if (type ast[4]) == 'table'
-      for v in *ast[4,]
+  if #ast > 5
+    child = ast[6]
+
+    if (type child) == 'table'
+      for v in *ast[6,]
         unless v
           break
         arg[] = build v, { ntype, ast }
-    elseif ntype == 'Invoke' -- 4 is !
-      n = types.SingleString ast[4]
-      n\set_source ln, col
+    elseif ntype == 'Invoke' -- 6 is !
+      n = types.SingleString ast[6]
+      n\set_source ln, col, end_ln, end_col
       arg[] = n
-    elseif ntype == 'ReversedIndex' and ast[4] == '[#]'
+    elseif ntype == 'ReversedIndex' and ast[6] == '[#]'
       n = types.ReversedIndex!
-      n\set_source ln, col
+      n\set_source ln, col, end_ln, end_col
       arg[] = n
-    elseif ntype == 'VarArgDef' and ast[4] == '...'
+    elseif ntype == 'VarArgDef' and ast[6] == '...'
       n = types.VarArgDef types.Variable types.Name '...'
-      n\set_source ln, col
+      n\set_source ln, col, end_ln, end_col
       arg[] = n
     else
       -- Handle various AST simplifications from yue.to_ast
-      if ntype == 'TableLit' and string.sub(ast[4], 1, 1) == '{'
+      if ntype == 'TableLit' and string.sub(ast[6], 1, 1) == '{'
         -- raw table literal string (e.g., "{\n\t-- comment\n}")
         -- this happens when the table contains only comments (no actual values)
-        -- store the raw content and line span so comment association can work correctly
-        raw = ast[4]
-        newline_count = xstring.count_nl raw
-        if newline_count > 0
-          -- multiline raw table - store end line for comment association
+        -- store the raw content so comment association can work correctly
+        raw = ast[6]
+        if (xstring.count_nl raw) > 0
           arg._raw_content = raw
-          arg._end_line = ln + newline_count
         else
           n = types.SingleString raw
-          n\set_source ln, col
+          n\set_source ln, col, end_ln, end_col
           arg[] = n
-      elseif ast[4] == '' and ntype == 'FnArgDefList'
+      elseif ast[6] == '' and ntype == 'FnArgDefList'
         arg[] = types.FnArgDef types.Variable types.Name ''
-      elseif ntype == 'Return' and ast[4] == 'return'
+      elseif ntype == 'Return' and ast[6] == 'return'
         _ = nil -- explicit return keyword, no value
-      elseif ast[4] == '' and ntype == 'DefaultValue'
+      elseif ast[6] == '' and ntype == 'DefaultValue'
         arg[] = types.DefaultValue ''
       elseif ntype == 'DoubleString'
         arg[] = types.DoubleStringInner ''
           |> types.DoubleStringContent
           |> types.DoubleString
-      elseif ntype == 'Block' and ast[4] == ''
+      elseif ntype == 'Block' and ast[6] == ''
         _ = nil -- empty files; just comments
-      elseif ntype == 'Comprehension' and ast[4] == '[]'
+      elseif ntype == 'Comprehension' and ast[6] == '[]'
         _ = nil -- empty comprehension
-      elseif ntype == 'ReversedIndex' and ast[4] == '[#]'
+      elseif ntype == 'ReversedIndex' and ast[6] == '[#]'
         arg[] = types.ReversedIndex!
-      elseif ntype == 'OuterVarShadow' and ast[4] == 'using nil'
+      elseif ntype == 'OuterVarShadow' and ast[6] == 'using nil'
         -- leave node empty; formatter writes 'using nil' when varList is nil
         _ = nil
       -- `x = class` with nothing else
-      elseif ntype == 'ClassDecl' and ast[4] == 'class'
+      elseif ntype == 'ClassDecl' and ast[6] == 'class'
         _ = nil
       else
-        arg[] = ast[4]
+        arg[] = ast[6]
 
   node = types[ntype]!
   -- print ntype, json.encode arg
   node\from_table arg
-  node\set_source ln, col
+  node\set_source ln, col, end_ln, end_col
   node.typ = ntype
 
-  -- attach metadata for TableLit nodes with raw multiline content
-  -- this allows comment association to properly handle comments inside empty tables
-  -- (TODO: cleanup, this is bad.jpeg)
+  -- attach raw content metadata for TableLit nodes with multiline comment-only bodies
+  -- this allows comment association to detect the raw text inside empty tables
   if arg._raw_content
     node._raw_content = arg._raw_content
-    node._end_line = arg._end_line
   node
 
 -- parse source string and return internal AST

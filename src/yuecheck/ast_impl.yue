@@ -14,13 +14,18 @@ class position
 class _ast
   -- positional data
   pos: nil
+  end_pos: nil
   g_yue_name: => @@yue_name
   g_yue_type: => @@yue_type
   g_src_pos: => @pos
   g_src_line: => @pos?.line or 0
   g_src_col: => @pos?.col or 0
-  set_source: (line, column) =>
+  g_end_pos: => @end_pos
+  g_end_line: => @end_pos?.line or 0
+  g_end_col: => @end_pos?.col or 0
+  set_source: (line, column, end_line, end_column) =>
     @pos = position { line, column }
+    @end_pos = position { end_line, end_column }
   is: (typ) =>
     unless typ
       error "comparing #{ @\g_yue_name! } to nil"

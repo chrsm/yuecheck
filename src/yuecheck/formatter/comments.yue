@@ -69,7 +69,7 @@ build_nodes_by_line = (ast) ->
 
     -- walk children
     for k, v in pairs node
-      if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments' ]
+      if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos', 'end_pos' ]
         continue
 
       if (type v) == 'table'
@@ -246,27 +246,9 @@ inject_comment = (node, comment, assoc_type) ->
       -- EOL is singular (last one wins if multiple, though rare)
       node._comments.eol = comment
 
--- get the end line of a node by recursively finding the maximum line among all children
--- used for determining block line ranges for recursive descent containment checking
 get_node_end_line = (node) ->
-  return 0 unless node and (type node) == 'table' and node.is
-
-  max_line = node\g_src_line! or 0
-
-  -- check all properties for child nodes
-  for k, v in pairs node
-    continue if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos' ]
-    if (type v) == 'table'
-      if v.is -- It's a single node
-        child_end = get_node_end_line v
-        max_line = math.max max_line, child_end
-      else -- It's a list
-        for item in *v
-          if (type item) == 'table' and item.is
-            child_end = get_node_end_line item
-            max_line = math.max max_line, child_end
-
-  max_line
+  return 0 unless node and node?.is
+  node\g_end_line!
 
 -- get the content indentation level of a block, by looking at its first stmt col,
 -- or the block's own col otherwise
@@ -349,7 +331,7 @@ find_containing_block = (ast, comment_line, comment_col) ->
     -- for non-Block nodes, recursively check all children for nested Blocks
     for k, v in pairs node
       -- ugh, cleanup TODO kthx
-      continue if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos' ]
+      continue if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos', 'end_pos' ]
 
       if (type v) == 'table'
         if v.is
@@ -385,8 +367,7 @@ is_keyword_eol_comment = (src, comment_line, comment_col) ->
       break
   false
 
--- collect TableLit nodes that span multiple lines (have _end_line from ast.yue)
--- these are empty tables that may contain comments
+-- collect TableLit nodes that span multiple lines and contain only comments
 collect_multiline_tablelits = (ast) ->
   tablelits = {}
 
@@ -394,17 +375,18 @@ collect_multiline_tablelits = (ast) ->
     return unless node and (type node) == 'table'
     return unless node.is and (type node.is) == 'function'
 
-    -- check if this is a multiline TableLit (has _end_line set by ast.yue)
-    if node\g_yue_name! == 'TableLit' and node._end_line
+    if node\g_yue_name! == 'TableLit' and node._raw_content
       start_line = node\g_src_line!
-      tablelits[] = {
-        node: node
-        start: start_line
-        finish: node._end_line
-      }
+      end_line = node\g_end_line!
+      if end_line > start_line
+        tablelits[] = {
+          node: node
+          start: start_line
+          finish: end_line
+        }
 
     for k, v in pairs node
-      continue if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', '_inner_comments', '_raw_content', '_end_line', 'pos' ]
+      continue if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', '_inner_comments', '_raw_content', 'pos', 'end_pos' ]
       if (type v) == 'table'
         if v.is and (type v.is) == 'function'
           walk v
