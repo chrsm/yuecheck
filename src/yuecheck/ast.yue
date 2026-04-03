@@ -8,77 +8,68 @@ import 'yuecheck.types'
 
 -- Build internal AST representation from yue.to_ast output
 build = (ast, parent = nil) ->
-  -- 6+ beyond = child nodes
+  -- { type, begin_line, begin_col, end_line, end_col, children... }
   { ntype, ln, col, end_ln, end_col } = ast
 
-  -- process children first
   arg = {}
   if #ast > 5
     child = ast[6]
-
-    if (type child) == 'table'
-      for v in *ast[6,]
-        unless v
-          break
-        arg[] = build v, { ntype, ast }
-    elseif ntype == 'Invoke' -- 6 is !
-      n = types.SingleString ast[6]
-      n\set_source ln, col, end_ln, end_col
-      arg[] = n
-    elseif ntype == 'ReversedIndex' and ast[6] == '[#]'
-      n = types.ReversedIndex!
-      n\set_source ln, col, end_ln, end_col
-      arg[] = n
-    elseif ntype == 'VarArgDef' and ast[6] == '...'
-      n = types.VarArgDef types.Variable types.Name '...'
-      n\set_source ln, col, end_ln, end_col
-      arg[] = n
-    else
-      -- Handle various AST simplifications from yue.to_ast
-      if ntype == 'TableLit' and string.sub(ast[6], 1, 1) == '{'
+    switch true
+      when (type child) == 'table'
+        for v in *ast[6,]
+          unless v
+            break
+          arg[] = build v, { ntype, ast }
+      --[[ handle various AST simplifications from yue.to_ast ]]
+      when ntype == 'Invoke'
+        n = types.SingleString child
+        n\set_source ln, col, end_ln, end_col
+        arg[] = n
+      when ntype == 'ReversedIndex' and child == '[#]'
+        n = types.ReversedIndex!
+        n\set_source ln, col, end_ln, end_col
+        arg[] = n
+      when ntype == 'VarArgDef' and child == '...'
+        n = types.VarArgDef types.Variable types.Name '...'
+        n\set_source ln, col, end_ln, end_col
+        arg[] = n
+      when ntype == 'TableLit' and string.sub(child, 1, 1) == '{'
         -- raw table literal string (e.g., "{\n\t-- comment\n}")
-        -- this happens when the table contains only comments (no actual values)
-        -- store the raw content so comment association can work correctly
-        raw = ast[6]
+        raw = child
         if (xstring.count_nl raw) > 0
           arg._raw_content = raw
         else
           n = types.SingleString raw
           n\set_source ln, col, end_ln, end_col
           arg[] = n
-      elseif ast[6] == '' and ntype == 'FnArgDefList'
+      when ntype == 'FnArgDefList' and child == ''
         arg[] = types.FnArgDef types.Variable types.Name ''
-      elseif ntype == 'Return' and ast[6] == 'return'
-        _ = nil -- explicit return keyword, no value
-      elseif ast[6] == '' and ntype == 'DefaultValue'
+      when ntype == 'DefaultValue' and child == ''
         arg[] = types.DefaultValue ''
-      elseif ntype == 'DoubleString'
+      when ntype == 'DoubleString'
         arg[] = types.DoubleStringInner ''
           |> types.DoubleStringContent
           |> types.DoubleString
-      elseif ntype == 'Block' and ast[6] == ''
+      --[[ nops ]]
+      when ntype == 'Return' and child == 'return'
+        _ = nil -- explicit return keyword, no value
+      when ntype == 'Block' and child == ''
         _ = nil -- empty files; just comments
-      elseif ntype == 'Comprehension' and ast[6] == '[]'
+      when ntype == 'Comprehension' and child == '[]'
         _ = nil -- empty comprehension
-      elseif ntype == 'ReversedIndex' and ast[6] == '[#]'
-        arg[] = types.ReversedIndex!
-      elseif ntype == 'OuterVarShadow' and ast[6] == 'using nil'
-        -- leave node empty; formatter writes 'using nil' when varList is nil
-        _ = nil
-      -- `x = class` with nothing else
-      elseif ntype == 'ClassDecl' and ast[6] == 'class'
-        _ = nil
+      when ntype == 'OuterVarShadow' and child == 'using nil'
+        _ = nil -- leave node empty; formatter writes 'using nil'
+      when ntype == 'ClassDecl' and child == 'class'
+        _ = nil -- `x = class` with nothing else
       else
-        arg[] = ast[6]
+        arg[] = child
 
   node = types[ntype]!
-  -- print ntype, json.encode arg
   node\from_table arg
   node\set_source ln, col, end_ln, end_col
   node.typ = ntype
 
   -- attach raw content metadata for TableLit nodes with multiline comment-only bodies
-  -- this allows comment association to detect the raw text inside empty tables
   if arg._raw_content
     node._raw_content = arg._raw_content
   node
