@@ -78,6 +78,8 @@ _check_cond_expr = (iftyp, n, args) ->
     message: "`#{ varn }` defaults to `#{ defv }`; " .. "cond #{ why } occurs `#{ iftyp } #{ varn } #{ op } #{ cv.item.value.v }`"
     line: n\g_src_line!
     col: n\g_src_col!
+    end_line: n\g_end_line!
+    end_col: n\g_end_col!
   }
 
 export default {

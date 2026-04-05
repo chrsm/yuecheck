@@ -42,12 +42,14 @@ describe 'linter customization', ->
     linter.enabled_rules = { wooop: true }
 
     r = linter.lint_string 'x = 1'
-    assert.same { {
-      type: 'FOO!'
-      message: 'oops!'
-      line: 1
-      col: 2
-    } }, r
+    assert.same {
+      {
+        type: 'FOO!'
+        message: 'oops!'
+        line: 1
+        col: 2
+      }
+    }, r
 
 describe 'find_comments lpegrex', ->
   it 'should handle retrieving comments from code', ->
@@ -203,7 +205,7 @@ describe 'comments/between', ->
 
     r = cmt.comments_between ast, 1, 3
     expect =
-      indices: [1, 2, 3]
+      indices: [ 1, 2, 3 ]
       * n: 1
         line: 1
         comment: '-- comment 1 (l1)'
@@ -221,7 +223,7 @@ describe 'comments/between', ->
 
     r = cmt.comments_between ast, 4, 12
     expect =
-      indices: [5, 6]
+      indices: [ 5, 6 ]
       * n: 1
         line: 5
         comment: '-- comment 3 (l5)'
@@ -236,7 +238,7 @@ describe 'comments/between', ->
 
     r = cmt.comments_between ast, 15, 19
     expect =
-      indices: [16, 19]
+      indices: [ 16, 19 ]
       * n: 1
         line: 16
         comment: '-- comment (l16)'
@@ -415,12 +417,16 @@ describe 'rule_style_comment', ->
         type: 'WARN'
         line: 1
         col: 1
+        end_line: -1
+        end_col: -1
         message: 'multi-line comment should have space between -- and content'
       },
       {
         type: 'WARN'
         line: 7
         col: 9
+        end_line: -1
+        end_col: -1
         message: 'multi-line comment should have space between -- and content'
       },
     }, r
@@ -436,12 +442,16 @@ describe 'rule_style_comment', ->
         type: 'WARN'
         line: 1
         col: 1
+        end_line: -1
+        end_col: -1
         message: 'multi-line comment should have space between -- and content'
       },
       {
         type: 'WARN'
         line: 3
         col: 1
+        end_line: -1
+        end_col: -1
         message: 'multi-line comment should have space between -- and content'
       },
     }, r
@@ -541,6 +551,8 @@ describe 'rule_style_import_as_ident', ->
         message: 'import statement and variable use same name'
         line: 1
         col: 8
+        end_line: 1
+        end_col: 16
       },
     }, r
 
@@ -574,6 +586,8 @@ describe 'rule_unnecessary_doublestring', ->
         message: 'double-quoted string where single-quoted would suffice'
         line: 2
         col: 5
+        end_line: 2
+        end_col: 8
       },
     }, r
 
@@ -586,6 +600,8 @@ describe 'rule_unnecessary_doublestring', ->
         message: 'double-quoted string where single-quoted would suffice'
         line: 1
         col: 3
+        end_line: 1
+        end_col: 8
       },
     }, r
 
@@ -598,12 +614,16 @@ describe 'rule_unnecessary_doublestring', ->
         message: 'double-quoted string where single-quoted would suffice'
         line: 1
         col: 3
+        end_line: 1
+        end_col: 6
       },
       {
         type: 'WARN'
         message: 'double-quoted string where single-quoted would suffice'
         line: 1
         col: 10
+        end_line: 1
+        end_col: 13
       },
     }, r
 
@@ -627,6 +647,8 @@ describe 'rule_unreachable', ->
         message: 'unreachable code after break statement'
         line: 4
         col: 3
+        end_line: 4
+        end_col: 11
       },
     }, r
 
@@ -642,6 +664,8 @@ describe 'rule global_writes', ->
         message: 'discourage write to global (_G.dotchain)'
         line: 1
         col: 1
+        end_line: 1
+        end_col: 18
       },
     }, r
 
@@ -654,6 +678,8 @@ describe 'rule global_writes', ->
         message: 'discourage write to global (_G.bracket)'
         line: 1
         col: 1
+        end_line: 1
+        end_col: 20
       },
     }, r
 
@@ -666,6 +692,8 @@ describe 'rule global_writes', ->
         message: 'discourage write to global (_G.bracket.double)'
         line: 1
         col: 1
+        end_line: 1
+        end_col: 47
       },
     }, r
 
@@ -717,12 +745,16 @@ describe 'rule_style_conditionals', ->
 
   it 'should warn on simple if-not', ->
     r = linter.lint_string 'if not x\n  print 1'
-    assert.same { {
-      type: 'WARN'
-      message: '`if not x` could be `unless x`'
-      line: 1
-      col: 1
-    } }, r
+    assert.same {
+      {
+        type: 'WARN'
+        message: '`if not x` could be `unless x`'
+        line: 1
+        col: 1
+        end_line: 2
+        end_col: 10
+      }
+    }, r
 
   it 'should warn on a simple unless-not', ->
     r = linter.lint_string 'unless not x\n  print 1'
@@ -732,6 +764,8 @@ describe 'rule_style_conditionals', ->
       message: '`unless not x` could be `if x`'
       line: 1
       col: 1
+      end_line: 2
+      end_col: 10
     }, r[1]
 
 -- TODO: make this rule configurable.
@@ -751,6 +785,8 @@ describe 'rule_style_simplify_if_to_switch', ->
       message: 'simple conditional chain for variables { x } could be simplified to switch'
       line: 1
       col: 1
+      end_line: 10
+      end_col: 10
     }, r[1]
 
   it 'should warn with multiple variables', ->
@@ -761,6 +797,8 @@ describe 'rule_style_simplify_if_to_switch', ->
       message: 'simple conditional chain for variables { x, y } could be simplified to switch'
       line: 1
       col: 1
+      end_line: 10
+      end_col: 10
     }, r[1]
 
 describe 'rule_stdlib_usage', ->
@@ -785,6 +823,8 @@ describe 'rule_stdlib_usage', ->
       message: 'os.clock accepts no arguments'
       line: 1
       col: 1
+      end_line: 1
+      end_col: 11
     }, r[1]
 
   it 'should complain if more arguments are passed', ->
@@ -794,6 +834,8 @@ describe 'rule_stdlib_usage', ->
       message: 'os.getenv requires 1 argument'
       line: 1
       col: 1
+      end_line: 1
+      end_col: 17
     }, r[1]
 
     r = linter.lint_string 'os.difftime t1, t2, t3'
@@ -802,6 +844,8 @@ describe 'rule_stdlib_usage', ->
       message: 'os.difftime requires 2 arguments'
       line: 1
       col: 1
+      end_line: 1
+      end_col: 23
     }, r[1]
 
     r = linter.lint_string 'pairs a,b'
@@ -810,6 +854,8 @@ describe 'rule_stdlib_usage', ->
       message: 'pairs requires 1 argument'
       line: 1
       col: 1
+      end_line: 1
+      end_col: 10
     }, r[1]
 
     r = linter.lint_string 'ipairs t1, t2'
@@ -818,6 +864,8 @@ describe 'rule_stdlib_usage', ->
       message: 'ipairs requires 1 argument'
       line: 1
       col: 1
+      end_line: 1
+      end_col: 14
     }, r[1]
 
   it 'should complain if an unknown func is called', ->
@@ -828,6 +876,8 @@ describe 'rule_stdlib_usage', ->
       message: 'unknownfn not found in std os'
       line: 1
       col: 1
+      end_line: 1
+      end_col: 14
     }, r[1]
 
   it 'should handle optional count', ->
@@ -843,6 +893,8 @@ describe 'rule_stdlib_usage', ->
       message: 'os.exit optionally accepts 2 arguments'
       line: 1
       col: 1
+      end_line: 1
+      end_col: 14
     }, r[1]
 
   it 'should handle a mix of required and optional', ->
@@ -852,6 +904,8 @@ describe 'rule_stdlib_usage', ->
       message: 'os.setlocale requires 1 argument, optionally accepts 1 argument'
       line: 1
       col: 1
+      end_line: 1
+      end_col: 19
     }, r[1]
 
   it 'should handle less than needed count', ->
@@ -861,6 +915,8 @@ describe 'rule_stdlib_usage', ->
       message: 'os.setlocale requires 1 argument, optionally accepts 1 argument'
       line: 1
       col: 1
+      end_line: 1
+      end_col: 14
     }, r[1]
 
   it 'should handle variadic args by ignoring the call completely', ->
@@ -877,6 +933,8 @@ describe 'rule_stdlib_usage', ->
       message: 'warn requires 1 argument, optionally accepts multiple args'
       line: 1
       col: 1
+      end_line: 1
+      end_col: 6
     }, r[1]
 
 describe 'style_discourage_require', ->
@@ -889,6 +947,8 @@ describe 'style_discourage_require', ->
       message: 'use `import` instead of `require`'
       line: 1
       col: 1
+      end_line: 1
+      end_col: 8
     }, r[1]
 
     r = linter.lint_string 'x = require("a")'
@@ -897,6 +957,8 @@ describe 'style_discourage_require', ->
       message: 'use `import` instead of `require`'
       line: 1
       col: 5
+      end_line: 1
+      end_col: 12
     }, r[1]
 
 describe 'style_discourage_unnecessary_sb', ->
@@ -909,6 +971,8 @@ describe 'style_discourage_unnecessary_sb', ->
       message: "use `c:` instead of `['c']`"
       line: 3
       col: 4
+      end_line: 3
+      end_col: 7
     }, r[1]
 
   it 'should handle multiple per lit', ->
@@ -919,12 +983,16 @@ describe 'style_discourage_unnecessary_sb', ->
         message: "use `a:` instead of `['a']`"
         line: 2
         col: 4
+        end_line: 2
+        end_col: 7
       },
       {
         type: 'WARN'
         message: "use `c:` instead of `['c']`"
         line: 3
         col: 4
+        end_line: 3
+        end_col: 7
       },
     }, r
 
@@ -967,18 +1035,24 @@ describe 'basic_nilness', ->
         message: '`scopearg_b` defaults to `true`; cond never occurs `if scopearg_b == nil`'
         line: 3
         col: 3
+        end_line: 6
+        end_col: 46
       },
       {
         type: 'WARN'
         message: '`unless_never` defaults to `true`; cond never occurs `unless unless_never != nil`'
         line: 10
         col: 3
+        end_line: 11
+        end_col: 17
       },
       {
         type: 'WARN'
         message: '`unless_always` defaults to `true`; cond always occurs `unless unless_always == nil`'
         line: 14
         col: 3
+        end_line: 15
+        end_col: 17
       },
     }, r
 
@@ -992,6 +1066,8 @@ describe 'basic_nilness', ->
       message: '`b` defaults to `true`; cond never occurs `if b == nil`'
       line: 1
       col: 24
+      end_line: 1
+      end_col: 35
     }, r[1]
 
   it 'should detect `if`-always', ->
@@ -1004,6 +1080,8 @@ describe 'basic_nilness', ->
       message: '`b` defaults to `true`; cond always occurs `if b != nil`'
       line: 1
       col: 24
+      end_line: 1
+      end_col: 35
     }, r[1]
 
   it 'should detect `unless`-always', ->
@@ -1015,6 +1093,8 @@ describe 'basic_nilness', ->
       message: '`b` defaults to `true`; cond always occurs `unless b == nil`'
       line: 1
       col: 24
+      end_line: 1
+      end_col: 39
     }, r[1]
 
   it 'should detect `unless`-never', ->
@@ -1026,6 +1106,8 @@ describe 'basic_nilness', ->
       message: '`b` defaults to `true`; cond never occurs `unless b != nil`'
       line: 1
       col: 24
+      end_line: 1
+      end_col: 39
     }, r[1]
 
   -- some day, it'd be nice to _warn_ that a check could be redundant.
@@ -1043,6 +1125,8 @@ describe 'basic_nilness', ->
       message: '`b` defaults to `1`; cond never occurs `if b == nil`'
       line: 1
       col: 21
+      end_line: 1
+      end_col: 32
     }, r[1]
 
     r = linter.lint_string 'x = (a, b = 1) -> 1 if b != nil',
@@ -1070,6 +1154,8 @@ describe 'basic_nilness', ->
       message: '`str` defaults to `"b"`; cond never occurs `if str == nil`'
       line: 1
       col: 25
+      end_line: 1
+      end_col: 38
     }, r[1]
 
     r = linter.lint_string 'x = (a, str = "b") -> 1 if str != nil'
@@ -1078,6 +1164,8 @@ describe 'basic_nilness', ->
       message: '`str` defaults to `"b"`; cond always occurs `if str != nil`'
       line: 1
       col: 25
+      end_line: 1
+      end_col: 38
     }, r[1]
 
     r = linter.lint_string 'x = (a, str = "b") -> 1 unless str == nil'
@@ -1086,6 +1174,8 @@ describe 'basic_nilness', ->
       message: '`str` defaults to `"b"`; cond always occurs `unless str == nil`'
       line: 1
       col: 25
+      end_line: 1
+      end_col: 42
     }, r[1]
 
     r = linter.lint_string 'x = (a, str = "b") -> 1 unless str != nil'
@@ -1094,6 +1184,8 @@ describe 'basic_nilness', ->
       message: '`str` defaults to `"b"`; cond never occurs `unless str != nil`'
       line: 1
       col: 25
+      end_line: 1
+      end_col: 42
     }, r[1]
 
   it 'should handle simple string defaults', ->
@@ -1103,6 +1195,8 @@ describe 'basic_nilness', ->
       message: '`str` defaults to `\'b\'`; cond never occurs `if str == nil`'
       line: 1
       col: 25
+      end_line: 1
+      end_col: 38
     }, r[1]
 
     r = linter.lint_string 'x = (a, str = \'b\') -> 1 if str != nil'
@@ -1111,6 +1205,8 @@ describe 'basic_nilness', ->
       message: '`str` defaults to `\'b\'`; cond always occurs `if str != nil`'
       line: 1
       col: 25
+      end_line: 1
+      end_col: 38
     }, r[1]
 
     r = linter.lint_string 'x = (a, str = \'b\') -> 1 unless str == nil'
@@ -1119,6 +1215,8 @@ describe 'basic_nilness', ->
       message: '`str` defaults to `\'b\'`; cond always occurs `unless str == nil`'
       line: 1
       col: 25
+      end_line: 1
+      end_col: 42
     }, r[1]
 
     r = linter.lint_string 'x = (a, str = \'b\') -> 1 unless str != nil'
@@ -1127,6 +1225,8 @@ describe 'basic_nilness', ->
       message: '`str` defaults to `\'b\'`; cond never occurs `unless str != nil`'
       line: 1
       col: 25
+      end_line: 1
+      end_col: 42
     }, r[1]
 
 describe 'rule_stdlib_match', ->
@@ -1143,6 +1243,8 @@ describe 'rule_stdlib_match', ->
       message: 'empty pattern'
       line: 1
       col: 23
+      end_line: 1
+      end_col: 25
     }, r[1]
 
   it 'should work without assignment', ->
@@ -1152,6 +1254,8 @@ describe 'rule_stdlib_match', ->
       message: 'invalid pattern \'[^\': malformed pattern (missing \']\')'
       line: 1
       col: 20
+      end_line: 1
+      end_col: 24
     }, r[1]
 
     r = linter.lint_string "if string.match 'a', '[a'\n  print 1"
@@ -1160,6 +1264,8 @@ describe 'rule_stdlib_match', ->
       message: 'invalid pattern \'[a\': malformed pattern (missing \']\')'
       line: 1
       col: 22
+      end_line: 1
+      end_col: 26
     }, r[1]
 
   it 'should warn on invalid patterns', ->
@@ -1170,6 +1276,8 @@ describe 'rule_stdlib_match', ->
       message: 'invalid pattern \'[a\': malformed pattern (missing \']\')'
       line: 1
       col: 23
+      end_line: 1
+      end_col: 27
     }, r[1]
 
   it 'should warn about capture group mismatch', ->
@@ -1180,6 +1288,8 @@ describe 'rule_stdlib_match', ->
       message: 'string.match assigns 2 vars, but has 1 capture'
       line: 1
       col: 26
+      end_line: 1
+      end_col: 31
     }, r[1]
 
     -- less assigns than caps is OK, but iffy
@@ -1189,6 +1299,8 @@ describe 'rule_stdlib_match', ->
       message: 'string.match assigns 1 var, but has 2 captures'
       line: 1
       col: 23
+      end_line: 1
+      end_col: 31
     }, r[1]
 
   it 'should hints for simplification', ->
@@ -1198,6 +1310,8 @@ describe 'rule_stdlib_match', ->
       message: 'use `%d` instead of [0-9]'
       line: 1
       col: 23
+      end_line: 1
+      end_col: 31
     }, r[1]
 
     r = linter.lint_string "a = string.match 'a', '[a-z]+'"
@@ -1206,6 +1320,8 @@ describe 'rule_stdlib_match', ->
       message: 'use `%l` instead of [a-z]'
       line: 1
       col: 23
+      end_line: 1
+      end_col: 31
     }, r[1]
 
     r = linter.lint_string "a = string.match 'a', '[A-Z]+'"
@@ -1214,6 +1330,8 @@ describe 'rule_stdlib_match', ->
       message: 'use `%u` instead of [A-Z]'
       line: 1
       col: 23
+      end_line: 1
+      end_col: 31
     }, r[1]
 
 describe 'rule_nil_comparisons', ->
@@ -1244,6 +1362,8 @@ describe 'rule_nil_comparisons', ->
         message: "syntax error: `x #{ op } nil`"
         line: 1
         col: 5
+        end_line: 1
+        end_col: 11 + #op
       }, r[1]
 
   it 'should warn on invalid comparisons (even lhs)', ->
@@ -1261,6 +1381,8 @@ describe 'rule_nil_comparisons', ->
         message: "syntax error: `nil #{ op } x`"
         line: 1
         col: 5
+        end_line: 1
+        end_col: 11 + #op
       }, r[1]
 
   it 'should work on conds', ->
@@ -1270,6 +1392,8 @@ describe 'rule_nil_comparisons', ->
       message: 'syntax error: `x > nil`'
       line: 1
       col: 4
+      end_line: 1
+      end_col: 11
     }, r[1]
 
     r = linter.lint_string 'unless x < nil\n  print 1'
@@ -1278,6 +1402,8 @@ describe 'rule_nil_comparisons', ->
       message: 'syntax error: `x < nil`'
       line: 1
       col: 8
+      end_line: 1
+      end_col: 15
     }, r[1]
 
 describe 'lpegrex grammar check', ->

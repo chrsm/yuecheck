@@ -42,6 +42,8 @@ stdlib_usage = rule.FuncRule
         message: "#{ fn } not found in std #{ pkg }"
         line: node\g_src_line!
         col: node\g_src_col!
+        end_line: node\g_end_line!
+        end_col: node\g_end_col!
       }
 
     oargs = args
@@ -99,6 +101,8 @@ stdlib_usage = rule.FuncRule
       message: "#{ cn } #{ table.concat msg, ', ' }"
       line: node\g_src_line!
       col: node\g_src_col!
+      end_line: node\g_end_line!
+      end_col: node\g_end_col!
     }
 
 --[[

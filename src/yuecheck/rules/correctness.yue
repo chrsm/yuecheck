@@ -31,6 +31,8 @@ cond_identical_exprs =
       message: "identical expressions on lhs and rhs of '#{ op }' operator"
       line: node\g_src_line!
       col: node\g_src_col!
+      end_line: node\g_end_line!
+      end_col: node\g_end_col!
     }
 
 -- cond_impossible
@@ -102,6 +104,8 @@ cond_impossible =
       :message
       line: node\g_src_line!
       col: node\g_src_col!
+      end_line: node\g_end_line!
+      end_col: node\g_end_col!
     }
 
 -- nil_comparisons
@@ -143,6 +147,8 @@ nil_comparisons =
       message: "syntax error: `#{ lhs } #{ op } #{ rhs }`"
       line: node\g_src_line!
       col: node\g_src_col!
+      end_line: node\g_end_line!
+      end_col: node\g_end_col!
     }
 
 -- unreachable
@@ -173,14 +179,14 @@ unreachable =
 
     -- assume block
     breakfound = false
-    afterbreak = false
+    afterbreak = nil
     for i, v in ipairs node.body.statementOrComments
       if v.content\is types.BreakLoop
         breakfound = true
         continue
 
       if breakfound
-        afterbreak = { v\g_src_line!, v\g_src_col! }
+        afterbreak = v
 
     unless breakfound and afterbreak
       return nil
@@ -188,8 +194,10 @@ unreachable =
     {
       type: 'ERROR'
       message: 'unreachable code after break statement'
-      line: afterbreak[1]
-      col: afterbreak[2]
+      line: afterbreak\g_src_line!
+      col: afterbreak\g_src_col!
+      end_line: afterbreak\g_end_line!
+      end_col: afterbreak\g_end_col!
     }
 
 -- basic_nilness
@@ -236,6 +244,8 @@ basic_nilness =
           -- override the position for the moment, if starts before
           r.line = stmt.appendix\g_src_line!
           r.col = stmt.appendix\g_src_col!
+          r.end_line = stmt.appendix\g_end_line!
+          r.end_col = stmt.appendix\g_end_col!
           results[] = r
 
       target = stmt.content?.expList?.exprs?[1]?.pipeExprs?[1]?.expos?[1]?.item?.value
@@ -244,6 +254,8 @@ basic_nilness =
         if r
           r.line = target\g_src_line!
           r.col = target\g_src_col!
+          r.end_line = target\g_end_line!
+          r.end_col = target\g_end_col!
           results[] = r
 
     (#results > 0 and results) or nil

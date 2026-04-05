@@ -32,6 +32,8 @@ class Rule
       :message
       line: node\g_src_line!
       col: node\g_src_col!
+      end_line: node\g_end_line!
+      end_col: node\g_end_col!
     }
   check: (node) =>
     @checker node

@@ -31,6 +31,8 @@ style_comment_space =
       message: "#{ typ } comment should have space between -- and content"
       line: node\g_src_line!
       col: node\g_src_col!
+      end_line: node\g_end_line!
+      end_col: node\g_end_col!
     }
 
 -- style_zero_index
@@ -71,6 +73,8 @@ style_zero_index =
       message: 'array indices start at 1, likely error'
       line: node\g_src_line!
       col: node\g_src_col!
+      end_line: node\g_end_line!
+      end_col: node\g_end_col!
     }
 
 -- style_import_as_ident
@@ -107,6 +111,8 @@ style_import_as_ident =
       -- should this point to the target name?
       -- or beginning of line?
       col: node\g_src_col!
+      end_line: node\g_end_line!
+      end_col: node\g_end_col!
     }
 
 -- style_unnecessary_doublestring
@@ -150,6 +156,8 @@ style_unnecessary_doublestring =
       message: 'double-quoted string where single-quoted would suffice'
       line: node\g_src_line!
       col: node\g_src_col!
+      end_line: node\g_end_line!
+      end_col: node\g_end_col!
     }
 
 -- style_conditionals
@@ -204,6 +212,8 @@ style_conditionals =
       :message
       line: node\g_src_line!
       col: node\g_src_col!
+      end_line: node\g_end_line!
+      end_col: node\g_end_col!
     }
 
 -- style_simplify_if_to_switch
@@ -298,6 +308,8 @@ style_simplify_if_to_switch =
       message: "simple conditional chain for variables { #{ nstr } } could be simplified to switch"
       line: node\g_src_line!
       col: node\g_src_col!
+      end_line: node\g_end_line!
+      end_col: node\g_end_col!
     }
 
 -- style_discourage_require
@@ -316,6 +328,8 @@ style_discourage_require =
       message: 'use `import` instead of `require`'
       line: node\g_src_line!
       col: node\g_src_col!
+      end_line: node\g_end_line!
+      end_col: node\g_end_col!
     }
 
 -- style_discourage_unnecessary_sb
@@ -360,6 +374,8 @@ style_discourage_unnecessary_sb =
                     message: "use `#{ k }:` instead of `['#{ k }']`"
                     line: item.str\g_src_line!
                     col: item.str\g_src_col!
+                    end_line: item.str\g_end_line!
+                    end_col: item.str\g_end_col!
                   }
 
     #results > 0 and results or nil
