@@ -138,6 +138,16 @@ describe 'formatter', ->
       r = fmt.format input
       assert.same 'switch x\n  -- comment\n  when 1\n    y = 1', r
 
+    it 'should not move trailing comments 1', ->
+      input, expect = parse_td fget 'fmt_cmt_nomove'
+      r = fmt.format input
+      assert.same expect, r
+
+    it 'should not move trailing comments 2 (dedent)', ->
+      input, expect = parse_td fget 'fmt_cmt_nomove2'
+      r = fmt.format input
+      assert.same expect, r
+
   describe 'eof comments', ->
     it 'should keep comments that at eof', ->
       r = fmt.format 'x = 1\n-- eof comment'

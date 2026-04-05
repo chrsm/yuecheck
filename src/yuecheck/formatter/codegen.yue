@@ -1497,6 +1497,12 @@ generators.TableBlock = (node, ctx, gen) ->
 
     parts[] = ir.HARDLINE if i < #node.values
 
+  -- emit trailing comments after the last value
+  if node._trailing_comments
+    for comment in *node._trailing_comments
+      parts[] = ir.HARDLINE
+      parts[] = gen comment, ctx
+
   ir.nest 2, ir.concat(parts)
 
 generators.TableBlockIndent = (node, ctx, gen) ->

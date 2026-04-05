@@ -1,0 +1,17 @@
+-- input
+fun = ->
+  nil
+
+v =
+  prop: 0
+  -- files offer `seek`, `setvbuf` in addition to some of the above..
+  -- can we handle that somehow?
+
+-- expect
+fun = ->
+  nil
+
+v =
+  prop: 0
+  -- files offer `seek`, `setvbuf` in addition to some of the above..
+  -- can we handle that somehow?

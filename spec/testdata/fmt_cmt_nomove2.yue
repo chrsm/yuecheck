@@ -1,0 +1,11 @@
+-- input
+v =
+  prop: 0
+  -- files offer `seek`, `setvbuf` in addition to some of the above..
+  -- can we handle that somehow?
+
+-- expect
+v =
+  prop: 0
+  -- files offer `seek`, `setvbuf` in addition to some of the above..
+  -- can we handle that somehow?

@@ -406,6 +406,66 @@ find_containing_tablelit = (comment_line, tablelits) ->
       return entry.node
   nil
 
+-- collect TableBlock nodes with their position and content indentation
+-- `TableBlocks` are indented table syntax (`v =\n  prop: 0`) and are _not_
+-- Block nodes, so they need separate handling for trailing comment association
+collect_tableblocks = (ast) ->
+  tableblocks = {}
+
+  walk = (node) ->
+    return unless node and (type node) == 'table'
+    return unless node.is and (type node.is) == 'function'
+
+    if node\is types.TableBlock
+      if node.values and #node.values > 0
+        first_val = node.values[1]
+        content_col = first_val\g_src_col!
+        tableblocks[] = {
+          :node
+          start_line: node\g_src_line!
+          end_line: node\g_end_line!
+          :content_col
+        }
+
+    for k, v in pairs node
+      continue if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', '_inner_comments', '_raw_content', 'pos', 'end_pos' ]
+      if (type v) == 'table'
+        if v.is and (type v.is) == 'function'
+          walk v
+        else
+          for item in *v
+            if (type item) == 'table' and item.is and (type item.is) == 'function'
+              walk item
+
+  walk ast
+  tableblocks
+
+-- find the TableBlock that a trailing comment belongs to
+-- comment must be after the table header, same col as table content,
+-- and the table's end must be the the closest prev node
+--
+-- example
+--[[
+  x = 
+    prop: 0
+    -- ^ i belong here ^
+  print 1
+]]
+find_containing_tableblock = (comment_line, comment_col, tableblocks) ->
+  best = nil
+  best_end = -1
+
+  for tb in *tableblocks
+    unless comment_line > tb.start_line and comment_col == tb.content_col
+      continue
+    -- comment is after the table's AST range and indentation matches;
+    -- prefer the table ending closest to the comment (most specific)
+    if tb.end_line > best_end and tb.end_line < comment_line
+      best = tb.node
+      best_end = tb.end_line
+
+  best
+
 -- inject comments into AST nodes
 -- takes: source string, AST root, parsed comments (from comments.to_ast)
 -- modifies AST in place by adding _comments properties to nodes
@@ -423,6 +483,8 @@ inject = (src, ast, comments) ->
   -- collect multiline TableLit nodes (empty tables that may contain comments, eg `t = {\n--abc\n}` have the comment as
   -- a psuedo-node now (probably from some of the comment updates pre-0.33.9; didn't dig into git)
   multiline_tablelits = collect_multiline_tablelits ast
+  -- collect TableBlock nodes for trailing comment association
+  tableblocks = collect_tableblocks ast
 
   for line_idx in *comments.indices
     line_comments = comments[line_idx]
@@ -457,6 +519,13 @@ inject = (src, ast, comments) ->
       if tablelit
         tablelit._inner_comments or= {}
         tablelit._inner_comments[] = comment
+        continue
+
+      -- check if this comment trails a TableBlock
+      tableblock = find_containing_tableblock comment_line, comment_col, tableblocks
+      if tableblock
+        tableblock._trailing_comments or= {}
+        tableblock._trailing_comments[] = comment
         continue
 
       -- otherwise, inject into the containing Block.statementOrComments
