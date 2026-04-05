@@ -1,0 +1,12 @@
+-- input
+do
+  do
+    unless #node.literal.inners == 1 and node.target.name.v == node.literal.inners[1].v
+      print 1
+
+-- expect
+do
+  do
+    unless #node.literal.inners == 1 and
+           node.target.name.v == node.literal.inners[1].v
+      print 1

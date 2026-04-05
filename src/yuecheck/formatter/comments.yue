@@ -446,7 +446,7 @@ collect_tableblocks = (ast) ->
 --
 -- example
 --[[
-  x = 
+  x =
     prop: 0
     -- ^ i belong here ^
   print 1

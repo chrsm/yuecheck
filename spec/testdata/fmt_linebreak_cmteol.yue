@@ -1,0 +1,9 @@
+-- input
+do
+  do
+    singleq = (node.segments[1].content.v\match "'") -- contains a singlequote, so it's OK
+
+-- expect
+do
+  do
+    singleq = (node.segments[1].content.v\match "'") -- contains a singlequote, so it's OK

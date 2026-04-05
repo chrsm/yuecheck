@@ -600,6 +600,17 @@ describe 'formatter', ->
       r = fmt.format src
       assert.same expect, r
 
+    it 'should ignore eol comments', ->
+      src, expect = parse_td fget 'fmt_linebreak_cmteol'
+
+      r = fmt.format src
+      assert.same expect, r
+
+    it 'should break around conditionals when needed', ->
+      src, expect = parse_td fget 'fmt_linebreak_conds'
+      r = fmt.format src
+      assert.same expect, r
+
   -- TODO: add some more thorough test cases
   -- mostly adding these as i work on stuff and dogfood the formatter
   describe 'golden files', ->

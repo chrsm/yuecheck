@@ -311,7 +311,10 @@ get_eol_doc_for_node = (node) ->
   comment._emitted = true
   -- strip trailing whitespace from comment text
   comment_text = comment.v\gsub '%s+$', ''
-  ir.cat ir.SPACE, ir.text(comment_text)
+
+  -- wrap in `line_suffix`, don't count toward line length when layout decides
+  -- whether to break groups or not
+  ir.line_suffix ir.cat ir.SPACE, (ir.text comment_text)
 
 -- Get EOL comment from a node or any of its descendants (depth-first).
 -- Used for container items (like table rows) where the EOL comment may be
@@ -325,7 +328,7 @@ get_eol_doc_recursive = (node) ->
     unless comment._emitted
       comment._emitted = true
       comment_text = comment.v\gsub '%s+$', ''
-      return ir.cat ir.SPACE, ir.text(comment_text)
+      return ir.line_suffix ir.cat ir.SPACE, (ir.text comment_text)
 
   return ir.EMPTY unless node.is
 
@@ -362,7 +365,7 @@ get_eol_doc = (line_num, ctx) ->
       ctx.emitted_eol_lines[line_num] = true
       comment._emitted = true
       comment_text = comment.v\gsub '%s+$', ''
-      return ir.cat ir.SPACE, ir.text(comment_text)
+      return ir.line_suffix ir.cat ir.SPACE, (ir.text comment_text)
 
   ir.EMPTY
 
@@ -905,10 +908,52 @@ generators.Exp = (node, ctx, gen) ->
     operand_doc = build_pipe_chain op_val.pipeExprs, ctx, gen
     operands[] = operand_doc
 
-  -- Use breakable_binop_trailing: operators stay at end of line when broken
-  result = ir.breakable_binop_trailing operands, operators, 3
+  -- check if we have a mix of logical (and/or) and other ops
+  -- IF mixed, prefer breaking at logical ops, group operands between logical
+  -- operators into flat subexps
+  has_logical = false
+  has_other = false
+  for op_val in *node.opValues
+    op_text = op_val.op.v
+    if op_text == 'and' or op_text == 'or'
+      has_logical = true
+    else
+      has_other = true
 
-  -- Handle nil coalescing if present
+  binop_indent = ctx.binop_indent ?? 3
+
+  result = if has_logical and has_other
+    -- group operands by logical operators
+    -- each group becomes a flat subexp, only the logical bits are breakable
+    grouped_operands = {}
+    grouped_operators = {}
+    current_parts = { operands[1] }
+
+    for i, op_val in ipairs node.opValues
+      op_text = op_val.op.v
+      if op_text == 'and' or op_text == 'or'
+        -- finish current group as a flat concat
+        group_doc = current_parts[1]
+        for j = 2, #current_parts
+          group_doc = ir.cat group_doc, current_parts[j]
+        grouped_operands[] = group_doc
+        grouped_operators[] = operators[i]
+        current_parts = { operands[i + 1] }
+      else
+        -- append to current group: space + op + space + operand
+        current_parts[] = ir.cat ir.SPACE, operators[i], ir.SPACE, operands[i + 1]
+
+    -- _don't_ forget the last group
+    group_doc = current_parts[1]
+    for j = 2, #current_parts
+      group_doc = ir.cat group_doc, current_parts[j]
+    grouped_operands[] = group_doc
+
+    ir.breakable_binop_trailing grouped_operands, grouped_operators, binop_indent
+  else
+    ir.breakable_binop_trailing operands, operators, binop_indent
+
+  -- handle nil coalescing
   if node.nilCoalesed
     result = ir.cat result, ir.text(' ?? '), gen(node.nilCoalesed, ctx)
 
@@ -1075,9 +1120,11 @@ generators.ChainValue = (node, ctx, gen) ->
     inner = ir.concat parts
     return ir.nest 2, inner
 
-  -- we _don't_ want to break index keys (`r[v.line]`, but really long obv)
-  -- it looks dumb and is confusing
-  if ctx.inside_bracket_index
+  -- inside bracket indices (`r[v.line]`) or conditional expressions
+  -- (`if obj\method!`), chains _must_ stay flat
+  -- breaking at [.\::] inside of conditions == invalid syntax
+  -- (think `with x\n  \abc!` but not in a with)
+  if ctx.inside_bracket_index or ctx.inside_condition
     return ir.concat [ gen_chain_item(it, ctx, gen) for it in *items ]
 
   -- for single-line source chains, use breakable_chain for line-width-aware breaking
@@ -1618,10 +1665,14 @@ generators.OuterVarShadow = (node, ctx, gen) ->
     ir.text 'using nil'
 
 generators.IfLine = (node, ctx, gen) ->
-  ir.cat ir.text(node.type.v), ir.SPACE, gen(node.condition, ctx)
+  cond_ctx = { k, v for k, v in pairs ctx }
+  cond_ctx.inside_condition = true
+  ir.cat (ir.text node.type.v), ir.SPACE, (gen node.condition, cond_ctx)
 
 generators.WhileLine = (node, ctx, gen) ->
-  ir.cat ir.text(node.type.v), ir.SPACE, gen(node.condition, ctx)
+  cond_ctx = { k, v for k, v in pairs ctx }
+  cond_ctx.inside_condition = true
+  ir.cat (ir.text node.type.v), ir.SPACE, (gen node.condition, cond_ctx)
 
 generators.If = (node, ctx, gen) ->
   nodes = node.nodes or {}
@@ -1634,17 +1685,24 @@ generators.If = (node, ctx, gen) ->
   while i <= #nodes
     item = nodes[i]
     if item\is types.IfCond
+      -- align cond continuation after keyword so that when a _long_
+      -- cond breaks, the continuation lines up after 'if '/'elseif '
+      -- chains inside conditions must stay flat (inside_condition)
+      cond_ctx = { k, v for k, v in pairs ctx }
+      cond_ctx.binop_indent = 0
+      cond_ctx.inside_condition = true
       if first
+        keyword_len = #iftyp + 1
         parts[] = ir.text iftyp
         parts[] = ir.SPACE
         first = false
+        parts[] = ir.nest keyword_len, gen(item, cond_ctx)
       else
         above_doc = get_above_doc item, ctx
         if above_doc._doc_type != 'empty'
           parts[] = above_doc
         parts[] = ir.text 'elseif '
-
-      parts[] = gen item, ctx
+        parts[] = ir.nest 7, gen(item, cond_ctx)
 
       cond_line = item\g_src_line!
       next_node = i + 1 <= #nodes and nodes[i + 1] or nil
@@ -1743,9 +1801,16 @@ generators.IfCond = (node, ctx, gen) ->
 
 generators.Unless = (node, ctx, gen) ->
   eol = get_eol_doc node.condition\g_src_line!, ctx
+  -- align condition continuation after 'unless ' and suppress the inner binop
+  -- indent (so fill breaks land at the keyword column)
+  -- chains inside conditions must stay flat (inside_condition) because
+  -- breaking at [\.::] produces invalid syntax.
+  cond_ctx = { k, v for k, v in pairs ctx }
+  cond_ctx.binop_indent = 0
+  cond_ctx.inside_condition = true
   ir.cat(
     ir.text('unless '),
-    gen(node.condition, ctx),
+    ir.nest(7, gen(node.condition, cond_ctx)),
     eol,
     ir.nest(2, ir.cat(ir.HARDLINE, gen(node.body, ctx)))
   )
@@ -1839,10 +1904,16 @@ generators.ForEach = (node, ctx, gen) ->
   ir.concat parts
 
 generators.While = (node, ctx, gen) ->
+  -- align condition continuation after 'while '/'until ' (6 chars)
+  keyword = node.type?.v or 'while'
+  keyword_len = #keyword + 1
+  cond_ctx = { k, v for k, v in pairs ctx }
+  cond_ctx.binop_indent = 0
+  cond_ctx.inside_condition = true
   parts = {
     gen node.type, ctx,
     ir.SPACE,
-    gen node.condition, ctx,
+    ir.nest keyword_len, (gen node.condition, cond_ctx),
   }
 
   if node.assignment

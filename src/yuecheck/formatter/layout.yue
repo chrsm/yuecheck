@@ -15,7 +15,7 @@ get_indent = (n) ->
 -- Results are memoized on the doc node itself via _flat_width.
 flat_width = (doc) ->
   cached = doc._flat_width
-  return cached if cached ~= nil
+  return cached if cached != nil
 
   result = switch doc._doc_type
     when 'empty'
@@ -43,6 +43,9 @@ flat_width = (doc) ->
       flat_width doc.doc
     when 'ifflat'
       flat_width doc.flat
+    when 'line_suffix'
+      -- 'invisible' to width calc
+      0
     when 'fill'
       -- flat width of all items + separators between them
       sep_w = flat_width doc.sep
@@ -110,6 +113,11 @@ fits = (w, doc, stack_rest) ->
       when 'ifflat'
         -- flat mode: use flat branch
         cs[] = { d: d.flat, rest: is_rest }
+      when 'line_suffix'
+        -- if in stack_rest, treat as line ending (fits)
+        -- _or_ if in the doc being checked, skip entirely (0 width)
+        if is_rest
+          return true
       when 'fill'
         -- flat: all items + separators
         sep_w = flat_width d.sep
@@ -148,6 +156,8 @@ render_flat = (doc, output) ->
       render_flat doc.doc, output
     when 'ifflat'
       render_flat doc.flat, output
+    when 'line_suffix'
+      render_flat doc.doc, output
     when 'fill'
       -- nested fill: render flat with separator between items
       for j, item in ipairs doc.items
@@ -223,6 +233,10 @@ layout = (doc, page_width = 84) ->
             stack[] = { indent: i, mode: 'flat', doc: d.doc }
           else
             stack[] = { indent: i, mode: 'break', doc: d.doc }
+
+      when 'line_suffix'
+        -- passthrough! width exclusion is only in `fits`
+        stack[] = { indent: i, mode: m, doc: d.doc }
 
       when 'ifflat'
         chosen = if m == 'flat' then d.flat else d.break_

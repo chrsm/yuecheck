@@ -471,7 +471,7 @@ do
 
 do
   v = if 1 and do
-    0 != 1
+       0 != 1
     1
   else
     2

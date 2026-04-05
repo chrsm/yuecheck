@@ -222,14 +222,14 @@ f = ->
   try tb.func(1)
 
   if (try func 1
-  catch err
-      print err
-  )
+     catch err
+         print err
+     )
     print 'OK'
 
   if try (func 1)
-  catch err
-      print err
+     catch err
+         print err
     print 'OK'
 
   do
@@ -317,14 +317,14 @@ do
   try tb.func(1)
 
   if (try func 1
-  catch err
-      print err
-  )
+     catch err
+         print err
+     )
     print 'OK'
 
   if try (func 1)
-  catch err
-      print err
+     catch err
+         print err
     print 'OK'
 
   do

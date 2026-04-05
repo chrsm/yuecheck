@@ -45,6 +45,11 @@ ifflat = (a, b) -> { _doc_type: 'ifflat', flat: a, break_: b }
 -- softline: nothing in flat mode, newline in break mode.
 softline = -> line ''
 
+-- line suffix: content that appears at the end of a line that does NOT count
+-- toward line width for fitting decisions
+-- used for eol comments so they don't force a break if the _code_ fits
+line_suffix = (doc) -> { _doc_type: 'line_suffix', doc: doc }
+
 -- fill: greedy line-packing for items from the same source line.
 -- items are pre-built docs (each may include trailing comma)
 -- separator is inserted between items when they fit on the same line
@@ -236,6 +241,7 @@ export default {
   :ifflat
   :softline
   :fill
+  :line_suffix
   :join
   :has_hardline
   :breakable_args

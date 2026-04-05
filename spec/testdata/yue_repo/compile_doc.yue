@@ -40,9 +40,7 @@ for [ compiledFile, docFile ] in *[
         print err
         os.exit 1
     for code in text\gmatch '<pre>(.-)</pre>'
-      if result, err := to_lua code
-        \gsub('&lt;', '<')
-        \gsub('&gt;', '>'), implicit_return_root: false, reserve_line_number: false
+      if result, err := to_lua code\gsub('&lt;', '<')\gsub('&gt;', '>'), implicit_return_root: false, reserve_line_number: false
         codes[] = result
       else
         print err
