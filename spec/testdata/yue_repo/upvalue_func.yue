@@ -227,7 +227,6 @@ do
 			return ...
 		else
 			os.exit 1
-
 -- expect
 -- In module root scope the anonymous functions won't be moved to up-values because they just run once.
 -- 1. if expr
@@ -425,15 +424,15 @@ GameEngine\schedule (deltaTime) ->
     UpdateScoreText "Score: #{value}"
     'continue'
 
-GameEngine\schedule (deltaTime) ->
+GameEngine\schedule (deltaTime) -> -- closure 1
   value = 123
   func if value > 200
     UpdateScoreText "Win: #{value}"
     'done'
   else
-    GameEngine\schedule (deltaTime) ->
-      UpdateScoreText "Score: #{value}" -- value is captured by closure 2 -- closure 2
-    'continue' -- closure 1
+    GameEngine\schedule (deltaTime) -> -- closure 2
+      UpdateScoreText "Score: #{value}" -- value is captured by closure 2
+    'continue'
 
 -- test cases from issue
 do

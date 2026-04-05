@@ -1,0 +1,32 @@
+-- input
+class testy
+  propN: 1
+  propS: 'string'
+
+  propF: () -> nil
+  propT: {}
+
+  abc: (a) => nil
+
+  -- stays/keeps empty line above
+  fun: =>
+    @\abc!
+
+  fun2: => -- inline comment preserved
+    nil
+-- expect
+class testy
+  propN: 1
+  propS: 'string'
+
+  propF: () -> nil
+  propT: {}
+
+  abc: (a) => nil
+
+  -- stays/keeps empty line above
+  fun: =>
+    @\abc!
+
+  fun2: => -- inline comment preserved
+    nil

@@ -258,7 +258,6 @@ do
     close xd = <close>: =>
 
 nil
-
 -- expect
 class Hello
   new: (@test, @world) =>
@@ -284,6 +283,7 @@ x\cool!
 class Hi
   new: (arg) =>
     print 'init arg', arg
+
   cool: (num) =>
     print 'num', num
 
@@ -372,8 +372,10 @@ class Whacko
   _ = @hello
   if something
     print 'hello world'
+
   hello = 'world'
   @another = 'day'
+
   print 'yeah' if something -- this is briken
 
 print 'hello'
@@ -443,6 +445,7 @@ class Wowha extends Thing
     _ = super.hello
     super\hello!
     super\hello
+
   @zone: cool {
     ->
       super!

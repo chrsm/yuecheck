@@ -60,7 +60,6 @@ class B extends A
 b = B!
 b.x = 999
 print b.x, b.abc
-
 -- expect
 class Props
   __index: (name):nil =>
@@ -79,6 +78,7 @@ class Props
         elseif item := rawget c, name
           rawset cls, name, item -- cache base member to class
           return item
+
   __newindex: (name, value) =>
     cls = @.<>
     if item := cls.__setter?[name] -- access properties
@@ -92,7 +92,9 @@ class Props
           item @, value
           return
       rawset @, name, value -- assign field to self
+
   assignReadOnly = -> error 'assigning a readonly property'
+
   prop: (name, props) =>
     {
       :get

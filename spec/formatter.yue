@@ -389,6 +389,19 @@ describe 'formatter', ->
       r = fmt.format 'class Foo\n:<add>'
       assert.same 'class Foo\n:<add>', r
 
+    it 'should preserve blank lines between class member groups', ->
+      src, expect = parse_td fget 'fmt_class_groups'
+      r = fmt.format src
+      assert.same expect, r
+
+    it 'should keep EOL comment on class method with multiline body', ->
+      r = fmt.format 'class X\n  fn: => -- comment\n    nil'
+      assert.same 'class X\n  fn: => -- comment\n    nil', r
+
+    it 'should keep EOL comment on class method with args', ->
+      r = fmt.format 'class X\n  fn: (a) => -- comment\n    nil'
+      assert.same 'class X\n  fn: (a) => -- comment\n    nil', r
+
   describe 'metatables', ->
     it 'should format metatable literal', ->
       r = fmt.format '{ <metatable>: {__index: t} }'

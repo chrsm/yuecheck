@@ -1142,7 +1142,8 @@ generators.InvokeArgs = (node, ctx, gen) ->
           if val and val.item and val.item.is and (val.item\is types.SimpleValue)
             sv = val.item
             if sv.value and sv.value.is and (sv.value\is types.TableLit)
-              first_is_multiline_table = sv.value\g_end_line! != sv.value\g_src_line!
+              first_is_multiline_table = sv.value\g_end_line! !=
+                 sv.value\g_src_line!
 
     should_nest = is_multiline and not first_is_multiline_table
     if should_nest
@@ -1403,7 +1404,7 @@ generators.NormalPair = (node, ctx, gen) ->
   -- EOL comment is on the NormalPair node itself
   eol_or_space = if value_is_multiline
     eol_doc = get_eol_doc_for_node node
-    if eol_doc.t != 'empty' then eol_doc else ir.text '\n'
+    if eol_doc._doc_type != 'empty' then eol_doc else ir.EMPTY
   else
     ir.SPACE
 
@@ -1547,6 +1548,11 @@ generators.FunLit = (node, ctx, gen) ->
       parts[] = ir.SPACE
       parts[] = gen content, ctx
     else
+      -- consume eol comment on the arrow line (`fn: => -- comment`)
+      -- _before_ indenting the body
+      arrow_line = node.arrow?\g_src_line!
+      eol = get_eol_doc arrow_line, ctx
+      parts[] = eol if eol._doc_type != 'empty'
       parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
 
   ir.concat parts
@@ -1925,10 +1931,34 @@ generators.ClassDecl = (node, ctx, gen) ->
 
 generators.ClassBlock = (node, ctx, gen) ->
   contents = node.contents or {}
+  source_lines = ctx.source_lines
   parts = {}
   for i, item in ipairs contents
     if i > 1
       parts[] = ir.HARDLINE
+
+    -- preserve blank lines between class members, ie:
+    --[[
+      class x
+        prop1: 0
+        prop2: 0
+        -- preserved --
+        new: => nil
+    ]]
+    src_line = item\g_src_line!
+    has_above = false
+    above_comments = item._comments?.above
+    if above_comments and #above_comments > 0
+      for c in *above_comments
+        unless c._emitted
+          has_above = true
+          break
+
+    if i > 1 and src_line and src_line > 1 and not has_above and source_lines
+      prev_line_content = source_lines[src_line - 1]
+      if prev_line_content and prev_line_content\match '^%s*$'
+        parts[] = ir.HARDLINE
+
     above_doc = get_above_doc item, ctx
     if above_doc._doc_type != 'empty'
       parts[] = above_doc

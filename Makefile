@@ -1,5 +1,8 @@
 .DEFAULT_GOAL := help
 
+# temporary: having issues with 5.5 and patching modules to work, not worth it
+LUAROCKS ?= luarocks --lua-version=5.4
+
 LUA_DIR=/usr
 LUA_LIBDIR=$(LUA_DIR)/lib/lua/5.4
 LUA_BINDIR=$(LUA_DIR)/bin
@@ -84,7 +87,7 @@ temp:
 .PHONY: uninstall
 ## delete all installed files
 uninstall:
-	luarocks remove yuecheck
+	$(LUAROCKS) remove yuecheck
 	rm -rf $(HOME)/.luarocks/bin/yuecheck
 	rm -rf $(HOME)/.luarocks/bin/yue-lsp
 	rm -rf $(HOME)/.luarocks/bin/yuefmt
@@ -94,10 +97,10 @@ uninstall:
 .PHONY: rock
 ## build and install rock locally
 rock:
-	luarocks --local make
+	$(LUAROCKS) --local make
 rock-actions:
 	@# not documenting this, because it's only for actions that run as root
-	luarocks make
+	$(LUAROCKS) make
 
 .PHONY: help
 ## list available commands
