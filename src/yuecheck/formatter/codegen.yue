@@ -1022,11 +1022,14 @@ gen_chain_item = (item, ctx, gen) ->
     when item\is types.Slice
       parts[] = gen item, ctx
     when item\is types.Exp
-      -- brackets: x[expr]
+      -- we _don't_ want to break index keys, so track that we're in one,
+      -- prevent `breakable_chain` from being applied
+      bracket_ctx = { k, v for k, v in pairs ctx }
+      bracket_ctx.inside_bracket_index = true
       parts[] = ir.text '['
       if is_stupid_luastring item
         parts[] = ir.SPACE
-      parts[] = gen item, ctx
+      parts[] = gen item, bracket_ctx
       if is_stupid_luastring item
         parts[] = ir.SPACE
       parts[] = ir.text ']'
@@ -1071,6 +1074,11 @@ generators.ChainValue = (node, ctx, gen) ->
       parts[] = gen_chain_item item, ctx, gen
     inner = ir.concat parts
     return ir.nest 2, inner
+
+  -- we _don't_ want to break index keys (`r[v.line]`, but really long obv)
+  -- it looks dumb and is confusing
+  if ctx.inside_bracket_index
+    return ir.concat [ gen_chain_item(it, ctx, gen) for it in *items ]
 
   -- for single-line source chains, use breakable_chain for line-width-aware breaking
   -- group items into segments: a new segment starts at each DotChainItem or ColonChainItem

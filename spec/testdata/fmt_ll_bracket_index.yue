@@ -1,0 +1,12 @@
+-- input
+do
+  do
+    do
+      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+
+-- expect
+do
+  do
+    do
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"

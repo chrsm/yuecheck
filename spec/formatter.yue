@@ -578,6 +578,18 @@ describe 'formatter', ->
       r = fmt.format src, { line_width: 81 }
       assert.same expect, r
 
+    it 'should not break chain expressions inside bracket indices', ->
+      src, expect = parse_td fget 'fmt_ll_bracket_index'
+
+      r = fmt.format src
+      assert.same expect, r
+
+    it 'should keep bracket index chains flat even when line is long', ->
+      src, expect = parse_td fget 'fmt_ll_bracket_chain'
+
+      r = fmt.format src
+      assert.same expect, r
+
   -- TODO: add some more thorough test cases
   -- mostly adding these as i work on stuff and dogfood the formatter
   describe 'golden files', ->
