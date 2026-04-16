@@ -49,6 +49,7 @@ args = argp\parse!
 opts =
   line_width: args.ll ?? 84
   table_spacing: args.ts ?? true
+  eof_nl: true
 
 if args.stdin
   src = io.read 'a*'

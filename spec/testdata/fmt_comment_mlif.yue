@@ -1,0 +1,16 @@
+-- input
+if c == 1 or c == 1 or
+   c == 1 -- keep1
+  print 1
+
+if c == 1 or c == 1 or c == 1 or c == 1 or c == 1 or c == 1 or c == 1 or c == 1 or
+   c == 1 or c == 1 or c == 1 or c == 1 or c == 1 -- keep2
+  print 1
+
+-- expect
+if c == 1 or c == 1 or c == 1 -- keep1
+  print 1
+
+if c == 1 or c == 1 or c == 1 or c == 1 or c == 1 or c == 1 or c == 1 or c == 1 or
+   c == 1 or c == 1 or c == 1 or c == 1 or c == 1 -- keep2
+  print 1

@@ -755,6 +755,16 @@ describe 'formatter', ->
       r = fmt.format src
       assert.same expect, r
 
+    it 'should preserve comments on multiline ifs', ->
+      src, expect = parse_td fget 'fmt_comment_mlif'
+      r = fmt.format src
+      assert.same expect, r
+
+    it 'should not indent func bodies unnecessarily', ->
+      src, expect = parse_td fget 'fmt_ident_body'
+      r = fmt.format src
+      assert.same expect, r
+
   describe 'yuescript repo inputs', ->
     inputs = find_yue_files '../spec/testdata/yue_repo', 'yue'
 

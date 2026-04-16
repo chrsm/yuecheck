@@ -9,7 +9,7 @@ import 'yuecheck.formatter.layout'
 import 'yuecheck.internal.xstring'
 
 join_import = (inners) ->
-  s = [inner.v for inner in *inners]
+  s = [ inner.v for inner in *inners ]
   table.concat s, '.'
 
 -- extract module name from an Import statement (for sorting)
@@ -154,6 +154,10 @@ format = (src, opts = {}) ->
 
   if shebang
     result = "#{ shebang }\n#{ result }"
+
+  -- add at least one nl to EOF
+  if opts.eof_nl and (result\sub #result) != '\n'
+    result ..= '\n'
 
   result
 

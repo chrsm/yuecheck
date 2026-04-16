@@ -65,7 +65,7 @@ generate:
 .PHONY: test
 ## run all tests
 test:
-	export LUA_PATH='$(YCT_LPATH)' && cd src && \
+	eval $$($(LUAROCKS) path) && export PATH="`$(LUAROCKS) path --lr-bin`:$(PATH)" && export LUA_PATH='$(YCT_LPATH)' && cd src && \
 		yue -e ../spec/rules.yue -v -C . -o gtest --exclude-tags='ignore' && \
 		yue -e ../spec/lsp.yue -v -C . -o gtest --exclude-tags='ignore' && \
 		yue -e ../spec/formatter.yue -v -C . -o gtest --exclude-tags='ignore'

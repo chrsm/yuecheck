@@ -62,7 +62,7 @@ has_trailing_comma = (node, ctx, open_char = '[', close_char = ']') ->
         in_string = true
         string_char = c
       elseif c == '-' and idx < #line_content and
-         line_content\sub(idx + 1, idx + 1) == '-'
+             line_content\sub(idx + 1, idx + 1) == '-'
         break -- rest of line is a comment
       elseif c == open_char
         depth += 1
@@ -168,6 +168,40 @@ extract_table_lit = (node) ->
 
   return inner if inner?.is and (inner\is types.TableLit)
   nil
+
+-- extract a FunLit from a wrapped expression
+-- Exp -> UnaryExp -> Value -> SimpleValue -> FunLit
+extract_funlit = (node) ->
+  if (not node) or node\is types.FunLit
+    return nil
+
+  inner = node
+  if (inner\is types.Exp) and #inner.pipeExprs > 0
+    inner = inner.pipeExprs[1]
+  if inner.expos? and #inner.expos > 0
+    inner = inner.expos[1]
+  if inner.item?
+    inner = inner.item
+  if inner\is types.SimpleValue
+    inner = inner.value
+
+  if inner\is types.FunLit
+    inner
+  else
+    nil
+
+-- check if the last arg in an invoke is a multiline FunLit (_block_ body, not stmt)
+is_last_arg_multiline_funlit = (invoke_node) ->
+  unless invoke_node?.args and #invoke_node.args > 0
+    return false
+
+  last_arg = invoke_node.args[#]
+  funlit = extract_funlit last_arg
+  unless funlit?.body
+    return false
+
+  content = funlit.body.content
+  not (content and content\is types.Statement)
 
 -- check if a table (or any nested table within it) spans multiple lines.
 -- used to force outer tables to expand when they contain multiline nested tables.
@@ -810,7 +844,7 @@ generators.DoubleString = (node, ctx) ->
           is_multiline = current_line > src_line
           content = original_str\sub 2, -2
           unless is_multiline or (original_str\find '#{', 1, true) or
-             (content\find "'", 1, true)
+                 (content\find "'", 1, true)
             return ir.cat ir.text("'"), ir.text(content), ir.text("'")
           else
             -- multiline string: preserve with hardlines
@@ -1059,6 +1093,8 @@ gen_chain_item = (item, ctx, gen) ->
           -- Use breakable_args for line-width-aware breaking
           arg_docs = [ gen(arg, ctx) for arg in *item.args ]
           parts[] = ir.breakable_args arg_docs
+          if is_last_arg_multiline_funlit item
+            parts[] = ir.HARDLINE
         parts[] = ir.text ')'
       else
         parts[] = ir.text '!'
@@ -1107,18 +1143,19 @@ generators.ChainValue = (node, ctx, gen) ->
   -- for multiline source chains, preserve the original formatting with HARDLINE
   if is_multiline_chain
     parts = {}
-    did_nest = false
+    emitted_hardline = false
     for i, item in ipairs items
       if i > 1 and item\is_any types.DotChainItem, types.ColonChainItem
         item_line = item\g_src_line!
         prev_end = items[i - 1]\g_end_line!
         if item_line and prev_end and item_line != prev_end
-          unless did_nest
-            did_nest = true
+          emitted_hardline = true
           parts[] = ir.HARDLINE
       parts[] = gen_chain_item item, ctx, gen
     inner = ir.concat parts
-    return ir.nest 2, inner
+    if emitted_hardline
+      return ir.nest 2, inner
+    return inner
 
   -- inside bracket indices (`r[v.line]`) or conditional expressions
   -- (`if obj\method!`), chains _must_ stay flat
@@ -1726,8 +1763,8 @@ generators.If = (node, ctx, gen) ->
               parts[] = ir.text ' then '
               i += 1
               parts[] = gen nodes[i], ctx
-          elseif (next_item\is types.Statement) and next_item\g_src_line! ==
-             cond_line
+          elseif (next_item\is types.Statement) and
+                 next_item\g_src_line! == cond_line
             parts[] = ir.text ' else '
             i += 1
             parts[] = gen nodes[i], ctx
@@ -1741,7 +1778,7 @@ generators.If = (node, ctx, gen) ->
             break
       else
         -- block form
-        eol = get_eol_doc cond_line, ctx
+        eol = get_eol_doc item\g_end_line!, ctx
         parts[] = eol if eol._doc_type != 'empty'
         i += 1
         if i <= #nodes
@@ -1800,7 +1837,7 @@ generators.IfCond = (node, ctx, gen) ->
   ir.concat parts
 
 generators.Unless = (node, ctx, gen) ->
-  eol = get_eol_doc node.condition\g_src_line!, ctx
+  eol = get_eol_doc node.condition\g_end_line!, ctx
   -- align condition continuation after 'unless ' and suppress the inner binop
   -- indent (so fill breaks land at the keyword column)
   -- chains inside conditions must stay flat (inside_condition) because
@@ -1846,7 +1883,7 @@ generators.Switch = (node, ctx, gen) ->
 
 generators.SwitchCase = (node, ctx, gen) ->
   above_doc = get_above_doc node, ctx
-  eol = get_eol_doc node.condition\g_src_line!, ctx
+  eol = get_eol_doc node.condition\g_end_line!, ctx
 
   body_doc = if node.body\is types.Statement
     ir.cat ir.text(' then '), gen(node.body.content, ctx)
@@ -1928,7 +1965,7 @@ generators.While = (node, ctx, gen) ->
         parts[] = ir.text ', ' if i < #assign.values
 
   -- EOL comment handling: line-based lookup for the condition line
-  eol = get_eol_doc node.condition\g_src_line!, ctx
+  eol = get_eol_doc node.condition\g_end_line!, ctx
   parts[] = eol if eol._doc_type != 'empty'
   parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
   ir.concat parts

@@ -14,9 +14,11 @@ style_comment_space =
     * types.YueLineComment
     * types.YueMultilineComment
   check: (node) ->
-    if (node\is types.YueLineComment) and ((node.v\match '^%-%- ') or (node.v\match '^%-%-$')) -- yuecheck:ignore
+    if (node\is types.YueLineComment) and
+       ((node.v\match '^%-%- ') or (node.v\match '^%-%-$'))
       return
-    elseif (node\is types.YueMultilineComment) and (node.v\match '%-%-%[%[%s+.+%s+%]%]')
+    elseif (node\is types.YueMultilineComment) and
+           (node.v\match '%-%-%[%[%s+.+%s+%]%]')
       return
     elseif node.v\match '^%-%-%-' -- LuaCATS
       return
@@ -100,7 +102,8 @@ style_import_as_ident =
       return nil
 
     -- eg busted.runner as busted not bad
-    unless #node.literal.inners == 1 and node.target.name.v == node.literal.inners[1].v
+    unless #node.literal.inners == 1 and
+           node.target.name.v == node.literal.inners[1].v
       return nil
 
     {
@@ -194,7 +197,15 @@ style_conditionals =
     iftyp = node.type.v
 
     name = ''
-    vnode = node.nodes[1]?.condition?.pipeExprs?[1].expos?[1]?.item?.items?[1]?.item?.name
+    vnode = node
+      .nodes[1]?
+      .condition?
+      .pipeExprs?[1]
+      .expos?[1]?
+      .item?
+      .items?[1]?
+      .item?
+      .name
     if vnode\is types.SelfName
       name = vnode.name.v
     else
@@ -365,8 +376,9 @@ style_discourage_unnecessary_sb =
               if item\is types.String
                 if item.str\is types.SingleString
                   k = xstring.stripq item.str.v
-                  -- skip 'keys-like-this' (telescope)
-                  if k\match '%w+%-%w'
+
+                  -- if it's not simple, skip
+                  unless k\match '^[_%a][%a%d_]*$'
                     continue
 
                   results[] = {

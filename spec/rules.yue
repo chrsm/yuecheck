@@ -173,7 +173,8 @@ describe 'find_comments lpegrex', ->
         comment: '-- should not have the single-line-comment violation'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
-      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
   it 'should properly parse comments with mixed content', ->
@@ -193,7 +194,8 @@ describe 'find_comments lpegrex', ->
         comment: "-- returns: success (boolean), exit_type ('exit'|'signal'), exit_code (number)"
     for v in *expect
       assert.truthy r[v.line], "expect r[#{ v.line }] to exist in results"
-      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
 describe 'comments/between', ->
@@ -218,7 +220,8 @@ describe 'comments/between', ->
     assert.same expect.indices, r.indices
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
-      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
     r = cmt.comments_between ast, 4, 12
@@ -233,7 +236,8 @@ describe 'comments/between', ->
     assert.same expect.indices, r.indices
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
-      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
     r = cmt.comments_between ast, 15, 19
@@ -248,7 +252,8 @@ describe 'comments/between', ->
     assert.same expect.indices, r.indices
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
-      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
 describe 'comment/string handling', ->
@@ -262,7 +267,8 @@ describe 'comment/string handling', ->
         comment: '-- hmm'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
-      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
     r = linter.find_comments "x = \"1 --2\"\nprint x -- 'hmm'\na!"
@@ -272,7 +278,8 @@ describe 'comment/string handling', ->
         comment: "-- 'hmm'"
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
-      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
     r = linter.find_comments 'x = [[1 --2]]\nprint x --[[ hmm ]]\na!'
@@ -282,7 +289,8 @@ describe 'comment/string handling', ->
         comment: '--[[ hmm ]]'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
-      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
   it 'should deal with escapes (lol)', ->
@@ -293,7 +301,8 @@ describe 'comment/string handling', ->
         comment: '--2'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
-      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
     r = linter.find_comments "x = \"'\" --a\n-- b\n--cdefg"
@@ -309,7 +318,8 @@ describe 'comment/string handling', ->
         comment: '--cdefg'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
-      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
   it 'should pass the example file', ->
@@ -345,7 +355,8 @@ describe 'comment/string handling', ->
         comment: '--this is at eof'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
-      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
   it 'should pass crude mix file', ->
@@ -389,7 +400,8 @@ describe 'comment/string handling', ->
         comment: '-- 12-rc'
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
-      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
 describe 'rule_style_comment', ->
@@ -406,7 +418,8 @@ describe 'rule_style_comment', ->
     assert.same 1, r[1].col
 
   it 'should work for multiline comments', ->
-    comments = linter.find_comments fget '../spec/testdata/style_comment_multiline.yue'
+    comments = linter
+      .find_comments fget '../spec/testdata/style_comment_multiline.yue'
     r = {}
     for k in *comments.indices
       for v in *comments[k]
@@ -526,11 +539,15 @@ describe 'rule_cond_impossible', ->
   it 'should catch number lit', ->
     r = linter.lint_string 'unless 1\n  print 1'
     assert.true #r > 0
-    assert.same '`unless` expression compared to number literal `1` never executed', r[1].message
+    assert
+      .same '`unless` expression compared to number literal `1` never executed', r[1]
+        .message
 
     r = linter.lint_string 'if 1\n  print 1'
     assert.true #r > 0
-    assert.same '`if` expression compared to number literal `1` always executed', r[1].message
+    assert
+      .same '`if` expression compared to number literal `1` always executed', r[1]
+        .message
 
 describe 'rule_style_import_as_ident', ->
   linter.enabled_rules = { style_import_as_ident: true }
@@ -635,7 +652,8 @@ describe 'rule_unreachable', ->
     assert.equal 0, #r
 
   it 'should be okay with a scoped break', ->
-    r = linter.lint_string 'repeat\n  print 1\n  if false\n    break\n  print(a)\nuntil false'
+    r = linter
+      .lint_string 'repeat\n  print 1\n  if false\n    break\n  print(a)\nuntil false'
     assert.same {}, r
 
   it 'should error on unreachable code', ->
@@ -774,11 +792,13 @@ describe 'rule_style_simplify_if_to_switch', ->
   linter.enabled_rules = { style_simplify_if_to_switch: true }
 
   it 'should ignore chains that use different vars', ->
-    r = linter.lint_string 'if x == 1 or y == 2\n  print 1\nelseif x == 3\n  print 2\nelse\n  print 3'
+    r = linter
+      .lint_string 'if x == 1 or y == 2\n  print 1\nelseif x == 3\n  print 2\nelse\n  print 3'
     assert.equal 0, #r
 
   it 'should warn on easy simplification', ->
-    r = linter.lint_string 'if x == 1 or x == 2\n  print 1\nelseif x == 3\n  print 2\nelseif x == 3\n  print 3\nelseif x\n  print 9\nelse\n  print 4'
+    r = linter
+      .lint_string 'if x == 1 or x == 2\n  print 1\nelseif x == 3\n  print 2\nelseif x == 3\n  print 3\nelseif x\n  print 9\nelse\n  print 4'
     assert.true #r > 0
     assert.same {
       type: 'WARN'
@@ -790,7 +810,8 @@ describe 'rule_style_simplify_if_to_switch', ->
     }, r[1]
 
   it 'should warn with multiple variables', ->
-    r = linter.lint_string 'if x == 1 or y == 2\n  print 1\nelseif x == 3 or y == 1\n  print 2\nelseif x == 3 or y == 2\n  print 3\nelseif x or y\n  print 9\nelse\n  print 4'
+    r = linter
+      .lint_string 'if x == 1 or y == 2\n  print 1\nelseif x == 3 or y == 1\n  print 2\nelseif x == 3 or y == 2\n  print 3\nelseif x or y\n  print 9\nelse\n  print 4'
     assert.true #r > 0
     assert.same {
       type: 'WARN'
@@ -1007,6 +1028,13 @@ describe 'style_discourage_unnecessary_sb', ->
     }, r[1]
     ]]
     nil
+
+  it 'should ignore non-simplifiables', ->
+    tc = { ':x' }
+
+    for t in *tc
+      r = linter.lint_string "x = { ['#{ t }']: 1 }"
+      assert.same {}, r
 
 describe 'basic_nilness', ->
   linter.enabled_rules = basic_nilness: true
@@ -1437,7 +1465,8 @@ describe 'lpegrex grammar check', ->
 
     for v in *expect
       assert.truthy r[v.line], "expected r[#{ v.line }] to exist in results"
-      assert.truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
+      assert
+        .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
   describe 'bugs', ->
