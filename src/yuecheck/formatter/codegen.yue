@@ -2564,4 +2564,11 @@ generators.YAMLMultiline = (node, ctx) ->
 generators.LuaKeyword = (node, ctx, gen) ->
   if node.name then gen node.name, ctx else ir.EMPTY
 
+generators.Annotation = (node, ctx, gen) ->
+  parts = { ir.text('$['), gen(node.name, ctx) }
+  if node.invoke
+    parts[] = gen node.invoke, ctx
+  parts[] = ir.text ']'
+  ir.concat parts
+
 export default gen

@@ -107,6 +107,12 @@ describe 'formatter', ->
       r = fmt.format input
       assert.same 'x = 1 != 0', r
 
+    it 'should handle annotations', ->
+      input = 'macro Tag = (tag, code) ->\n  tableName = code\\match \'^[%w_]+\'\n  return\n    type: \'text\'\n    before: tag == \'before\'\n    code: "-- #{tag}:#{tableName}"\n$[Tag before]\ntableA = {}'
+      r, err = fmt.format input
+      assert.nil err
+      assert.same input, r
+
   describe 'inline comment preservation', ->
     it 'should preserve inline comment on variable', ->
       r = fmt.format 'b --[[ x ]] = 2'

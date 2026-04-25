@@ -385,16 +385,17 @@ There are likely more simplifications that are not listed. I am adding cases as 
 
 `src/types.yue` is a generated file. To regenerate it, run `make generate`.
 
-This calls two scripts:
-- `bin/fetch_ast.yue`
+This runs `bin/generate_types.yue`, which:
   * fetches `yue_ast.h` header from [Yuescript][1] repo
-  * does some simple parsing of types
-  * has a few manual overrides because I'm lazy and haven't made it parse better
-  * generates `gen/types_raw.yue` (ignored in .gitignore)
-- `bin/generate_types.yue`
-  * imports `gen/types_raw.yue` and generates `src/types.yue`
-  * has all types specified as actual `class` instances
-  * allows walking ast and comparing types
+  * parses `AST_NODE`/`AST_LEAF` blocks and their `ast_ptr`/`ast_sel`/`ast_sel_list`/`ast_list` fields
+  * emits each type as a `class` instance in `src/yuecheck/types.yue`, supporting ast walking and type comparison
+
+For offline or pinning to a specific version, point the generator at a local file:
+
+```
+# via env var
+YUECHECK_AST_H=/path/to/yue_ast.h make generate
+```
 
 
 ## comments

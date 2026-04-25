@@ -7,6 +7,7 @@ _list_t = ast._list_t
 Node = ast.Node
 Leaf = ast.Leaf
 ast_nodes = {}
+
 _in = (val, set) ->
   for i,v in ipairs set
     return true if v == val
@@ -1879,13 +1880,13 @@ ast_nodes.SimpleTable = SimpleTable
 class SimpleValue extends Node
   @yue_name: 'SimpleValue'
   
-  -- @value: _sel_t(true,TableLit,ConstValue,If,Switch,With,ClassDecl,ForEach,For,While,Do,Try,UnaryValue,TblComprehension,Comprehension,FunLit,Num,VarArg,Repeat)
+  -- @value: _sel_t(true,TableLit,ConstValue,If,Switch,With,ClassDecl,For,While,Repeat,Do,Try,UnaryValue,TblComprehension,Comprehension,FunLit,Num,VarArg)
   new: (value = nil) =>
     @value = value
 
   from_table: (tbl) =>
     for i, v in ipairs tbl
-      if (not @value) and _in v\g_yue_name!, {'TableLit','ConstValue','If','Switch','With','ClassDecl','ForEach','For','While','Do','Try','UnaryValue','TblComprehension','Comprehension','FunLit','Num','VarArg','Repeat'}
+      if (not @value) and _in v\g_yue_name!, {'TableLit','ConstValue','If','Switch','With','ClassDecl','For','While','Repeat','Do','Try','UnaryValue','TblComprehension','Comprehension','FunLit','Num','VarArg'}
         @value = v
         continue
       _ = v
@@ -2437,13 +2438,13 @@ ast_nodes.SpreadListExp = SpreadListExp
 class TableLit extends Node
   @yue_name: 'TableLit'
   
-  -- @values: _sel_list_t(false,VariablePairDef,NormalPairDef,SpreadExp,NormalDef,MetaVariablePairDef,MetaNormalPairDef,VariablePair,NormalPair,Exp,MetaVariablePair,MetaNormalPair,TableBlockIndent,SpreadListExp)
+  -- @values: _sel_list_t(false,VariablePairDef,NormalPairDef,SpreadExp,NormalDef,MetaVariablePairDef,MetaNormalPairDef,VariablePair,NormalPair,Exp,MetaVariablePair,MetaNormalPair,YueComment,EmptyLine,TableBlockIndent,SpreadListExp)
   new: (values = {}) =>
     @values = values
 
   from_table: (tbl) =>
     for i, v in ipairs tbl
-      if _in v\g_yue_name!, {'VariablePairDef','NormalPairDef','SpreadExp','NormalDef','MetaVariablePairDef','MetaNormalPairDef','VariablePair','NormalPair','Exp','MetaVariablePair','MetaNormalPair','TableBlockIndent','SpreadListExp'}
+      if _in v\g_yue_name!, {'VariablePairDef','NormalPairDef','SpreadExp','NormalDef','MetaVariablePairDef','MetaNormalPairDef','VariablePair','NormalPair','Exp','MetaVariablePair','MetaNormalPair','YueComment','EmptyLine','TableBlockIndent','SpreadListExp'}
         table.insert @values, v
         continue
       _ = v
@@ -2458,13 +2459,13 @@ ast_nodes.TableLit = TableLit
 class TableBlockIndent extends Node
   @yue_name: 'TableBlockIndent'
   
-  -- @values: _sel_list_t(false,VariablePair,NormalPair,Exp,TableBlockIndent,MetaVariablePair,MetaNormalPair)
+  -- @values: _sel_list_t(false,VariablePair,NormalPair,Exp,TableBlockIndent,MetaVariablePair,MetaNormalPair,YueComment,EmptyLine)
   new: (values = {}) =>
     @values = values
 
   from_table: (tbl) =>
     for i, v in ipairs tbl
-      if _in v\g_yue_name!, {'VariablePair','NormalPair','Exp','TableBlockIndent','MetaVariablePair','MetaNormalPair'}
+      if _in v\g_yue_name!, {'VariablePair','NormalPair','Exp','TableBlockIndent','MetaVariablePair','MetaNormalPair','YueComment','EmptyLine'}
         table.insert @values, v
         continue
       _ = v
@@ -2974,6 +2975,33 @@ class Macro extends Node
 ast_nodes.Macro = Macro
 
 -- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L856
+class Annotation extends Node
+  @yue_name: 'Annotation'
+  
+  -- @name(true): ast_nodes.UnicodeName
+  -- @invoke: _sel_t(false,Invoke,InvokeArgs)
+  new: (name = nil, invoke = nil) =>
+    @name = name
+    @invoke = invoke
+
+  from_table: (tbl) =>
+    for i, v in ipairs tbl
+      if (not @name) and v\g_yue_name! == 'UnicodeName'
+        @name = v
+        continue
+      if (not @invoke) and _in v\g_yue_name!, {'Invoke','InvokeArgs'}
+        @invoke = v
+        continue
+      _ = v
+    nil
+
+  walk: (visitor) =>
+    @name\walk visitor
+    @invoke\walk visitor if @invoke
+    visitor @
+ast_nodes.Annotation = Annotation
+
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L862
 class NameOrDestructure extends Node
   @yue_name: 'NameOrDestructure'
   
@@ -2994,7 +3022,7 @@ class NameOrDestructure extends Node
     visitor @
 ast_nodes.NameOrDestructure = NameOrDestructure
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L861
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L867
 class AssignableNameList extends Node
   @yue_name: 'AssignableNameList'
   
@@ -3015,7 +3043,7 @@ class AssignableNameList extends Node
     visitor @
 ast_nodes.AssignableNameList = AssignableNameList
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L867
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L873
 class InvokeArgs extends Node
   @yue_name: 'InvokeArgs'
   
@@ -3036,7 +3064,7 @@ class InvokeArgs extends Node
     visitor @
 ast_nodes.InvokeArgs = InvokeArgs
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L873
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L879
 class ConstValue extends Leaf
   @yue_name: 'ConstValue'
   
@@ -3045,7 +3073,7 @@ class ConstValue extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.ConstValue = ConstValue
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L876
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L882
 class UnaryValue extends Node
   @yue_name: 'UnaryValue'
   
@@ -3072,7 +3100,7 @@ class UnaryValue extends Node
     visitor @
 ast_nodes.UnaryValue = UnaryValue
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L882
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L888
 class UnaryExp extends Node
   @yue_name: 'UnaryExp'
   
@@ -3105,7 +3133,7 @@ class UnaryExp extends Node
     visitor @
 ast_nodes.UnaryExp = UnaryExp
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L889
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L895
 class SubBackcall extends Node
   @yue_name: 'SubBackcall'
   
@@ -3132,7 +3160,7 @@ class SubBackcall extends Node
     visitor @
 ast_nodes.SubBackcall = SubBackcall
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L895
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L901
 class ExpListAssign extends Node
   @yue_name: 'ExpListAssign'
   
@@ -3159,7 +3187,7 @@ class ExpListAssign extends Node
     visitor @
 ast_nodes.ExpListAssign = ExpListAssign
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L901
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L907
 class IfLine extends Node
   @yue_name: 'IfLine'
   
@@ -3186,7 +3214,7 @@ class IfLine extends Node
     visitor @
 ast_nodes.IfLine = IfLine
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L907
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L913
 class WhileLine extends Node
   @yue_name: 'WhileLine'
   
@@ -3213,7 +3241,7 @@ class WhileLine extends Node
     visitor @
 ast_nodes.WhileLine = WhileLine
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L913
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L919
 class Break extends Leaf
   @yue_name: 'Break'
   
@@ -3222,7 +3250,7 @@ class Break extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.Break = Break
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L916
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L922
 class Continue extends Leaf
   @yue_name: 'Continue'
   
@@ -3231,7 +3259,7 @@ class Continue extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.Continue = Continue
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L919
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L925
 class BreakLoop extends Node
   @yue_name: 'BreakLoop'
   
@@ -3258,7 +3286,7 @@ class BreakLoop extends Node
     visitor @
 ast_nodes.BreakLoop = BreakLoop
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L926
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L932
 class PipeBody extends Node
   @yue_name: 'PipeBody'
   
@@ -3279,7 +3307,7 @@ class PipeBody extends Node
     visitor @
 ast_nodes.PipeBody = PipeBody
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L932
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L938
 class StatementAppendix extends Node
   @yue_name: 'StatementAppendix'
   
@@ -3300,7 +3328,7 @@ class StatementAppendix extends Node
     visitor @
 ast_nodes.StatementAppendix = StatementAppendix
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L937
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L943
 class StatementSep extends Leaf
   @yue_name: 'StatementSep'
   
@@ -3309,7 +3337,7 @@ class StatementSep extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.StatementSep = StatementSep
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L940
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L946
 class YueLineComment extends Leaf
   @yue_name: 'YueLineComment'
   
@@ -3318,7 +3346,7 @@ class YueLineComment extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.YueLineComment = YueLineComment
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L943
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L949
 class YueMultilineComment extends Leaf
   @yue_name: 'YueMultilineComment'
   
@@ -3327,7 +3355,7 @@ class YueMultilineComment extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.YueMultilineComment = YueMultilineComment
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L946
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L952
 class YueComment extends Node
   @yue_name: 'YueComment'
   
@@ -3348,7 +3376,7 @@ class YueComment extends Node
     visitor @
 ast_nodes.YueComment = YueComment
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L951
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L957
 class EmptyLine extends Leaf
   @yue_name: 'EmptyLine'
   
@@ -3357,7 +3385,7 @@ class EmptyLine extends Leaf
   walk: (visitor) => visitor @
 ast_nodes.EmptyLine = EmptyLine
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L954
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L960
 class ChainAssign extends Node
   @yue_name: 'ChainAssign'
   
@@ -3384,24 +3412,19 @@ class ChainAssign extends Node
     visitor @
 ast_nodes.ChainAssign = ChainAssign
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L961
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L967
 class Statement extends Node
   @yue_name: 'Statement'
   
-  -- @comments: _sel_list_t(false,YueLineComment,YueMultilineComment)
-  -- @content: _sel_t(true,Import,While,Repeat,For,ForEach,Return,Local,Global,Export,Macro,MacroInPlace,BreakLoop,Label,Goto,ShortTabAppending,Backcall,LocalAttrib,PipeBody,ExpListAssign,ChainAssign)
+  -- @content: _sel_t(true,Import,While,Repeat,For,Return,Local,Global,Export,Macro,MacroInPlace,Annotation,BreakLoop,Label,Goto,ShortTabAppending,Backcall,LocalAttrib,PipeBody,ExpListAssign,ChainAssign)
   -- @appendix(false): ast_nodes.StatementAppendix
-  new: (comments = {}, content = nil, appendix = nil) =>
-    @comments = comments
+  new: (content = nil, appendix = nil) =>
     @content = content
     @appendix = appendix
 
   from_table: (tbl) =>
     for i, v in ipairs tbl
-      if _in v\g_yue_name!, {'YueLineComment','YueMultilineComment'}
-        table.insert @comments, v
-        continue
-      if (not @content) and _in v\g_yue_name!, {'Import','While','Repeat','For','ForEach','Return','Local','Global','Export','Macro','MacroInPlace','BreakLoop','Label','Goto','ShortTabAppending','Backcall','LocalAttrib','PipeBody','ExpListAssign','ChainAssign'}
+      if (not @content) and _in v\g_yue_name!, {'Import','While','Repeat','For','Return','Local','Global','Export','Macro','MacroInPlace','Annotation','BreakLoop','Label','Goto','ShortTabAppending','Backcall','LocalAttrib','PipeBody','ExpListAssign','ChainAssign'}
         @content = v
         continue
       if (not @appendix) and v\g_yue_name! == 'StatementAppendix'
@@ -3411,13 +3434,12 @@ class Statement extends Node
     nil
 
   walk: (visitor) =>
-    node\walk visitor for node in *@comments
     @content\walk visitor
     @appendix\walk visitor if @appendix
     visitor @
 ast_nodes.Statement = Statement
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L972
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L979
 class Body extends Node
   @yue_name: 'Body'
   
@@ -3438,7 +3460,7 @@ class Body extends Node
     visitor @
 ast_nodes.Body = Body
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L977
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L984
 class Block extends Node
   @yue_name: 'Block'
   
@@ -3459,7 +3481,7 @@ class Block extends Node
     visitor @
 ast_nodes.Block = Block
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L983
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L990
 class BlockEnd extends Node
   @yue_name: 'BlockEnd'
   
@@ -3480,7 +3502,7 @@ class BlockEnd extends Node
     visitor @
 ast_nodes.BlockEnd = BlockEnd
 
--- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L988
+-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L995
 class File extends Node
   @yue_name: 'File'
   
@@ -3518,4 +3540,3 @@ nodes.<> = __index: (k) =>
   @types[k]
 
 export default nodes
-

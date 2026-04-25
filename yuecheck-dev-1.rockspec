@@ -14,7 +14,7 @@ description = {
 
 dependencies = {
   'lua >= 5.4',
-  'yuescript >= 0.33.10',
+  'yuescript >= 0.34.0',
   'lpeg >= 1.1.0-2',
   'lpegrex >= 0.2.2-1',
   'argparse >= 0.7.1',

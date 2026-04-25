@@ -1,191 +1,303 @@
-import 'gen.types_raw' as types
+#!/usr/bin/env -S yue -e
+import 'http.request' as request
 import 'inspect'
 
-print '-- yuecheck:ignore'
-print '-- generated code; do not edit'
-print "import 'yuecheck.ast_impl' as ast"
-print '_selector_t = ast._selector_t'
-print '_selector_list_t = ast._selector_list_t'
-print '_list_t = ast._list_t'
-print 'Node = ast.Node'
-print 'Leaf = ast.Leaf'
-print 'ast_nodes = {}'
-print [[
+ast_h_url = 'https://raw.githubusercontent.com/IppClub/Yuescript/main/src/yuescript/yue_ast.h'
 
-_in = (val, set) ->
-  for i,v in ipairs set
-    return true if v == val
-  false
-]]
-
+-- excluded from generation as it is not available in to_ast.
 exclude =
-  -- excluded from generation as it is not available in to_ast.
   Seperator: true
 
-p = (v) ->
-  print (v\gsub '^%s%s%s%s%s%s', '')
+-- `*_t` to `*` on types referenced inside template arguments.
+chop_t = (s) ->
+  (s\gsub '_t$', '')
 
-ast_names = {}
-for t in *types
-  ast_names[t.decl_name] = t.decl_name
-  --[[
-  ast_names[t.decl_name] = t.internal_name
-  print "ast_names[\"#{ t.decl_name }\"] = \"#{ t.internal_name }\""
-  ]]
+tobool =
+  ['true']: true
+  ['false']: false
 
-for t in *types
-  -- what do we want to do here?
-  -- most likely, we want a caller to register a handler for this type.
-  -- so we should be calling something like ast._registered[t.decl_name]?
-  -- for example, if we look at go/ast, each type has (at a minimum)
-  -- End()/Pos(). we don't have that in yue ast.
-  --
-  -- as a matter of fact, all we know are what the node bits are.
-  -- so, it seems that
-  typ = t.type
-  switch typ
-    when 'node'
-      typ = 'Node'
-    when 'leaf'
-      typ = 'Leaf'
+-- walk + split on top-level commas (outside any <...> nesting)
+split_template_args = (s) ->
+  parts = {}
+  depth = 0
+  start = 1
+  for i = 1, #s
+    c = s\sub i, i
+    if c == '<'
+      depth += 1
+    elseif c == '>'
+      depth -= 1
+    elseif c == ',' and depth == 0
+      parts[] = (s\sub start, i - 1)\match '^%s*(.-)%s*$'
+      start = i + 1
 
-  if exclude[t.decl_name]
-    continue
+  tail = (s\sub start)\match '^%s*(.-)%s*$'
+  if #tail > 0
+    parts[] = tail
 
-  p "-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L#{ t.ast_h[1] }"
-  p "class #{ t.decl_name } extends #{ typ }
-  @yue_name: '#{ t.decl_name }'
-  "
-  -- @internal_name: \"#{ t.internal_name }\"
+  parts
 
-  if typ == 'Leaf'
-    p '  new: (v) => @v = v'
-    p '  from_table: (tbl) => @v = tbl[1]'
-    p '  walk: (visitor) => visitor @'
-    -- p "    new: (v) => print \"#{ t.decl_name } new: \""
+-- turn one joined cpp statement (sans `;`) into an attr entry
+parse_stmt = (stmt, attrs) ->
+  kind, args, name = stmt\match '^%s*ast_([%w_]+)%s*<(.*)>%s+([%w_]+)%s*$'
+  return unless kind -- ignore AST_MEMBER, blank lines, etc
 
-  if t.attr
-    args = {}
-    argassign = {}
-    argassignfrom = {}
-    argwalk = {}
-    for i, v in ipairs t.attr
-      if exclude[ast_names[v.type]]
+  parts = split_template_args args
+  if #parts < 2
+    error "malformed ast_#{kind}<...> #{name}: #{stmt}"
+
+  required = tobool[parts[1]]
+  if required == nil
+    error "expected true/false as first arg, got #{parts[1]}: #{stmt}"
+
+  types = [ chop_t p for p in *parts[2,] ]
+
+  switch kind
+    when 'ptr'
+      if #types != 1
+        error "ast_ptr expects exactly 1 type, got #{#types}: #{stmt}"
+      attrs[] = { type: types[1], :required, :name }
+    when 'sel'
+      attrs[] = { special: true, type: 'sel', :required, :name, any: types }
+    when 'sel_list'
+      attrs[] = { special: true, type: 'sel_list', :required, :name, any: types }
+    when 'list'
+      attrs[] = { special: true, type: 'list', :required, :name, any: types }
+    else
+      error "unknown ast_* kind: ast_#{kind} (stmt: #{stmt})"
+
+parse_h = (h) ->
+  types = {}
+
+  state = 'outside'
+  current = nil
+  stmt_buf = ''
+  lineno = 0
+
+  for ln in h\gmatch '([^\n]*)\n?'
+    lineno += 1
+
+    if state == 'outside'
+      m = ln\match '^AST_NODE%(([%w_]+)%)$'
+      if m
+        current = { type: 'node', decl_name: m, ast_h: { lineno, 0 }, attr: {} }
+        state = 'inside'
+        stmt_buf = ''
         continue
 
-      iname = "ast_nodes.#{ ast_names[v.type] }"
-      argdecl = "#{ v.name } = #{ iname }!"
-      argdesc = "--@#{ v.name }: #{ argdecl }"
-      switch v.type
-        when 'sel'
-          any = [ ast_names[v] for v in *v.any ]
-          argdecl = "_sel_t(#{ v.required or false },#{ table.concat any, "," })"
-          argdesc = "-- @#{ v.name }: #{ argdecl }"
-        when 'sel_list'
-          any = [ ast_names[v] for v in *v.any ]
-          argdecl = "_sel_list_t(#{ v.required or false },#{ table.concat any, "," })"
-          argdesc = "-- @#{ v.name}: #{ argdecl }"
-        when 'list'
-          any = [ ast_names[v] for v in *v.any ]
-          argdecl = "_list_t(#{ v.required or false },#{ table.concat any, "," })"
-          argdesc = "-- @#{ v.name }: #{ argdecl }"
-        else
-          argdesc = "-- @#{ v.name }(#{ v.required or false }): ast_nodes.#{ ast_names[v.type] }"
+      m = ln\match '^AST_LEAF%(([%w_]+)%)$'
+      if m
+        current = { type: 'leaf', decl_name: m, ast_h: { lineno, 0 }, attr: {} }
+        state = 'inside'
+        stmt_buf = ''
+        continue
+    else
+      m = ln\match '^AST_END%(([%w_]+)%)$'
+      if m
+        if m != current.decl_name
+          error "AST_END(#{m}) does not match open AST_NODE/AST_LEAF(#{current.decl_name}) at line #{lineno}"
+        current.ast_h[2] = lineno
+        types[] = current
+        current = nil
+        state = 'outside'
+        stmt_buf = ''
+        continue
 
-      print "  #{ argdesc }"
+      if ln\match '^AST_NODE%(' or ln\match '^AST_LEAF%('
+        error "missing AST_END before line #{lineno}; open node is #{current.decl_name}"
 
-      argtyp = switch v.type
-        when 'sel_list'
-          '{}'
-        when 'list'
-          '{}'
-        else
-          'nil'
+      cleaned = (ln\gsub '/%*.-%*/', '')
+      cleaned = cleaned\match '^%s*(.-)%s*$'
+      if #cleaned > 0
+        stmt_buf ..= ' ' .. cleaned
 
-      args[] = "#{ v.name } = #{ argtyp }"
-      argassign[] = "    @#{ v.name } = #{ v.name }"
+      -- process finished stmt buf
+      while true
+        semi = stmt_buf\find ';', 1, true
+        break unless semi
+        stmt = stmt_buf\sub 1, semi - 1
+        stmt_buf = stmt_buf\sub semi + 1
+        parse_stmt stmt, current.attr
 
-      -- here, if t == thing, put it in @target.
-      assgnstr = ''
-      sp = '  '
-      switch v.type
-        when 'sel_list'
-          names = [ "'#{ ast_names[v] }'" for v in *v.any ]
-          expr = "{#{ table.concat names, ',' }}"
+  if state != 'outside'
+    error "EOF reached while still inside #{current.decl_name}"
 
-          argassignfrom[] = "      if _in v\\g_yue_name!, #{ expr }"
-          argassignfrom[] = "        table.insert @#{ v.name }, v"
-          argassignfrom[] = "        continue"
+  -- custom type for whitespace, only used by formatter
+  types[] =
+    type: 'leaf'
+    decl_name: 'FmtWhitespace'
+    ast_h: { -1, -1 }
+    attr: {}
 
-          argwalk[] = "#{ sp }  node\\walk visitor for node in *@#{ v.name }"
-        when 'list'
-          names = [ "'#{ ast_names[v] }'" for v in *v.any ]
-          expr = "{#{ table.concat names, ',' }}"
+  types
 
-          argassignfrom[] = "      if _in v\\g_yue_name!, #{ expr }"
-          argassignfrom[] = "        table.insert @#{ v.name }, v"
-          argassignfrom[] = "        continue"
+-- fetch the ast header
+fetch_http = ->
+  req = request.new_from_uri ast_h_url
+  hd, stream = req\go 10
+  unless hd
+    error "request to #{ast_h_url} failed"
+  body, err = stream\get_body_as_string!
+  unless body
+    error "failed to fetch yue_ast.h: #{err}"
+  body
 
-          argwalk[] = "#{ sp }  node\\walk visitor for node in *@#{ v.name }"
-        when 'sel'
-          names = [ "'#{ ast_names[v] }'" for v in *v.any ]
-          expr = "{#{ table.concat names, ',' }}"
+read_file = (path) ->
+  f, err = io.open path, 'r'
+  unless f
+    error "failed to read #{path}: #{err}"
+  body = f\read '*a'
+  f\close!
+  body
 
-          argassignfrom[] = "      if (not @#{ v.name }) and _in v\\g_yue_name!, #{ expr }"
-          argassignfrom[] = "        @#{ v.name } = v"
-          argassignfrom[] = "        continue"
+resolve_source = (args) ->
+  -- --cache PATH
+  for i = 1, #args
+    if args[i] == '--cache'
+      path = args[i + 1]
+      unless path
+        error '--cache requires a path argument'
+      return read_file path
 
-          wext = ''
-          unless v.required
-            wext = " if @#{ v.name }"
-          argwalk[] = "#{ sp }  @#{ v.name }\\walk visitor#{ wext }"
-        else
-          argassignfrom[] = "      if (not @#{ v.name }) and v\\g_yue_name! == '#{ v.type }'"
-          argassignfrom[] = "        @#{ v.name } = v"
-          argassignfrom[] = "        continue"
+  env_path = os.getenv 'YUECHECK_AST_H'
+  if env_path and #env_path > 0
+    return read_file env_path
 
-          wext = ''
-          unless v.required
-            wext = " if @#{ v.name }"
-          argwalk[] = "    @#{ v.name }\\walk visitor#{ wext }"
+  fetch_http!
 
-    -- make attributes args to the fn?
-    print "  new: (#{ table.concat args, ', ' }) =>"
-    print table.concat argassign, "\n"
+-- generate
+emit = (types) ->
+  out = {}
+  push = (s) -> out[] = s
 
-    --[[ generate method that can handle yue.to_ast ]]
-    print ''
-    print '  from_table: (tbl) =>'
-    print '    for i, v in ipairs tbl'
-    print table.concat argassignfrom, "\n"
-    print '      _ = v'
-    print '    nil'
+  push '-- yuecheck:ignore'
+  push '-- generated code; do not edit'
+  push "import 'yuecheck.ast_impl' as ast"
+  push '_selector_t = ast._selector_t'
+  push '_selector_list_t = ast._selector_list_t'
+  push '_list_t = ast._list_t'
+  push 'Node = ast.Node'
+  push 'Leaf = ast.Leaf'
+  push 'ast_nodes = {}'
+  push ''
+  push '_in = (val, set) ->'
+  push '  for i,v in ipairs set'
+  push '    return true if v == val'
+  push '  false'
+  push ''
 
-    --[[ generate method that handles ast walking
-      (user) visitor: (node) -> (process & return visitor, or false/error to stop)
+  ast_names = {}
+  for t in *types
+    ast_names[t.decl_name] = t.decl_name
 
-      (typelib, example With) ast_walk: (visitor) ->
-        visitor @eop
-        visitor @valueList
-        visitor @assign
-        visitor @body
-    ]]
-    print ''
-    p '  walk: (visitor) =>'
-    print table.concat argwalk, "\n"
-    print '    visitor @'
+  for t in *types
+    continue if exclude[t.decl_name]
 
-  print "ast_nodes.#{ t.decl_name } = #{ t.decl_name }"
-  print ''
+    typ = switch t.type
+      when 'node' then 'Node'
+      when 'leaf' then 'Leaf'
+      else error "unknown type kind: #{t.type}"
 
-print [[
+    push "-- https://github.com/IppClub/YueScript/blob/main/src/yuescript/yue_ast.h#L#{t.ast_h[1]}"
+    push "class #{t.decl_name} extends #{typ}"
+    push "  @yue_name: '#{t.decl_name}'"
+    push '  '
 
--- be loud on invalid refs
-nodes = { types: ast_nodes }
-nodes.<> = __index: (k) =>
-  unless @types[k]
-    error "invalid ast type #{ k }"
-  @types[k]
+    if typ == 'Leaf'
+      push '  new: (v) => @v = v'
+      push '  from_table: (tbl) => @v = tbl[1]'
+      push '  walk: (visitor) => visitor @'
 
-export default nodes
-]]
+    visible_attrs = [ a for a in *t
+      .attr when not exclude[ast_names[a.type] or a.type] ]
+
+    if #visible_attrs > 0
+      args = {}
+      argassigns = {}
+      argassignfroms = {}
+      argwalks = {}
+
+      for a in *visible_attrs
+        argdecl = switch a.type
+          when 'sel'
+            any = [ ast_names[v] for v in *a.any ]
+            "_sel_t(#{a.required or false},#{table.concat any, ','})"
+          when 'sel_list'
+            any = [ ast_names[v] for v in *a.any ]
+            "_sel_list_t(#{a.required or false},#{table.concat any, ','})"
+          when 'list'
+            any = [ ast_names[v] for v in *a.any ]
+            "_list_t(#{a.required or false},#{table.concat any, ','})"
+          else
+            "ast_nodes.#{ast_names[a.type] or a.type}!"
+
+        argdesc = switch a.type
+          when 'sel', 'sel_list', 'list'
+            "-- @#{a.name}: #{argdecl}"
+          else
+            "-- @#{a.name}(#{a.required or false}): ast_nodes.#{ast_names[a.type] or a.type}"
+        push "  #{argdesc}"
+
+        default = switch a.type
+          when 'sel_list', 'list' then '{}'
+          else 'nil'
+        args[] = "#{a.name} = #{default}"
+        argassigns[] = "    @#{a.name} = #{a.name}"
+
+        switch a.type
+          when 'sel_list', 'list'
+            names = [ "'#{ast_names[v]}'" for v in *a.any ]
+            expr = "{#{table.concat names, ','}}"
+            argassignfroms[] = "      if _in v\\g_yue_name!, #{expr}"
+            argassignfroms[] = "        table.insert @#{a.name}, v"
+            argassignfroms[] = '        continue'
+            argwalks[] = "    node\\walk visitor for node in *@#{a.name}"
+          when 'sel'
+            names = [ "'#{ast_names[v]}'" for v in *a.any ]
+            expr = "{#{table.concat names, ','}}"
+            argassignfroms[] = "      if (not @#{a.name}) and _in v\\g_yue_name!, #{expr}"
+            argassignfroms[] = "        @#{a.name} = v"
+            argassignfroms[] = '        continue'
+            wext = a.required and '' or " if @#{a.name}"
+            argwalks[] = "    @#{a.name}\\walk visitor#{wext}"
+          else
+            argassignfroms[] = "      if (not @#{a.name}) and v\\g_yue_name! == '#{a.type}'"
+            argassignfroms[] = "        @#{a.name} = v"
+            argassignfroms[] = '        continue'
+            wext = a.required and '' or " if @#{a.name}"
+            argwalks[] = "    @#{a.name}\\walk visitor#{wext}"
+
+      push "  new: (#{table.concat args, ', '}) =>"
+      push table.concat argassigns, '\n'
+
+      push ''
+      push '  from_table: (tbl) =>'
+      push '    for i, v in ipairs tbl'
+      push table.concat argassignfroms, '\n'
+      push '      _ = v'
+      push '    nil'
+
+      push ''
+      push '  walk: (visitor) =>'
+      push table.concat argwalks, '\n'
+      push '    visitor @'
+
+    push "ast_nodes.#{t.decl_name} = #{t.decl_name}"
+    push ''
+
+  push '-- be loud on invalid refs'
+  push 'nodes = { types: ast_nodes }'
+  push 'nodes.<> = __index: (k) =>'
+  push '  unless @types[k]'
+  push '    error "invalid ast type #{ k }"'
+  push '  @types[k]'
+  push ''
+  push 'export default nodes'
+
+  table.concat out, '\n'
+
+args = { ... }
+source = resolve_source args
+types = parse_h source
+io.write emit types
+io.write '\n'

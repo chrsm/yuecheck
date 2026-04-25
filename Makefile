@@ -58,8 +58,6 @@ install:
 .PHONY: generate
 ## generate code from yue typedefs
 generate:
-	mkdir -p gen
-	yue -e bin/fetch_ast.yue > gen/types_raw.yue
 	yue -e bin/generate_types.yue > src/yuecheck/types.yue
 
 .PHONY: test
