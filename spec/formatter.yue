@@ -114,6 +114,47 @@ describe 'formatter', ->
       assert.nil err
       assert.same expected, r
 
+  describe 'string interpolation', ->
+    it 'should add canonical spaces around bare interpolation', ->
+      r = fmt.format 'x = "#{some_var}"'
+      assert.same 'x = "#{ some_var }"', r
+
+    it 'should leave already-spaced interpolation alone', ->
+      r = fmt.format 'x = "#{ some_var }"'
+      assert.same 'x = "#{ some_var }"', r
+
+    it 'should normalize multi-interp strings', ->
+      r = fmt.format 'x = "#{a} and #{b} and #{c}"'
+      assert.same 'x = "#{ a } and #{ b } and #{ c }"', r
+
+    it 'should not touch escaped #{', ->
+      r = fmt.format 'x = "\\#{not_interp}"'
+      assert.same 'x = "\\#{not_interp}"', r
+
+    it 'should handle nested double-quoted string in interp', ->
+      r = fmt.format 'x = "#{"inner"}"'
+      assert.same 'x = "#{ "inner" }"', r
+
+    it 'should handle multiple nested quotes in interp', ->
+      r = fmt.format 'x = "#{"a" .. "b"}"'
+      assert.same 'x = "#{ "a" .. "b" }"', r
+
+    it 'should handle escaped quote inside nested string in interp', ->
+      r = fmt.format 'x = "#{"with \\" escape"}"'
+      assert.same 'x = "#{ "with \\" escape" }"', r
+
+    it 'should handle table literal in interp', ->
+      r = fmt.format 'x = "#{ {key: "v"} }"'
+      assert.same 'x = "#{ {key: "v"} }"', r
+
+    it 'should handle conditional with strings in interp', ->
+      r = fmt.format 'x = "#{if ok then "pass" else "fail"}"'
+      assert.same 'x = "#{ if ok then "pass" else "fail" }"', r
+
+    it 'should handle bracketed index in interp', ->
+      r = fmt.format 'x = "#{tbl["k"]}"'
+      assert.same 'x = "#{ tbl["k"] }"', r
+
   describe 'inline comment preservation', ->
     it 'should preserve inline comment on variable', ->
       r = fmt.format 'b --[[ x ]] = 2'

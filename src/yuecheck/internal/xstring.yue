@@ -18,6 +18,89 @@ count_nl = (str) ->
     n += 1
   n
 
+-- scan_interp_body
+-- given str[start,start+1] == '#{', find the position of the matching `}`,
+-- treating nested `{...}` (sub-tables, table comprehensions), nested string
+-- literals (", ', long brackets), and `\` escapes as opaque
+-- returns position of the closing `}` or nil if unterminated
+scan_interp_body = (str, start) ->
+  n = #str
+  i = start + 2
+  depth = 1
+  while i <= n and depth > 0
+    c = str\sub i, i
+    if c == '\\'
+      i += 2
+      continue
+
+    if c == '"' or c == "'"
+      quote = c
+      i += 1
+      while i <= n
+        qc = str\sub i, i
+        if qc == '\\'
+          i += 2
+          continue
+        i += 1
+        break if qc == quote
+      continue
+
+    if c == '['
+      k = i + 1
+      while k <= n and (str\sub k, k) == '='
+        k += 1
+      if k <= n and (str\sub k, k) == '['
+        level = k - i - 1
+        close_seq = ']' .. (string.rep '=', level) .. ']'
+        found_close = str\find close_seq, k + 1, true
+        if found_close
+          i = found_close + #close_seq
+        else
+          i += 1
+        continue
+      i += 1
+      continue
+
+    if c == '{'
+      depth += 1
+      i += 1
+      continue
+
+    if c == '}'
+      depth -= 1
+      if depth == 0
+        return i
+      i += 1
+      continue
+
+    i += 1
+  nil
+
+-- scan_dquote
+-- given str[start] == '"' (the opening quote of a double-quoted string),
+-- find the position of the matching closing `"`. handles `\` escapes and
+-- skips past `#{ ... }` interpolations so nested `"` inside an interpolation
+-- doesn't terminate the outer string
+-- returns position of the closing `"` or nil if unterminated
+scan_dquote = (str, start) ->
+  n = #str
+  i = start + 1
+  while i <= n
+    c = str\sub i, i
+    if c == '\\'
+      i += 2
+      continue
+    if c == '"'
+      return i
+    if c == '#' and (str\sub i + 1, i + 1) == '{'
+      end_brace = scan_interp_body str, i
+      unless end_brace
+        return nil
+      i = end_brace + 1
+      continue
+    i += 1
+  nil
+
 -- normalize_interp_spacing
 -- rewrites interpolations (`#{ abc }`) to have exactly 1 leading and 1 trailing space
 -- _inside_ the brace (per how _i_ usually write them)
@@ -38,65 +121,14 @@ normalize_interp_spacing = (str) ->
       i += 1
       continue
 
-    -- scan from `#{` to matching `}`
-    start = i + 2
-    j = start
-    depth = 1
-    while j <= n and depth > 0
-      c = str\sub j, j
-      if c == '\\'
-        j += 2
-        continue
-
-      if c == '"' or c == "'"
-        quote = c
-        j += 1
-        while j <= n
-          c2 = str\sub j, j
-          if c2 == '\\'
-            j += 2
-            continue
-          j += 1
-          break if c2 == quote
-        continue
-
-      if c == '['
-        k = j + 1
-        while k <= n and (str\sub k, k) == '='
-          k += 1
-        if k <= n and (str\sub k, k) == '['
-          level = k - j - 1
-          close_seq = ']' .. (string.rep '=', level) .. ']'
-          found_close = str\find close_seq, k + 1, true
-          if found_close
-            j = found_close + #close_seq
-          else
-            j += 1
-          continue
-        j += 1
-        continue
-
-      if c == '{'
-        depth += 1
-        j += 1
-        continue
-
-      if c == '}'
-        depth -= 1
-        if depth == 0
-          break
-        j += 1
-        continue
-
-      j += 1
-
-    if depth == 0 and j <= n
-      inner = str\sub start, j - 1
+    end_brace = scan_interp_body str, i
+    if end_brace
+      inner = str\sub i + 2, end_brace - 1
       trimmed = (inner\match '^%s*(.-)%s*$') or ''
       out[] = '#{ '
       out[] = trimmed
       out[] = ' }'
-      i = j + 1
+      i = end_brace + 1
     else
       -- unbalanced, copy as-is and continue
       out[] = '#{'
@@ -109,5 +141,7 @@ export default {
   :stripq
   :match_any
   :count_nl
+  :scan_interp_body
+  :scan_dquote
   :normalize_interp_spacing
 }

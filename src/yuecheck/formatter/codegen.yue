@@ -805,44 +805,14 @@ generators.DoubleString = (node, ctx) ->
     if line
       str_start = line\find '"', src_col
       if str_start
-        current_line = src_line
-        pos = str_start + 1
-        found = false
-        original_str = nil
+        -- join from src_line forward and scan for the matching `"`
+        -- account for interpss, because nested `"`s inside are valid yue
+        joined = table.concat ctx.source_lines, '\n', src_line
+        end_pos = xstring.scan_dquote joined, str_start
+        original_str = if end_pos then joined\sub str_start, end_pos else nil
 
-        until found
-          current_line_text = ctx.source_lines[current_line]
-          break unless current_line_text
-
-          if current_line > src_line
-            pos = 1
-
-          while pos <= #current_line_text
-            ch = current_line_text\sub pos, pos
-            if ch == '\\'
-              pos += 2
-            elseif ch == '"'
-              found = true
-              if current_line == src_line
-                original_str = line\sub str_start, pos
-              else
-                original_str = line\sub str_start
-                for ln = src_line + 1, current_line - 1
-                  original_str ..= '\n' .. ctx.source_lines[ln]
-                original_str ..= '\n' .. current_line_text\sub 1, pos
-              break
-            else
-              pos += 1
-
-          unless found
-            if pos > #current_line_text
-              current_line += 1
-              pos = 1
-            else
-              break
-
-        if found and original_str
-          is_multiline = current_line > src_line
+        if original_str
+          is_multiline = (original_str\find '\n', 1, true) != nil
           content = original_str\sub 2, -2
           unless is_multiline or (original_str\find '#{', 1, true) or
                  (content\find "'", 1, true)
