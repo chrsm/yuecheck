@@ -137,14 +137,14 @@ do
 
 propA = do
   (value) <= property => @_value
-  print "old value: #{@_value}"
-  print "new value: #{value}"
+  print "old value: #{ @_value }"
+  print "new value: #{ value }"
   @_value = value
 
 propB = do
   <= property _, (value) =>
-    print "old value: #{@_value}"
-    print "new value: #{value}"
+    print "old value: #{ @_value }"
+    print "new value: #{ value }"
     @_value = value
   @_value
 

@@ -45,5 +45,5 @@ for [ compiledFile, docFile ] in *[
       else
         print err
         os.exit 1
-    close output = with io.open "#{outputFolder}/#{compiledFile}", 'w+'
+    close output = with io.open "#{ outputFolder }/#{ compiledFile }", 'w+'
       \write table.concat codes

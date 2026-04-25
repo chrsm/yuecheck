@@ -290,7 +290,7 @@ func with tb
   \func 'a'
 
 -- 15. table comprehension expr
-func { "#{k}-post-fix", v * 2 for k, v in pairs tb }
+func { "#{ k }-post-fix", v * 2 for k, v in pairs tb }
 
 -- 16. do expr
 func do
@@ -380,7 +380,7 @@ GameEngine\onUpdate (deltaTime) ->
     \func 'a'
 
   -- 15. table comprehension expr
-  func { "#{k}-post-fix", v * 2 for k, v in pairs tb }
+  func { "#{ k }-post-fix", v * 2 for k, v in pairs tb }
 
   -- 16. do expr
   func do
@@ -418,20 +418,20 @@ GameEngine\onEvent 'SomeEvent', ->
 GameEngine\schedule (deltaTime) ->
   value = 123
   func if value > 200
-    UpdateScoreText "Win: #{value}"
+    UpdateScoreText "Win: #{ value }"
     'done'
   else
-    UpdateScoreText "Score: #{value}"
+    UpdateScoreText "Score: #{ value }"
     'continue'
 
 GameEngine\schedule (deltaTime) -> -- closure 1
   value = 123
   func if value > 200
-    UpdateScoreText "Win: #{value}"
+    UpdateScoreText "Win: #{ value }"
     'done'
   else
     GameEngine\schedule (deltaTime) -> -- closure 2
-      UpdateScoreText "Score: #{value}" -- value is captured by closure 2
+      UpdateScoreText "Score: #{ value }" -- value is captured by closure 2
     'continue'
 
 -- test cases from issue

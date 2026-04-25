@@ -68,7 +68,7 @@ unless version?
 
 rockspec = "rockspec_format = '3.0'
 package = 'Yuescript'
-version = '#{version}-1'
+version = '#{ version }-1'
 source = {
 	url = 'git+https://github.com/pigpigyyy/yuescript'
 }
@@ -101,12 +101,14 @@ build = {
 	}
 }"
 
-specFile = "yuescript-#{version}-1.rockspec"
+specFile = "yuescript-#{ version }-1.rockspec"
 with? io.open specFile, 'w+'
   \write rockspec
   \close!
 
-result = io.popen("luarocks upload --api-key #{luarocksKey} #{specFile}")\read '*a'
+result = io
+  .popen("luarocks upload --api-key #{ luarocksKey } #{ specFile }")
+  \read '*a'
 unless result\match 'Done:'
   print result
   os.exit 1

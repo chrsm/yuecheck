@@ -11,11 +11,11 @@ export macro todo = (msg)-> |
 
 -- expect
 export macro todoInner = (module, line, msg) ->
-  print "TODO#{msg and ': ' .. msg or ''} in file #{module}, at line #{line}"
+  print "TODO#{ msg and ': ' .. msg or '' } in file #{ module }, at line #{ line }"
   {
-    code: "-- TODO#{msg and ': ' .. msg or ''}"
+    code: "-- TODO#{ msg and ': ' .. msg or '' }"
     type: 'lua'
   }
 
 export macro todo = (msg) -> |
-  $todoInner $FILE, $LINE#{msg and ", #{msg}" or ""}
+  $todoInner $FILE, $LINE#{ msg and ", #{msg}" or "" }

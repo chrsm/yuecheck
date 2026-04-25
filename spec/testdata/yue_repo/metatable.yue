@@ -149,7 +149,7 @@ do { new: ctor, :update } = a.<>
 
 tb = {}
 do
-  f = tb\<"value#{x < y}">(123, ...)
+  f = tb\<"value#{ x < y }">(123, ...)
   f tb\<'value'> 123, ...
   tb\<[[
 		value
@@ -165,7 +165,7 @@ do
 
 do
   f = tb.<['value']> 123, ...
-  f = tb.<"value#{x < y}">(123, ...)
+  f = tb.<"value#{ x < y }">(123, ...)
   f tb.<'value'> 123, ...
   tb.<[[ value
 1]]>(123, ...)

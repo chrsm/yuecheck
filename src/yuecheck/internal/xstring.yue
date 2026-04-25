@@ -18,9 +18,96 @@ count_nl = (str) ->
     n += 1
   n
 
+-- normalize_interp_spacing
+-- rewrites interpolations (`#{ abc }`) to have exactly 1 leading and 1 trailing space
+-- _inside_ the brace (per how _i_ usually write them)
+-- try to respect escapes/nested lits/brace depth
+normalize_interp_spacing = (str) ->
+  out = {}
+  i = 1
+  n = #str
+  while i <= n
+    ch = str\sub i, i
+    if ch == '\\'
+      out[] = str\sub i, (math.min i + 1, n)
+      i += 2
+      continue
+
+    unless ch == '#' and (str\sub i + 1, i + 1) == '{'
+      out[] = ch
+      i += 1
+      continue
+
+    -- scan from `#{` to matching `}`
+    start = i + 2
+    j = start
+    depth = 1
+    while j <= n and depth > 0
+      c = str\sub j, j
+      if c == '\\'
+        j += 2
+        continue
+
+      if c == '"' or c == "'"
+        quote = c
+        j += 1
+        while j <= n
+          c2 = str\sub j, j
+          if c2 == '\\'
+            j += 2
+            continue
+          j += 1
+          break if c2 == quote
+        continue
+
+      if c == '['
+        k = j + 1
+        while k <= n and (str\sub k, k) == '='
+          k += 1
+        if k <= n and (str\sub k, k) == '['
+          level = k - j - 1
+          close_seq = ']' .. (string.rep '=', level) .. ']'
+          found_close = str\find close_seq, k + 1, true
+          if found_close
+            j = found_close + #close_seq
+          else
+            j += 1
+          continue
+        j += 1
+        continue
+
+      if c == '{'
+        depth += 1
+        j += 1
+        continue
+
+      if c == '}'
+        depth -= 1
+        if depth == 0
+          break
+        j += 1
+        continue
+
+      j += 1
+
+    if depth == 0 and j <= n
+      inner = str\sub start, j - 1
+      trimmed = (inner\match '^%s*(.-)%s*$') or ''
+      out[] = '#{ '
+      out[] = trimmed
+      out[] = ' }'
+      i = j + 1
+    else
+      -- unbalanced, copy as-is and continue
+      out[] = '#{'
+      i += 2
+
+  table.concat out
+
 export default {
   :stripnl
   :stripq
   :match_any
   :count_nl
+  :normalize_interp_spacing
 }

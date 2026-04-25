@@ -381,9 +381,9 @@ do
   for item in *items
     switch item
       when :x, :y
-        print "Vec2 #{x}, #{y}"
+        print "Vec2 #{ x }, #{ y }"
       when :width, :height
-        print "Size #{width}, #{height}"
+        print "Size #{ width }, #{ height }"
       when false
         print 'None'
       when __class: cls
@@ -417,9 +417,9 @@ do
   tb = x: 'abc'
   switch tb
     when :x, :y
-      print "x: #{x} with y: #{y}"
+      print "x: #{ x } with y: #{ y }"
     when :x
-      print "x: #{x} only"
+      print "x: #{ x } only"
 
 do
   matched = switch tb
@@ -437,7 +437,7 @@ do
     when nil
       'invalid'
     when :a, :b
-      "#{a + b}"
+      "#{ a + b }"
     when 1, 2, 3, 4, 5
       'number 1 - 5'
     when { :matchAnyTable = 'fallback' }
@@ -462,9 +462,9 @@ do
     when [ 1, 2, 3 ]
       print '1, 2, 3'
     when [ 1, b, 3 ]
-      print "1, #{b}, 3"
+      print "1, #{ b }, 3"
     when [ 1, 2, b = 3 ]
-      print "1, 2, #{b}"
+      print "1, 2, #{ b }"
 
 do
   switch tb
@@ -534,7 +534,7 @@ do
     when 42
       print 'life universe everything'
     else
-      print "other #{result}"
+      print "other #{ result }"
   -- output: life universe everything
 
 do

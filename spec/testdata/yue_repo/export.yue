@@ -157,20 +157,20 @@ f a?.b
 f a\b
 f class A
 
-_ = "#{if a then b}"
-_ = "#{do 123}"
-_ = "#{switch a
-	when b then c}"
-_ = "#{[i for i = 1,10]}"
-_ = "#{for i = 1,10 do i}"
-_ = "#{{k,v for k,v in pairs tb}}"
-_ = "#{for k,v in pairs tb do {k,v}}"
-_ = "#{while a do true}"
-_ = "#{with a
-	.b = 123}"
-_ = "#{a?.b}"
-_ = "#{a\b}"
-_ = "#{class A}"
+_ = "#{ if a then b }"
+_ = "#{ do 123 }"
+_ = "#{ switch a
+	when b then c }"
+_ = "#{ [i for i = 1,10] }"
+_ = "#{ for i = 1,10 do i }"
+_ = "#{ {k,v for k,v in pairs tb} }"
+_ = "#{ for k,v in pairs tb do {k,v} }"
+_ = "#{ while a do true }"
+_ = "#{ with a
+	.b = 123 }"
+_ = "#{ a?.b }"
+_ = "#{ a\b }"
+_ = "#{ class A }"
 
 local *
 v1 = 1

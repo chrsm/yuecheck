@@ -1,6 +1,7 @@
 -- convert AST -> Doc IR (wadler-lindig)
 import 'yuecheck.ast'
 import 'yuecheck.formatter.ir'
+import 'yuecheck.internal.xstring'
 import 'yuecheck.types'
 
 import 'dkjson' as json
@@ -847,6 +848,9 @@ generators.DoubleString = (node, ctx) ->
                  (content\find "'", 1, true)
             return ir.cat ir.text("'"), ir.text(content), ir.text("'")
           else
+            -- normalize spacing in interps
+            if original_str\find '#{', 1, true
+              original_str = xstring.normalize_interp_spacing original_str
             -- multiline string: preserve with hardlines
             if is_multiline
               parts = {}
@@ -2535,6 +2539,9 @@ generators.YAMLMultiline = (node, ctx) ->
             current_line += 1
           else
             break
+        -- normalize spacing in interps
+        if result\find '#{', 1, true
+          result = xstring.normalize_interp_spacing result
         -- build as concat of lines with literallines (no indent added by layout)
         -- normalize tab indentation to spaces
         parts = {}
