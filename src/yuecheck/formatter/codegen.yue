@@ -1,4 +1,4 @@
--- convert AST -> Doc IR (wadler-lindig)
+-- convert AST -> doc tree (Wadler-Lindig)
 import 'yuecheck.ast'
 import 'yuecheck.formatter.ir'
 import 'yuecheck.internal.xstring'
@@ -150,20 +150,20 @@ extract_table_lit = (node) ->
   -- TableValue.value -> (same chain)
   inner = node.item or node.value
 
-  -- Unwrap Exp -> UnaryExp/pipeExprs
+  -- unwrap Exp -> UnaryExp/pipeExprs
   if inner?.is and (inner\is types.Exp)
     if inner.pipeExprs and #inner.pipeExprs > 0
       inner = inner.pipeExprs[1]
 
-  -- Unwrap UnaryExp -> expos
+  -- unwrap UnaryExp -> expos
   if inner?.expos and #inner.expos > 0
     inner = inner.expos[1]
 
-  -- Unwrap Value -> item
+  -- unwrap Value -> item
   if inner?.item
     inner = inner.item
 
-  -- Unwrap SimpleValue -> value
+  -- unwrap SimpleValue -> value
   if inner?.is and (inner\is types.SimpleValue)
     inner = inner.value
 
@@ -204,8 +204,8 @@ is_last_arg_multiline_funlit = (invoke_node) ->
   content = funlit.body.content
   not (content and content\is types.Statement)
 
--- check if a table (or any nested table within it) spans multiple lines.
--- used to force outer tables to expand when they contain multiline nested tables.
+-- check if a table (or any nested table within it) spans multiple lines
+-- used to force outer tables to expand when they contain multiline nested tables
 table_spans_multiple_lines = (node) ->
   unless node?.is and (node\is types.TableLit)
     return false
@@ -231,14 +231,12 @@ is_pair_type = (item) ->
   (string.find item\g_yue_name!, 'Pair') != nil
 
 --[[ comment helpers ]]
--- get 'above' comments as a Doc (with hardlines).
--- returns empty doc if no unread above comments.
--- NOTE: above_doc always contains hardlines, so it forces the enclosing group to break.
+-- above comments always carry hardlines, so the enclosing group will break
 get_above_doc = (node, ctx) ->
   comments = node._comments?.above
   return ir.EMPTY unless comments and #comments > 0
 
-  -- Filter already emitted comments
+  -- filter already emitted comments
   active = [ c for c in *comments when not c._emitted ]
   return ir.EMPTY if #active == 0
 
@@ -265,8 +263,8 @@ get_above_doc = (node, ctx) ->
 
   ir.concat parts
 
--- get "preceding" comments (inline block comments that appear before code on same line)
--- these should be emitted with just a trailing space, not hardline
+-- inline block comments on the node's own line
+-- emit with trailing space, not hardline
 get_preceding_doc = (node, ctx) ->
   comments = node._comments?.above
   return ir.EMPTY unless comments and #comments > 0
@@ -293,7 +291,7 @@ get_preceding_doc_recursive = (node) ->
   node_line = node\g_src_line!
   return ir.EMPTY unless node_line
 
-  -- Check the node itself first
+  -- check the node itself first
   if node._comments?.above and #node._comments.above > 0
     for c in *node._comments.above
       comment_line = c\g_src_line!
@@ -319,9 +317,7 @@ get_preceding_doc_recursive = (node) ->
 
   ir.EMPTY
 
--- check if a node's content is a block-containing construct (While, If, For, etc.)
--- these need special handling for EOL comments - the comment should appear after
--- the condition line, not after the entire block.
+-- block constructs (If/For/etc) want their eol on the header line, not the body
 is_block_containing = (node) ->
   unless node
     return false
@@ -336,24 +332,21 @@ is_block_containing = (node) ->
     types.Try,
     types.ClassDecl
 
--- Get EOL comment for a node as a text Doc.
--- Returns empty doc if no EOL comment or already emitted.
--- Reads from node._comments.eol (injected during association phase)
+-- eol comment for a node, as a doc
+-- returns empty if no eol comment or already emitted
+-- reads from node._comments.eol (injected during association)
 get_eol_doc_for_node = (node) ->
   comment = node._comments?.eol
   return ir.EMPTY unless comment and not comment._emitted
 
   comment._emitted = true
-  -- strip trailing whitespace from comment text
   comment_text = comment.v\gsub '%s+$', ''
 
-  -- wrap in `line_suffix`, don't count toward line length when layout decides
-  -- whether to break groups or not
+  -- wrap in line_suffix so it doesn't count toward line width in layout decisions
   ir.line_suffix ir.cat ir.SPACE, (ir.text comment_text)
 
--- Get EOL comment from a node or any of its descendants (depth-first).
--- Used for container items (like table rows) where the EOL comment may be
--- associated with a nested node rather than the item itself.
+-- eol comment from a node or any descendant (depth-first)
+-- container items (e.g. table rows) may own the eol via a nested node
 get_eol_doc_recursive = (node) ->
   return ir.EMPTY unless node and (type node) == 'table'
 
@@ -382,18 +375,18 @@ get_eol_doc_recursive = (node) ->
 
   ir.EMPTY
 
--- get EOL comment for a specific source line as a text Doc (legacy).
--- this is needed for cases where we don't have direct node access.
--- returns empty doc if no unread EOL comments for that line.
+-- legacy: eol comment for a source line, as a doc
+-- used where we don't have direct node access
+-- returns empty if no unread eol comments for that line
 get_eol_doc = (line_num, ctx) ->
   return ir.EMPTY unless line_num
   ctx.emitted_eol_lines = ctx.emitted_eol_lines or {}
   if ctx.emitted_eol_lines[line_num]
     return ir.EMPTY
 
-  -- walk the nodes_by_line to find EOL comment for this line
-  -- since comments are now on nodes, we need to find the node with EOL comment for this line
-  -- this is a fallback - prefer get_eol_doc_for_node when possible
+  -- walk nodes_by_line to find an eol comment for this line
+  -- since comments are now on nodes, we need to find the owning node
+  -- this is a fallback, prefer get_eol_doc_for_node when possible
   if ctx.eol_comments_by_line?[line_num]
     comment = ctx.eol_comments_by_line[line_num]
     unless comment._emitted
@@ -404,8 +397,8 @@ get_eol_doc = (line_num, ctx) ->
 
   ir.EMPTY
 
--- get trailing comments for a node (inline block comments like --[[t]]).
--- reads from node._comments.trailing (injected during association phase)
+-- trailing comments for a node (inline block comments like --[[t]])
+-- reads from node._comments.trailing (injected during association)
 get_trailing_doc = (node, ctx) ->
   comments = node._comments?.trailing
   return ir.EMPTY unless comments and #comments > 0
@@ -418,8 +411,8 @@ get_trailing_doc = (node, ctx) ->
       parts[] = ir.text c.v
   ir.concat parts
 
--- group items by source line number.
--- returns list of groups, each group is a list of items from the same source line.
+-- group items by source line number
+-- returns a list of groups, each group is items from the same source line
 group_items_by_line = (items) ->
   groups = {}
   cur_group = nil
@@ -434,7 +427,7 @@ group_items_by_line = (items) ->
       cur_line = item_line
   groups
 
--- Check if there's a blank line gap between two consecutive items in source.
+-- check if there's a blank line gap between two consecutive items in source
 has_blank_gap = (item_a, item_b, ctx) ->
   return false unless ctx.source_lines
   la = item_a\g_end_line!
@@ -446,10 +439,10 @@ has_blank_gap = (item_a, item_b, ctx) ->
       return true
   false
 
--- Build doc for a single "row" (items from the same source line).
--- Uses fill for greedy packing within the row.
+-- build a doc for a single row (items from the same source line)
+-- uses fill for greedy packing within the row
 -- is_last_row: true if this is the last row of items (affects trailing comma)
--- trailing_comma: whether source had trailing comma on last item
+-- trailing_comma: whether source had a trailing comma on the last item
 -- is_pair_row: whether items are key-value pairs (affects comma placement)
 build_row_doc = (gen, row_items, ctx, is_last_row, trailing_comma, is_pair_row, forced) ->
   item_docs = {}
@@ -459,18 +452,15 @@ build_row_doc = (gen, row_items, ctx, is_last_row, trailing_comma, is_pair_row, 
 
     item_doc = gen item, ctx
 
-    -- Get EOL comment for the last item in row
-    -- In forced mode, we emit it unconditionally (not wrapped in ifflat)
-    -- because fill uses render_flat which would drop ifflat comments.
-    -- Try recursive lookup first, then fall back to line-based lookup
-    -- (comment may be associated with a sibling on the same line).
+    -- forced mode emits the eol unconditionally because fill's render_flat drops ifflat
+    -- recursive lookup first, since a sibling on the same line may own the comment
     eol_doc = ir.EMPTY
     has_eol = false
     if is_last_in_row and forced
-      -- First try recursive lookup on this item
+      -- first try recursive lookup on this item
       eol_doc = get_eol_doc_recursive item
       if eol_doc._doc_type == 'empty'
-        -- Fall back to line-based lookup for this row's line
+        -- fall back to line-based lookup for this row's line
         item_line = item\g_src_line!
         if item_line
           eol_doc = get_eol_doc item_line, ctx
@@ -489,7 +479,7 @@ build_row_doc = (gen, row_items, ctx, is_last_row, trailing_comma, is_pair_row, 
         item_docs[] = ir.cat item_doc, ir.ifflat(ir.EMPTY, ir.COMMA), eol_doc
     elseif is_last_in_row and not is_pair_row
       -- last in non-pair row but not last overall: comma always (continuation)
-      -- EOL comment emitted unconditionally
+      -- eol comment emitted unconditionally
       item_docs[] = ir.cat item_doc, ir.COMMA, eol_doc
     elseif is_last_in_row and is_pair_row
       -- last in pair row but not last overall: comma in flat, none in break
@@ -507,9 +497,8 @@ build_row_doc = (gen, row_items, ctx, is_last_row, trailing_comma, is_pair_row, 
   -- use fill for same-line items
   ir.fill ir.SPACE, item_docs
 
--- Build the inner doc for container items (tables, arrays).
--- Handles: above comments, blank gaps, row grouping, fill packing.
--- forced output (caller wraps in group with forced flag based on this)
+-- build the inner doc for container items (tables, arrays)
+-- forced=true skips layout negotiation (caller wraps in a forced group)
 build_container_items_doc = (gen_fn, items, ctx, trailing_comma, has_eol_for_opening, forced) ->
   return ir.EMPTY if #items == 0
 
@@ -517,7 +506,6 @@ build_container_items_doc = (gen_fn, items, ctx, trailing_comma, has_eol_for_ope
   rows = group_items_by_line items
 
   -- determine if any item has above comments (forces group break)
-  -- Now using node._comments.above directly
   has_above_comments = false
   for item in *items
     aboves = item._comments?.above
@@ -541,8 +529,7 @@ build_container_items_doc = (gen_fn, items, ctx, trailing_comma, has_eol_for_ope
     -- above comments for first item of row (reads from node._comments.above)
     above_doc = get_above_doc first_item, ctx
     has_this_above = false
-    -- check if above_doc has content by checking if it's non-empty
-    -- (it returns ir.EMPTY which has _doc_type 'empty')
+    -- above_doc is ir.EMPTY when there are no active above comments
     if above_doc._doc_type != 'empty'
       has_this_above = true
 
@@ -568,9 +555,9 @@ build_container_items_doc = (gen_fn, items, ctx, trailing_comma, has_eol_for_ope
 
   ir.concat parts
 
--- build a container doc: open + [spacing] + items + [spacing] + close.
+-- build a container doc: open + [spacing] + items + [spacing] + close
 -- items_doc: the pre-built inner items doc
--- forced: whether group should always break
+-- forced: whether the group should always break
 -- table_spacing: whether to add spaces around inline content
 gen_container_with_doc = (open, items_doc, close, forced, table_spacing) ->
   open_space = if table_spacing then ir.line ' ' else ir.line ''
@@ -590,9 +577,9 @@ gen_container_with_doc = (open, items_doc, close, forced, table_spacing) ->
 
 generators = {}
 
--- generate a Doc from an AST node.
+-- generate a doc from an AST node
 -- node: root AST node (typically File)
--- ctx: context table with comment_data, source_lines, table_spacing, emitted_eol_lines
+-- ctx: context with comment_data, source_lines, table_spacing, emitted_eol_lines
 gen = (node, ctx) ->
   return ir.EMPTY unless node
 
@@ -795,8 +782,8 @@ generators.LuaString = (node, ctx, gen) ->
   ir.cat open_doc, gen(node.close, ctx)
 
 generators.DoubleString = (node, ctx) ->
-  -- yue ast does not preserve interpolated strings or leading/trailing whitespace.
-  -- extract from source when possible.
+  -- yue ast does not preserve interpolated strings or leading/trailing whitespace
+  -- extract from source when possible
   src_line = node\g_src_line!
   src_col = node\g_src_col!
 
@@ -806,7 +793,7 @@ generators.DoubleString = (node, ctx) ->
       str_start = line\find '"', src_col
       if str_start
         -- join from src_line forward and scan for the matching `"`
-        -- account for interpss, because nested `"`s inside are valid yue
+        -- account for interps, because nested `"`s inside are valid yue
         joined = table.concat ctx.source_lines, '\n', src_line
         end_pos = xstring.scan_dquote joined, str_start
         original_str = if end_pos then joined\sub str_start, end_pos else nil
@@ -881,14 +868,14 @@ generators.KeyName = (node, ctx, gen) ->
   gen node.name, ctx
 
 --[[ expression generators ]]
--- Helper to build a single pipe chain doc (handles |> between pipeExprs)
--- For now, keep pipes simple (rigid concatenation) to preserve existing behavior.
--- Line-width-aware pipe breaking can be added later.
+-- build a single pipe chain doc (handles |> between pipeExprs)
+-- pipes stay simple (rigid concatenation) for now
+-- line-width-aware pipe breaking can be added later
 build_pipe_chain = (pipe_exprs, ctx, gen) ->
   return ir.EMPTY if #pipe_exprs == 0
   return gen pipe_exprs[1], ctx if #pipe_exprs == 1
 
-  -- Simple concatenation for pipes (original behavior)
+  -- simple concatenation for pipes (original behavior)
   parts = {}
   for i, pipe in ipairs pipe_exprs
     parts[] = ir.text ' |> ' if i > 1
@@ -896,28 +883,28 @@ build_pipe_chain = (pipe_exprs, ctx, gen) ->
   ir.concat parts
 
 generators.Exp = (node, ctx, gen) ->
-  -- First, build the initial pipe chain
+  -- first, build the initial pipe chain
   first_operand = build_pipe_chain node.pipeExprs, ctx, gen
 
-  -- If no binary operators, just return the pipe chain
+  -- if no binary operators, just return the pipe chain
   unless node.opValues and #node.opValues > 0
-    -- Handle nil coalescing if present
+    -- handle nil coalescing if present
     if node.nilCoalesed
       return ir.cat first_operand, ir.text(' ?? '), gen(node.nilCoalesed, ctx)
     return first_operand
 
-  -- Collect all operands and operators for binary expression
+  -- collect all operands and operators for binary expression
   operands = { first_operand }
   operators = {}
 
   for op_val in *node.opValues
-    operators[] = gen op_val.op, ctx -- get formatted operator doc
-    -- Build the operand (which may itself be a pipe chain)
+    operators[] = gen op_val.op, ctx -- formatted operator doc
+    -- build the operand (which may itself be a pipe chain)
     operand_doc = build_pipe_chain op_val.pipeExprs, ctx, gen
     operands[] = operand_doc
 
   -- check if we have a mix of logical (and/or) and other ops
-  -- IF mixed, prefer breaking at logical ops, group operands between logical
+  -- if mixed, prefer breaking at logical ops, group operands between logical
   -- operators into flat subexps
   has_logical = false
   has_other = false
@@ -1017,15 +1004,13 @@ gen_chain_item = (item, ctx, gen) ->
     when item\is types.DotChainItem
       -- check for preceding comments on the name (handles --[[comment]] .x)
       prec_doc = get_preceding_doc item.name, ctx
-      if prec_doc._doc_type != 'empty'
-        parts[] = prec_doc
+      ir.append_if_nonempty parts, prec_doc
       parts[] = ir.text '.'
       parts[] = gen item.name, ctx
     when item\is types.ColonChainItem
       -- check for preceding comments on the name (handles --[[comment]] \x!)
       prec_doc = get_preceding_doc item.name, ctx
-      if prec_doc._doc_type != 'empty'
-        parts[] = prec_doc
+      ir.append_if_nonempty parts, prec_doc
       parts[] = ir.text '\\'
       parts[] = gen item.name, ctx
     when item\is types.Invoke
@@ -1050,7 +1035,7 @@ gen_chain_item = (item, ctx, gen) ->
           should_nest = not first_is_multiline_table
           arg_parts = {}
           for j, arg in ipairs item.args
-            -- Get preceding inline comments (--[[x]] before arg on same line)
+            -- preceding inline comments (--[[x]] before arg on same line)
             pre_inline = get_preceding_doc_recursive arg
             eol_d = get_eol_doc arg\g_src_line!, ctx
             arg_doc = ir.cat pre_inline, gen(arg, ctx), eol_d
@@ -1059,12 +1044,12 @@ gen_chain_item = (item, ctx, gen) ->
             arg_parts[] = arg_doc
           inner = ir.join ir.HARDLINE, arg_parts
           if should_nest
-            parts[] = ir.nest 2, ir.cat(ir.HARDLINE, inner)
+            parts[] = ir.indent_block inner
           else
             parts[] = ir.cat ir.HARDLINE, inner
           parts[] = ir.HARDLINE
         else
-          -- Use breakable_args for line-width-aware breaking
+          -- breakable_args for line-width-aware breaking
           arg_docs = [ gen(arg, ctx) for arg in *item.args ]
           parts[] = ir.breakable_args arg_docs
           if is_last_arg_multiline_funlit item
@@ -1154,19 +1139,19 @@ generators.ChainValue = (node, ctx, gen) ->
     else
       current_segment[] = item
 
-  -- Don't forget the last segment
+  -- don't forget the last segment
   if #current_segment > 0
     segments[] = ir
       .concat [ gen_chain_item(it, ctx, gen) for it in *current_segment ]
 
-  -- Use breakable_chain for line-width-aware breaking
+  -- breakable_chain for line-width-aware breaking
   ir.breakable_chain segments
 
 generators.Callable = (node, ctx, gen) ->
   gen node.item, ctx
 
 generators.Invoke = (node, ctx, gen) ->
-  -- Invoke without parens (standalone)
+  -- invoke without parens (standalone)
   if node.args and #node.args == 1
     arg = node.args[1]
     if (arg\is types.SingleString) and arg.v == '!'
@@ -1177,10 +1162,10 @@ generators.Invoke = (node, ctx, gen) ->
 
   if node.args and #node.args > 0
     arg_docs = [ gen(arg, ctx) for arg in *node.args ]
-    -- Use breakable_args for line-width-aware breaking
-    -- When broken, format as: func(arg1,
-    --                              arg2,
-    --                              arg3)
+    -- breakable_args for line-width-aware breaking
+    -- when broken: func(arg1,
+    --                   arg2,
+    --                   arg3)
     inner = ir.breakable_args arg_docs
     return ir.cat ir.text('('), inner, ir.text(')')
   else
@@ -1377,7 +1362,7 @@ generators.SubBackcall = (node, ctx, gen) ->
 --[[ table generators ]]
 generators.TableLit = (node, ctx, gen) ->
   table_line = node\g_src_line!
-  -- Check if this table or any nested table spans multiple lines
+  -- check if this table or any nested table spans multiple lines
   is_source_multiline = table_spans_multiple_lines node
 
   -- check for above/eol comments that force break
@@ -1413,7 +1398,7 @@ generators.TableLit = (node, ctx, gen) ->
 
     return ir.text '{}'
 
-  -- EOL comment on opening brace line (for multiline tables)
+  -- eol comment on opening brace line (for multiline tables)
   eol_open_doc = if is_source_multiline then get_eol_doc table_line, ctx else ir
     .EMPTY
 
@@ -1424,9 +1409,8 @@ generators.TableLit = (node, ctx, gen) ->
   result = gen_container_with_doc '{', items_doc, '}', forced, table_spacing
 
   if is_source_multiline and eol_open_doc._doc_type != 'empty'
-    -- insert EOL comment after opening brace: {<eol>\n  items\n}
-    -- this is done by inserting eol_open_doc before the items group.
-    -- we rebuild the container with the EOL on the opening line
+    -- insert eol comment after opening brace: {<eol>\n  items\n}
+    -- insert eol_open_doc before the items group, rebuilding the container
     ir.cat(
       ir.text('{'),
       eol_open_doc,
@@ -1467,7 +1451,7 @@ generators.NormalPair = (node, ctx, gen) ->
   value_is_multiline = node.value and
      node.value\is_any types.TableBlock, types.FunLit
 
-  -- EOL comment is on the NormalPair node itself
+  -- eol comment is on the NormalPair node itself
   eol_or_space = if value_is_multiline
     eol_doc = get_eol_doc_for_node node
     if eol_doc._doc_type != 'empty' then eol_doc else ir.EMPTY
@@ -1543,15 +1527,14 @@ generators.TableBlock = (node, ctx, gen) ->
   parts = { ir.HARDLINE }
   for i, val in ipairs node.values
     above_doc = get_above_doc val, ctx
-    if above_doc._doc_type != 'empty'
-      parts[] = above_doc
+    ir.append_if_nonempty parts, above_doc
 
     unless is_pair_type val
       parts[] = ir.text '* '
 
     parts[] = gen val, ctx
     eol = get_eol_doc val\g_src_line!, ctx
-    parts[] = eol if eol._doc_type != 'empty'
+    ir.append_if_nonempty parts, eol
 
     parts[] = ir.HARDLINE if i < #node.values
 
@@ -1567,7 +1550,7 @@ generators.TableBlockIndent = (node, ctx, gen) ->
   parts = {}
   for i, val in ipairs node.values
     if i > 1
-      parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(val, ctx))
+      parts[] = ir.indent_block gen(val, ctx)
     else
       parts[] = gen val, ctx
   ir.concat parts
@@ -1624,8 +1607,8 @@ generators.FunLit = (node, ctx, gen) ->
       -- _before_ indenting the body
       arrow_line = node.arrow?\g_src_line!
       eol = get_eol_doc arrow_line, ctx
-      parts[] = eol if eol._doc_type != 'empty'
-      parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+      ir.append_if_nonempty parts, eol
+      parts[] = ir.indent_block gen(node.body, ctx)
 
   ir.concat parts
 
@@ -1710,8 +1693,7 @@ generators.If = (node, ctx, gen) ->
         parts[] = ir.nest keyword_len, gen(item, cond_ctx)
       else
         above_doc = get_above_doc item, ctx
-        if above_doc._doc_type != 'empty'
-          parts[] = above_doc
+        ir.append_if_nonempty parts, above_doc
         parts[] = ir.text 'elseif '
         parts[] = ir.nest 7, gen(item, cond_ctx)
 
@@ -1746,21 +1728,21 @@ generators.If = (node, ctx, gen) ->
           elseif next_item\is types.Block
             parts[] = ir.text ' else'
             i += 1
-            parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(nodes[i], ctx))
+            parts[] = ir.indent_block gen(nodes[i], ctx)
             break
           else
             break
       else
         -- block form
         eol = get_eol_doc item\g_end_line!, ctx
-        parts[] = eol if eol._doc_type != 'empty'
+        ir.append_if_nonempty parts, eol
         i += 1
         if i <= #nodes
-          parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(nodes[i], ctx))
+          parts[] = ir.indent_block gen(nodes[i], ctx)
           if i < #nodes and nodes[i + 1] != nil
             parts[] = ir.HARDLINE
     elseif item\is_any types.Block, types.Statement
-      -- else block: check for 'else if' → 'elseif' conversion
+      -- else block: check for 'else if' -> 'elseif' conversion
       nested_if = nil
       if item\is types.Statement
         content = item.content
@@ -1783,14 +1765,13 @@ generators.If = (node, ctx, gen) ->
         continue
       else
         above_doc = get_above_doc item, ctx
-        if above_doc._doc_type != 'empty'
-          parts[] = above_doc
+        ir.append_if_nonempty parts, above_doc
         parts[] = ir.text 'else'
-        -- Get EOL comment for the 'else' line (line before block content)
+        -- eol comment for the 'else' line (line before block content)
         else_line = item\g_src_line! - 1
         eol = get_eol_doc else_line, ctx
-        parts[] = eol if eol._doc_type != 'empty'
-        parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(item, ctx))
+        ir.append_if_nonempty parts, eol
+        parts[] = ir.indent_block gen(item, ctx)
 
     i += 1
 
@@ -1815,7 +1796,7 @@ generators.Unless = (node, ctx, gen) ->
   -- align condition continuation after 'unless ' and suppress the inner binop
   -- indent (so fill breaks land at the keyword column)
   -- chains inside conditions must stay flat (inside_condition) because
-  -- breaking at [\.::] produces invalid syntax.
+  -- breaking at [\.::] produces invalid syntax
   cond_ctx = { k, v for k, v in pairs ctx }
   cond_ctx.binop_indent = 0
   cond_ctx.inside_condition = true
@@ -1823,7 +1804,7 @@ generators.Unless = (node, ctx, gen) ->
     ir.text('unless '),
     ir.nest(7, gen(node.condition, cond_ctx)),
     eol,
-    ir.nest(2, ir.cat(ir.HARDLINE, gen(node.body, ctx)))
+    ir.indent_block gen(node.body, ctx)
   )
 
 generators.Switch = (node, ctx, gen) ->
@@ -1846,13 +1827,10 @@ generators.Switch = (node, ctx, gen) ->
     else_doc = if node.lastBranch\is types.Statement
       ir.cat ir.text('else '), gen(node.lastBranch.content, ctx)
     else
-      ir
-        .cat ir
-            .text('else'), ir
-            .nest(2, ir.cat(ir.HARDLINE, gen(node.lastBranch, ctx)))
+      ir.cat ir.text('else'), ir.indent_block(gen(node.lastBranch, ctx))
     branch_parts[] = else_doc
 
-  parts[] = ir.nest 2, ir.cat(ir.HARDLINE, ir.join(ir.HARDLINE, branch_parts))
+  parts[] = ir.indent_block ir.join(ir.HARDLINE, branch_parts)
   ir.concat parts
 
 generators.SwitchCase = (node, ctx, gen) ->
@@ -1862,14 +1840,13 @@ generators.SwitchCase = (node, ctx, gen) ->
   body_doc = if node.body\is types.Statement
     ir.cat ir.text(' then '), gen(node.body.content, ctx)
   else
-    ir.nest(2, ir.cat(ir.HARDLINE, gen(node.body, ctx)))
+    ir.indent_block gen(node.body, ctx)
 
   parts = {}
-  if above_doc._doc_type != 'empty'
-    parts[] = above_doc
+  ir.append_if_nonempty parts, above_doc
   parts[] = ir.text 'when '
   parts[] = gen node.condition, ctx
-  parts[] = eol if eol._doc_type != 'empty'
+  ir.append_if_nonempty parts, eol
   parts[] = body_doc
   ir.concat parts
 
@@ -1900,7 +1877,7 @@ generators.ForNum = (node, ctx, gen) ->
     parts[] = ir.text ', '
     parts[] = gen node.stepValue.value, ctx
 
-  parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+  parts[] = ir.indent_block gen(node.body, ctx)
   ir.concat parts
 
 generators.ForEach = (node, ctx, gen) ->
@@ -1911,7 +1888,7 @@ generators.ForEach = (node, ctx, gen) ->
     gen node.loopValue, ctx,
   }
 
-  parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+  parts[] = ir.indent_block gen(node.body, ctx)
   ir.concat parts
 
 generators.While = (node, ctx, gen) ->
@@ -1938,16 +1915,16 @@ generators.While = (node, ctx, gen) ->
         parts[] = gen val, ctx
         parts[] = ir.text ', ' if i < #assign.values
 
-  -- EOL comment handling: line-based lookup for the condition line
+  -- eol comment handling: line-based lookup for the condition line
   eol = get_eol_doc node.condition\g_end_line!, ctx
-  parts[] = eol if eol._doc_type != 'empty'
-  parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+  ir.append_if_nonempty parts, eol
+  parts[] = ir.indent_block gen(node.body, ctx)
   ir.concat parts
 
 generators.Repeat = (node, ctx, gen) ->
   ir.cat(
     ir.text('repeat'),
-    ir.nest(2, ir.cat(ir.HARDLINE, gen(node.body, ctx))),
+    ir.indent_block gen(node.body, ctx),
     ir.HARDLINE,
     ir.text('until '),
     gen(node.condition, ctx)
@@ -1961,7 +1938,7 @@ generators.Do = (node, ctx, gen) ->
 
   ir.cat(
     ir.text('do'),
-    ir.nest(2, ir.cat(ir.HARDLINE, gen(node.body, ctx)))
+    ir.indent_block gen(node.body, ctx)
   )
 
 generators.With = (node, ctx, gen) ->
@@ -1974,7 +1951,7 @@ generators.With = (node, ctx, gen) ->
     parts[] = ir.text ' :'
     parts[] = gen node.assign, ctx
 
-  parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+  parts[] = ir.indent_block gen(node.body, ctx)
   ir.concat parts
 
 generators.Try = (node, ctx, gen) ->
@@ -1990,7 +1967,7 @@ generators.Try = (node, ctx, gen) ->
     parts[] = ir.SPACE
     parts[] = gen node.func, ctx
   else
-    parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.func, ctx))
+    parts[] = ir.indent_block gen(node.func, ctx)
 
   if node.catchBlock
     parts[] = ir.HARDLINE
@@ -2021,7 +1998,7 @@ generators.ClassDecl = (node, ctx, gen) ->
     parts[] = gen node.extend, ctx
 
   if node.body
-    parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+    parts[] = ir.indent_block gen(node.body, ctx)
 
   ir.concat parts
 
@@ -2056,11 +2033,10 @@ generators.ClassBlock = (node, ctx, gen) ->
         parts[] = ir.HARDLINE
 
     above_doc = get_above_doc item, ctx
-    if above_doc._doc_type != 'empty'
-      parts[] = above_doc
+    ir.append_if_nonempty parts, above_doc
     parts[] = gen item, ctx
     eol = get_eol_doc item\g_src_line!, ctx
-    parts[] = eol if eol._doc_type != 'empty'
+    ir.append_if_nonempty parts, eol
   ir.concat parts
 
 generators.ClassMemberList = (node, ctx, gen) ->
@@ -2090,22 +2066,22 @@ generators.Block = (node, ctx, gen) ->
     src_line = stmt\g_src_line!
     stmt_type = stmt\g_yue_name!
 
-    -- Handle standalone YueComment nodes (orphan comments injected into Block)
+    -- handle standalone YueComment nodes (orphan comments injected into Block)
     if stmt_type == 'YueComment'
-      -- Blank line before comment if source had one
+      -- blank line before comment if source had one
       if i > 1 and src_line and src_line > 1 and source_lines
         prev_line_content = source_lines[src_line - 1]
         if prev_line_content and prev_line_content\match '^%s*$'
           parts[] = ir.HARDLINE
 
-      -- Emit the comment(s)
+      -- emit the comment(s)
       for comment in *(stmt.comments or {})
         parts[] = ir.text comment.v
         parts[] = ir.HARDLINE if i < #stmts
       continue
 
     -- blank line before this statement?
-    -- Check for above comments using node._comments.above
+    -- check for above comments using node._comments.above
     has_above = false
     above_comments = stmt._comments?.above
     if above_comments and #above_comments > 0
@@ -2121,12 +2097,11 @@ generators.Block = (node, ctx, gen) ->
         parts[] = ir.HARDLINE
 
     above_doc = get_above_doc stmt, ctx
-    if above_doc._doc_type != 'empty'
-      parts[] = above_doc
+    ir.append_if_nonempty parts, above_doc
 
-    -- build statement doc first, then check for EOL comments.
-    -- statement generators (While, Unless, etc.) may consume EOL comments
-    -- for their condition line; if so, get_eol_doc_for_node will return empty.
+    -- build statement doc first, then check for eol comments
+    -- statement generators (While, Unless, etc) may consume eol comments
+    -- for their condition line. if so, get_eol_doc_for_node returns empty
     stmt_doc = gen stmt, ctx
     eol_doc = get_eol_doc_for_node stmt
     parts[] = ir.cat stmt_doc, eol_doc
@@ -2154,7 +2129,7 @@ generators.File = (node, ctx, gen) ->
   gen node.block, ctx
 
 --[[ comprehension generators ]]
--- Check if a NormalDef item starts with a nested Comprehension (bracket)
+-- check if a NormalDef item starts with a nested Comprehension (bracket)
 first_item_is_bracket = (item) ->
   return false unless item\is types.NormalDef
   exp = item.item
@@ -2431,7 +2406,7 @@ generators.Macro = (node, ctx, gen) ->
 generators.MacroInPlace = (node, ctx, gen) ->
   ir.cat(
     ir.text('$ ->'),
-    ir.nest(2, ir.cat(ir.HARDLINE, gen(node.body, ctx)))
+    ir.indent_block gen(node.body, ctx)
   )
 
 generators.MacroLit = (node, ctx, gen) ->
@@ -2449,7 +2424,7 @@ generators.MacroLit = (node, ctx, gen) ->
       parts[] = ir.SPACE
       parts[] = gen content, ctx
     else
-      parts[] = ir.nest 2, ir.cat(ir.HARDLINE, gen(node.body, ctx))
+      parts[] = ir.indent_block gen(node.body, ctx)
 
   ir.concat parts
 
@@ -2464,8 +2439,8 @@ generators.ShortTabAppending = (node, ctx, gen) ->
 
 generators.Parens = (node, ctx, gen) ->
   inner_doc = gen(node.expr, ctx)
-  -- Only break closing paren to new line if inner doc has hardlines.
-  -- Content starts immediately after '(' (no extra indent or newline).
+  -- only break closing paren to a new line if the inner doc has hardlines
+  -- content starts immediately after '(' (no extra indent or newline)
   if ir.has_hardline inner_doc
     ir.cat ir.text('('), inner_doc, ir.HARDLINE, ir.text(')')
   else

@@ -226,11 +226,11 @@ extract.simple_value = (node) ->
 
   -- Only handle simple types
   unless is.any_of v, {
-    types.ConstValue,
-    types.Num,
-    types.DoubleString,
-    types.SingleString,
-  }
+           types.ConstValue,
+           types.Num,
+           types.DoubleString,
+           types.SingleString,
+         }
     return nil
 
   ret = v.v

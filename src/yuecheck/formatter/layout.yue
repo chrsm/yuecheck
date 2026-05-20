@@ -1,7 +1,8 @@
--- Wadler-Lindig layout engine.
--- Renders a Doc IR tree to a string with a given page width.
+-- Wadler-Lindig style layout engine
+-- renders a doc tree to a string with a given page width
+import 'yuecheck.formatter.ir'
 
--- Cache for indent strings to avoid repeated string.rep allocations.
+-- cache for indent strings (elim repeated string.rep calls)
 indent_cache = {}
 get_indent = (n) ->
   cached = indent_cache[n]
@@ -10,9 +11,9 @@ get_indent = (n) ->
   indent_cache[n] = s
   s
 
--- Compute the flat (single-line) rendering width of a doc.
--- Returns math.huge if the doc contains a hardline (can never be flat).
--- Results are memoized on the doc node itself via _flat_width.
+-- flat (single-line) rendering width of a doc
+-- math.huge means the doc contains a hardline and can never be flat
+-- memoized on the doc node itself via _flat_width
 flat_width = (doc) ->
   cached = doc._flat_width
   return cached if cached != nil
@@ -66,17 +67,14 @@ flat_width = (doc) ->
   doc._flat_width = result
   result
 
--- Check if doc (in flat mode) + remaining stack items fit in w chars.
--- stack_rest: the main stack at the time of the group check (items after current group).
+-- does `doc` (flat) plus the remaining stack items fit in w chars?
+-- stack_rest: the main stack at the time of the group check, items after current group
 fits = (w, doc, stack_rest) ->
-  -- Build a local check stack: doc_to_check on top (processed first), then stack_rest.
-  -- LIFO: last element = first processed.
+  -- local check stack: doc_to_check on top, then stack_rest below (LIFO)
   cs = {}
-  -- Add stack_rest in original order (processed after doc_to_check).
-  -- Mark these as 'rest' so that hardlines/lines in them mean end-of-line (return true).
+  -- stack_rest items get marked 'rest' so their hardlines/lines mean end-of-line (fits)
   for frame in *stack_rest
     cs[] = { d: frame.doc, rest: true }
-  -- doc_to_check on top (processed first)
   cs[] = { d: doc, rest: false }
 
   while w >= 0 and #cs > 0
@@ -91,13 +89,13 @@ fits = (w, doc, stack_rest) ->
         w -= #d.s
       when 'line'
         if is_rest
-          return true  -- line in remaining context = end of current line, fits
+          return true -- line in remaining context = end of current line, fits
         -- in fits() we check flat mode: use alt string
         w -= #d.alt
       when 'hardline'
         if is_rest
-          return true  -- hardline in remaining context = end of current line, fits
-        return false  -- hardline in the doc itself = can never be flat
+          return true -- hardline in remaining context = end of current line, fits
+        return false -- hardline in the doc itself = can never be flat
       when 'literalline'
         if is_rest
           return true
@@ -133,8 +131,8 @@ fits = (w, doc, stack_rest) ->
 
   w >= 0
 
--- Render a doc flat (single-line) to an output buffer.
--- Used by the fill handler to efficiently render items that fit on current line.
+-- render a doc flat (single-line) to an output buffer
+-- used by the fill handler for items that fit on the current line
 render_flat = (doc, output) ->
   switch doc._doc_type
     when 'text'
@@ -144,9 +142,9 @@ render_flat = (doc, output) ->
     when 'empty'
       -- nothing
     when 'hardline'
-      -- shouldn't happen in fill items; skip
+      -- shouldn't happen in fill items, skip
     when 'literalline'
-      -- shouldn't happen in fill items; skip
+      -- shouldn't happen in fill items, skip
     when 'concat'
       for d in *doc.docs
         render_flat d, output
@@ -167,14 +165,13 @@ render_flat = (doc, output) ->
     else
       -- unknown: skip
 
--- Strip trailing spaces from the last element in an output buffer.
+-- strip trailing spaces from the last element in an output buffer
 strip_trailing_output = (output) ->
   if #output > 0
     last = output[#output]
     output[#output] = last\gsub ' +$', ''
 
--- Render a Doc to a string.
--- doc: the root Doc
+-- render a doc to a string
 -- page_width: maximum line width (default 84)
 layout = (doc, page_width = 84) ->
   output = {}
@@ -182,17 +179,15 @@ layout = (doc, page_width = 84) ->
   stack = { { indent: 0, mode: 'break', doc: doc } }
 
   while #stack > 0
-    frame = table.remove stack  -- LIFO pop
+    frame = table.remove stack -- LIFO pop
     i, m, d = frame.indent, frame.mode, frame.doc
 
     switch d._doc_type
       when 'empty'
         -- nothing
-
       when 'text'
         output[] = d.s
         col += #d.s
-
       when 'line'
         if m == 'flat'
           output[] = d.alt
@@ -203,26 +198,21 @@ layout = (doc, page_width = 84) ->
           output[] = '\n'
           output[] = get_indent i
           col = i
-
       when 'hardline'
         strip_trailing_output output
         output[] = '\n'
         output[] = get_indent i
         col = i
-
       when 'literalline'
         strip_trailing_output output
         output[] = '\n'
         col = 0
-
       when 'concat'
-        -- push children in reverse order (LIFO → first child processed first)
+        -- push children in reverse order (LIFO -> first child processed first)
         for j = #d.docs, 1, -1
           stack[] = { indent: i, mode: m, doc: d.docs[j] }
-
       when 'nest'
         stack[] = { indent: i + d.n, mode: m, doc: d.doc }
-
       when 'group'
         if d.forced
           stack[] = { indent: i, mode: 'break', doc: d.doc }
@@ -233,18 +223,15 @@ layout = (doc, page_width = 84) ->
             stack[] = { indent: i, mode: 'flat', doc: d.doc }
           else
             stack[] = { indent: i, mode: 'break', doc: d.doc }
-
       when 'line_suffix'
         -- passthrough! width exclusion is only in `fits`
         stack[] = { indent: i, mode: m, doc: d.doc }
-
       when 'ifflat'
         chosen = if m == 'flat' then d.flat else d.break_
         stack[] = { indent: i, mode: m, doc: chosen }
-
       when 'fill'
-        -- Greedy fill: eagerly process items to pack them on lines.
-        -- This breaks the normal stack-based flow but is necessary for fill semantics.
+        -- greedy fill: eagerly process items to pack them onto lines
+        -- breaks the normal stack-based flow, but fill semantics need it
         sep = d.sep
         sep_w = flat_width sep
         local_i = i
@@ -253,7 +240,8 @@ layout = (doc, page_width = 84) ->
           item_w = flat_width item_doc
 
           if j > 1
-            if item_w < math.huge and sep_w < math.huge and col + sep_w + item_w <= page_width
+            if item_w < math.huge and sep_w < math.huge and
+               col + sep_w + item_w <= page_width
               -- item + separator fits on current line: render sep flat, then item flat
               render_flat sep, output
               col += sep_w
@@ -269,17 +257,23 @@ layout = (doc, page_width = 84) ->
                 render_flat item_doc, output
                 col += item_w
               else
-                -- item has hardlines (e.g., multiline value): push to stack for normal processing
-                -- This handles edge cases like multiline values inside fill rows
+                -- item has hardlines (e.g. a multiline value), push it for normal processing
                 stack[] = { indent: local_i, mode: m, doc: item_doc }
-                -- We can't continue eagerly after this; break out
-                -- Remaining fill items need to be handled after stack processes item_doc
-                -- Simple approach: push remaining items as a new fill node
+                -- can't continue eagerly, push the rest as a fresh fill and break out
+                -- the stack will process item_doc, then come back to the fill below
                 if j < #d.items
                   remaining_items = {}
                   for k = j + 1, #d.items
                     remaining_items[] = d.items[k]
-                  stack[] = { indent: local_i, mode: m, doc: { _doc_type: 'fill', sep: sep, items: remaining_items } }
+
+                  stack[] = {
+                    indent: local_i, mode: m,
+                    doc: { _doc_type: 'fill', sep: sep, items: remaining_items }
+                  }
+
+                  stack[] = {
+                    indent: local_i, mode: m, doc: ir.fill(sep, remaining_items)
+                  }
                 break
           else
             -- first item
@@ -293,7 +287,15 @@ layout = (doc, page_width = 84) ->
                 remaining_items = {}
                 for k = 2, #d.items
                   remaining_items[] = d.items[k]
-                stack[] = { indent: local_i, mode: m, doc: { _doc_type: 'fill', sep: sep, items: remaining_items } }
+
+                stack[] = {
+                  indent: local_i, mode: m,
+                  doc: { _doc_type: 'fill', sep: sep, items: remaining_items }
+                }
+
+                stack[] = {
+                  indent: local_i, mode: m, doc: ir.fill(sep, remaining_items)
+                }
               break
 
   result = table.concat output, ''

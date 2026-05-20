@@ -1,14 +1,14 @@
 import 'yuecheck.macros' as { $ }
 
-import 'inspect'
 import 'dkjson' as json
+import 'inspect'
 import 'yue'
 
 import 'yuecheck.linter'
 
 import 'yuecheck.exp.conn'
-import 'yuecheck.exp.server'
 import 'yuecheck.exp.handlers'
+import 'yuecheck.exp.server'
 
 os.exit 1
 
@@ -37,7 +37,6 @@ right now, all this can do is suggest `Global`s, further work is needed
 in the ast helper package to pull more data. and, of course, reading the
 fuckin' spec.
 ]]
-
 srv = server.Server conn.Stdio
 
 -- (request) -> response{:id, :method, :result, :error}
@@ -57,10 +56,10 @@ srv.handler = (request) ->
       uri = request.params.textDocument.uri
       handlers['textDocument/definition'] ln, col, uri
     when 'textDocument/didChange'
-      __nop=true
+      __nop = true
     when 'textDocument/didSave'
       -- { id: request.id, result: {}}
-      __nop=true
+      __nop = true
     when 'exit'
       os.exit 0
 
@@ -73,7 +72,7 @@ repeat
       if resp
         srv\write req, resp
   catch err
-    log yue.traceback err
-    print yue.traceback err
-    os.exit 1
+      log yue.traceback err
+      print yue.traceback err
+      os.exit 1
 until done

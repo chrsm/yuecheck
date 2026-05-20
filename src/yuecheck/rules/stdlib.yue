@@ -25,7 +25,7 @@ stdlib_usage = rule.FuncRule
       fn = pkg
       pkg = 'base'
       pkg_v = defs.base
-      path = ['base', fn]
+      path = [ 'base', fn ]
     else
       pkg_v = defs[pkg]
 
@@ -91,7 +91,8 @@ stdlib_usage = rule.FuncRule
     else
       "#{ pkg }.#{ fn }"
 
-    typ = if (reqn > 0 and #args < reqn + optn) or (reqn > 0 and #args > reqn + optn) or (reqn == 0 and #args > reqn + optn) -- not enough [req,opt]()
+    typ = if (reqn > 0 and #args < reqn + optn) or
+       (reqn > 0 and #args > reqn + optn) or (reqn == 0 and #args > reqn + optn) -- not enough [req,opt]()
       'ERROR'
     else
       'WARN'
@@ -126,8 +127,8 @@ stdlib_match = rule.FuncRule
   name: 'stdlib_match'
   description: ''
   type: 'error'
-  on: [types.ExpListAssign, types.ChainValue]
-  fns: ['^string%.match$', '^string%.gmatch$', '^string%.find$', '^string%.gsub$']
+  on: [ types.ExpListAssign, types.ChainValue ]
+  fns: [ '^string%.match$', '^string%.gmatch$', '^string%.find$', '^string%.gsub$' ]
   checker: (path, args, varnames, node) =>
     -- argv
     --   * [1] is the string we're operating on

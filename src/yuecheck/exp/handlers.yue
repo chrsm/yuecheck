@@ -1,7 +1,7 @@
 import 'yuecheck.macros' as { $ }
 
-import 'inspect'
 import 'dkjson' as json
+import 'inspect'
 
 import 'yuecheck.ast' as ast
 import 'yuecheck.linter'
@@ -67,13 +67,13 @@ export interface CompletionParams extends TextDocumentPositionParams,
 }
 ]]
 typ2kind =
-  string: 1     -- CompletionItemKind.Text
-  function: 3   -- CompletionItemKind.Function
-  number: 6     -- CompletionItemKind.Variable
-  variable: 6   -- CompletionItemKind.Variable
-  const: 21     -- CompletionItemKind.Constant
+  string: 1 -- CompletionItemKind.Text
+  function: 3 -- CompletionItemKind.Function
+  number: 6 -- CompletionItemKind.Variable
+  variable: 6 -- CompletionItemKind.Variable
+  const: 21 -- CompletionItemKind.Constant
   chainvalue: 6 -- CompletionItemKind.Variable (for now)
-  unknown: 1    -- CompletionItemKind.Text
+  unknown: 1 -- CompletionItemKind.Text
 
 handlers['textDocument/completion'] = (line, col, document_uri) ->
   document = document_uri\gsub 'file://', ''
@@ -172,6 +172,5 @@ handlers['textDocument/definition'] = (line, col, document_uri) ->
         line: 0
         character: 0
   r
-
 
 export default handlers

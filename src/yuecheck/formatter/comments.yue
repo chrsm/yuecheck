@@ -1,16 +1,16 @@
 -- comment association for the formatter
 -- associates parsed comments with AST nodes based on position
--- then INJECTS comments directly into AST nodes as _comments property
+-- then injects comments into AST nodes as a _comments property
 import 'yuecheck.types'
 
--- Comment decoration structure on AST nodes:
+-- comment decoration structure on AST nodes:
 -- node._comments = {
 --   above: [Comment]      -- comments on lines immediately before node
 --   eol: Comment?         -- end-of-line comment (same line, after node)
 --   trailing: [Comment]   -- inline block comments (--[[x]] after identifier)
 -- }
--- priority for node types; higher = more specific, prefer for trailing comments
--- leaf nodes should be preferred over containers
+--
+-- higher = more specific
 node_priority = {
   Name: 100
   UnicodeName: 100
@@ -37,7 +37,7 @@ node_priority = {
 get_priority = (node) ->
   node_priority[node\g_yue_name!] or 50
 
--- Build nodes_by_line map from AST
+-- build nodes_by_line map from AST
 build_nodes_by_line = (ast) ->
   nodes_by_line = {}
 
@@ -87,8 +87,8 @@ build_nodes_by_line = (ast) ->
 
   nodes_by_line
 
--- Determine association type for a comment
--- Returns: { node: best_node, type: assoc_type } or { node: nil, type: 'orphan' }
+-- determine association type for a comment
+-- returns { node: best_node|nil, type: assoc_type|'orphan' }
 determine_association = (comment, nodes_by_line) ->
   comment_col = comment\g_src_col!
   comment_line = comment\g_src_line!
@@ -103,7 +103,7 @@ determine_association = (comment, nodes_by_line) ->
   is_end_of_line = false
 
   if same_line_nodes and #same_line_nodes > 0
-    -- First, determine if this is an end-of-line comment (no more tokens after it)
+    -- first, determine if this is an end-of-line comment (no more tokens after it)
     multiline_containers = {
       'TableBlock': true
       'Block': true
@@ -122,22 +122,19 @@ determine_association = (comment, nodes_by_line) ->
     is_end_of_line = not has_more
 
     if is_end_of_line
-      -- For EOL comments, prefer nodes at the "statement/expression level".
-      -- We want to attach to Statement (priority 10) or item nodes like Exp (40),
-      -- not to overly broad containers like File (1) or Block (5), and not to
-      -- deep leaf nodes like SingleString (100).
-      -- Strategy: pick the lowest priority node with priority >= 10 (Statement level).
-      -- If no such node exists, fall back to the highest priority node.
+      -- for eol comments, attach to the statement/expression level (priority >= 10)
+      -- not the broad File/Block containers, and not deep leaves like SingleString
+      -- pick the lowest priority that qualifies, otherwise fall back to highest
       MIN_EOL_PRIORITY = 10
 
-      -- First pass: find lowest priority >= MIN_EOL_PRIORITY
+      -- first pass: find lowest priority >= MIN_EOL_PRIORITY
       for entry in *same_line_nodes
         if entry.col < comment_col
           priority = get_priority entry.node
 
           if priority >= MIN_EOL_PRIORITY
-            -- Among eligible nodes, prefer lower priority (outer containers)
-            -- On same priority, prefer leftmost (lower column)
+            -- among eligible nodes, prefer lower priority (outer containers)
+            -- on same priority, prefer leftmost (lower column)
             if best_node == nil or priority < best_priority or
                (priority == best_priority and entry.col < best_col)
               best_node = entry.node
@@ -145,8 +142,8 @@ determine_association = (comment, nodes_by_line) ->
               best_priority = priority
               best_col = entry.col
 
-      -- If no node found with priority >= MIN_EOL_PRIORITY, use fallback
-      -- (This handles edge cases where only File/Block nodes exist)
+      -- no node with priority >= MIN_EOL_PRIORITY, fall back
+      -- (handles edge cases where only File/Block nodes exist)
       unless best_node
         for entry in *same_line_nodes
           if entry.col < comment_col
@@ -157,7 +154,7 @@ determine_association = (comment, nodes_by_line) ->
               best_priority = priority
               best_col = entry.col
     else
-      -- For trailing comments (not at end of line), prefer most specific (highest priority)
+      -- trailing comments (not at end of line): prefer most specific (highest priority)
       for entry in *same_line_nodes
         if entry.col < comment_col
           priority = get_priority entry.node
@@ -171,9 +168,8 @@ determine_association = (comment, nodes_by_line) ->
             best_priority = priority
             best_col = entry.col
 
-      -- If no node found BEFORE the comment, check for nodes AFTER it.
-      -- This handles "preceding" comments like --[[arg]] \func!
-      -- where the comment precedes code on the same line.
+      -- nothing found before the comment, check after
+      -- handles inline block comments like `--[[arg]] \func!` (inline before code)
       unless best_node
         for entry in *same_line_nodes
           if entry.col > comment_col
@@ -182,12 +178,12 @@ determine_association = (comment, nodes_by_line) ->
             if best_node == nil or priority > best_priority or
                (priority == best_priority and entry.col < best_col)
               best_node = entry.node
-              best_type = 'above' -- treat as "above" (leading) comment
+              best_type = 'above' -- the comment leads the node
               best_priority = priority
               best_col = entry.col
 
   -- special case: if the only/best node on this line is a Block,
-  -- and the comment appears to be indented content, treat as "above" for next line
+  -- and the comment appears to be indented content, treat as above for the next line
   if best_node and best_type == 'end_of_line'
     if best_node\is_any types.Block, types.Body
       -- look for the actual statement on the next line
@@ -196,31 +192,31 @@ determine_association = (comment, nodes_by_line) ->
       while next_line <= comment_line + 50
         if nodes_by_line[next_line] and #nodes_by_line[next_line] > 0
           found_next = true
-          -- Only associate as "above" if comment is at same or lesser indentation
+          -- only associate as above if comment is at same or lesser indentation
           target_col = nodes_by_line[next_line][1].col
           if comment_col <= target_col
             best_node = nodes_by_line[next_line][1].node
             best_type = 'above'
           else
-            -- Comment is more indented - leave as orphan for Block to handle
+            -- comment is more indented, leave as orphan for Block to handle
             best_node = nil
             best_type = 'orphan'
           break
         next_line += 1
-      -- If no next-line nodes found, this is an orphan comment in an empty block
+      -- no next-line nodes, this is an orphan comment in an empty block
       unless found_next
         best_node = nil
         best_type = 'orphan'
 
-  -- _if_ there isn't a same-line node, check if this is an 'above' comment
+  -- _if_ there isn't a same-line node, check if this is an above comment
   unless best_node
     next_line = comment_line + 1
     while next_line <= comment_line + 50
       if nodes_by_line[next_line] and #nodes_by_line[next_line] > 0
-        -- Check indentation: only associate as "above" if the comment
-        -- is at same or lesser indentation than the target node.
-        -- Comments more indented than the target are likely inside a
-        -- sibling block (e.g., comment inside if-block before else).
+        -- check indentation: only associate as above if the comment is at
+        -- same or lesser indentation than the target node
+        -- 'more'indented comments are likely inside a sibling block
+        -- (comment inside the if-block before else)
         target_node = nodes_by_line[next_line][1].node
         target_col = nodes_by_line[next_line][1].col
 
@@ -243,7 +239,7 @@ inject_comment = (node, comment, assoc_type) ->
     when 'trailing'
       table.insert node._comments.trailing, comment
     when 'end_of_line'
-      -- EOL is singular (last one wins if multiple, though rare)
+      -- eol is singular
       node._comments.eol = comment
 
 get_node_end_line = (node) ->
@@ -269,21 +265,20 @@ get_block_content_col = (node) ->
     return block_col + 2 -- assume 2-space indent (TODO: fixme kthx)
   1
 
--- find the containing Block for a given line number using recursive descent
--- this ensures structural correctness: we drill down through the AST hierarchy
--- to find the innermost Block that actually contains the comment's line
+-- find the containing Block for a given line number
+-- drills down through the AST to the innermost Block on that line
 --
--- special handling: if comment appears after a block's last statement but has
--- matching indentation, it still belongs to that block (e.g., trailing comment
--- at end of a do block)
+-- special case: if a comment appears after a block's last statement but matches
+-- the block's indentation, it still belongs to that block (e.g. a trailing
+-- comment at the end of a do block)
 find_containing_block = (ast, comment_line, comment_col) ->
   best_strict = nil -- best block that strictly contains the comment
-  best_strict_start = 0 -- prefer block that starts LATEST (most specific)
+  best_strict_start = 0 -- prefer the block that starts LATEST (most specific)
 
   best_indent = nil -- best block matched by indentation (for trailing comments)
-  best_indent_end = -1 -- prefer block that ends LATEST (closest to comment)
+  best_indent_end = -1 -- prefer the block that ends latest (closest to comment)
 
-  -- walk all blocks and finds the best match
+  -- walk all blocks and find the best match
   find_in_node = (node) ->
     return unless node and (type node) == 'table' and node.is
 
@@ -300,10 +295,10 @@ find_containing_block = (ast, comment_line, comment_col) ->
       for stmt in *(node.statementOrComments or {})
         find_in_node stmt
 
-      -- check if THIS block strictly contains the comment
+      -- check if this block strictly contains the comment
       if comment_line <= end_line
-        -- for empty blocks, we can't reliably compute content_col.
-        -- for blocks with content, check if indentation matches.
+        -- for empty blocks we can't reliably compute content_col.
+        -- for blocks with content, check if indentation matches
         content_col = get_block_content_col node
         stmts = node.statementOrComments or {}
         is_empty = #stmts == 0
@@ -311,17 +306,17 @@ find_containing_block = (ast, comment_line, comment_col) ->
         -- accept if: a] block is empty (can't compute content_col), or
         -- b] comment indentation matches block's content indentation
         if is_empty or comment_col == content_col
-          -- prefer the block that starts LATEST (most specific)
+          -- prefer the block that starts latest (most specific)
           if start_line > best_strict_start
             best_strict = node
             best_strict_start = start_line
         return
 
-      -- comment is AFTER this block's last AST node.
-      -- check if indentation matches - if so, this might be a trailing comment.
+      -- comment is after this block's last AST node
+      -- if indentation matches, this might be a trailing comment
       content_col = get_block_content_col node
       if comment_col == content_col
-        -- prefer the block that ends LATEST (closest to the comment)
+        -- prefer the block that ends latest (closest to the comment)
         if end_line > best_indent_end
           best_indent = node
           best_indent_end = end_line
@@ -344,11 +339,11 @@ find_containing_block = (ast, comment_line, comment_col) ->
   find_in_node ast
 
   -- prefer strict containment over indentation matching
-  -- if no strict match, use indentation match; jfinally, fall back to root block
+  -- if no strict match, use indentation. finally, fall back to root block
   best_strict or best_indent or ast.block
 
--- check if a source line contains a keyword before the comment position.
--- used to detect EOL comments on keyword-only lines like "else -- comment"
+-- does a source line contain a keyword before the comment position?
+-- used to detect eol comments on keyword-only lines like `else -- comment`
 -- where the keyword has no actual AST node
 is_keyword_eol_comment = (src, comment_line, comment_col) ->
   line_num = 0
@@ -357,9 +352,8 @@ is_keyword_eol_comment = (src, comment_line, comment_col) ->
     if line_num == comment_line
       -- check if the content before the comment is just whitespace + keyword
       before_comment = line\sub 1, comment_col - 1
-      -- strip trailing whitespace
       before_comment = before_comment\gsub '%s+$', ''
-      -- check if it ends with a keyword (else, elseif, then, do, etc.)
+      -- check if it ends with a keyword (else, elseif, then, do, etc)
       if (before_comment\match '%s*else$') or
          (before_comment\match '%s*elseif$') or
          (before_comment\match '%s*then$') or (before_comment\match '%s*do$')
@@ -401,7 +395,7 @@ collect_multiline_tablelits = (ast) ->
 -- find the TableLit that contains a comment at the given line
 find_containing_tablelit = (comment_line, tablelits) ->
   for entry in *tablelits
-    -- Comment must be strictly inside (not on the opening/closing brace lines)
+    -- comment must be strictly inside (not on the opening/closing brace lines)
     if comment_line > entry.start and comment_line < entry.finish
       return entry.node
   nil
@@ -442,7 +436,7 @@ collect_tableblocks = (ast) ->
 
 -- find the TableBlock that a trailing comment belongs to
 -- comment must be after the table header, same col as table content,
--- and the table's end must be the the closest prev node
+-- and the table's end must be the closest prev node
 --
 -- example
 --[[
@@ -458,7 +452,7 @@ find_containing_tableblock = (comment_line, comment_col, tableblocks) ->
   for tb in *tableblocks
     unless comment_line > tb.start_line and comment_col == tb.content_col
       continue
-    -- comment is after the table's AST range and indentation matches;
+    -- comment is after the table's AST range and indentation matches
     -- prefer the table ending closest to the comment (most specific)
     if tb.end_line > best_end and tb.end_line < comment_line
       best = tb.node
@@ -470,7 +464,7 @@ find_containing_tableblock = (comment_line, comment_col, tableblocks) ->
 -- takes: source string, AST root, parsed comments (from comments.to_ast)
 -- modifies AST in place by adding _comments properties to nodes
 -- returns: { orphans: [], eol_comments_by_line: {} }
--- eol_comments_by_line maps source line numbers to their EOL comments
+-- eol_comments_by_line maps source line numbers to their eol comments
 -- (used for line-based lookup in control flow generators like While)
 inject = (src, ast, comments) ->
   unless comments?.indices? and #comments.indices > 0
@@ -480,8 +474,9 @@ inject = (src, ast, comments) ->
   orphans = {}
   eol_comments_by_line = {}
 
-  -- collect multiline TableLit nodes (empty tables that may contain comments, eg `t = {\n--abc\n}` have the comment as
-  -- a psuedo-node now (probably from some of the comment updates pre-0.33.9; didn't dig into git)
+  -- collect multiline TableLit nodes. empty tables may contain comments like
+  -- `t = {\n--abc\n}` where the comment becomes a pseudo-node (probably from
+  -- pre-0.33.9 comment updates, didn't dig into git)
   multiline_tablelits = collect_multiline_tablelits ast
   -- collect TableBlock nodes for trailing comment association
   tableblocks = collect_tableblocks ast
@@ -500,8 +495,8 @@ inject = (src, ast, comments) ->
           comment_line = comment\g_src_line!
           eol_comments_by_line[comment_line] = comment
       else
-        -- check if this orphan is actually an EOL comment on a keyword line
-        -- (e.g., "else -- comment" where 'else' has no AST node)
+        -- check if this orphan is actually an eol comment on a keyword line
+        -- (e.g. `else -- comment` where 'else' has no AST node)
         comment_line = comment\g_src_line!
         comment_col = comment\g_src_col!
         if is_keyword_eol_comment src, comment_line, comment_col

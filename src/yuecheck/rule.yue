@@ -40,7 +40,7 @@ class Rule
 
 class AssignRule extends Rule
   on: { types.ExpListAssign }
-  checker: invalid_checker 'Rule', ['simplified_assigns', 'node']
+  checker: invalid_checker 'Rule', [ 'simplified_assigns', 'node' ]
   new: (opts = {}) =>
     super opts
   check: (node) =>
@@ -70,9 +70,9 @@ class AssignRule extends Rule
 class FuncRule extends Rule
   name: 'func_rule'
   description: 'rule for checking function calls'
-  on: [types.ExpListAssign, types.ChainValue]
+  on: [ types.ExpListAssign, types.ChainValue ]
   fns: []
-  checker: invalid_checker 'FuncRule', ['fully_qualified_fn_path', 'arguments', 'varnames', 'node']
+  checker: invalid_checker 'FuncRule', [ 'fully_qualified_fn_path', 'arguments', 'varnames', 'node' ]
   new: (opts) =>
     super opts
     @fns = opts.fns

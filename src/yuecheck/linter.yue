@@ -9,11 +9,11 @@ import 'yuecheck.types'
 import 'yuecheck.internal.fs'
 import 'yuecheck.internal.sys'
 
-ruleset = {k, v for k, v in pairs rules}
+ruleset = { k, v for k, v in pairs rules }
 
 linter =
   enable_compilation: false
-  enabled_rules: {k, true for k, _ in pairs rules}
+  enabled_rules: { k, true for k, _ in pairs rules }
 
 linter.define_rule = (t) ->
   unless t and type(t) == 'table'
@@ -125,7 +125,8 @@ linter.lint_string = (src) ->
   run_rule = (k, node) ->
     _rule = ruleset[k]
     r = nil
-    if _rule.__class and (_rule.__class == rule.Rule or _rule.__class.__parent == rule.Rule)
+    if _rule.__class and
+       (_rule.__class == rule.Rule or _rule.__class.__parent == rule.Rule)
       r = _rule\check node
     else
       r = _rule.check node

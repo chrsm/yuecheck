@@ -185,7 +185,7 @@ extract.name_list = (node) ->
   unless node\is types.NameList
     error "expected NameList, got #{ node\g_yue_name! }"
 
-  [n.name.v for n in *node.names]
+  [ n.name.v for n in *node.names ]
 
 extract.file_symbols = (node) ->
   unless node\is types.File

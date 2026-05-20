@@ -19,7 +19,7 @@ global_writes = rule.AssignRule
   name: 'global_writes'
   description: 'checks for writes to known-globals'
   config:
-    patterns: ['^_G[%.%[]', '^_ENV[%.%[]', '^package[%.%[]', '^_G$']
+    patterns: [ '^_G[%.%[]', '^_ENV[%.%[]', '^package[%.%[]', '^_G$' ]
   checker: (assigns, node) =>
     unless assigns and #assigns > 0
       return

@@ -30,11 +30,10 @@ class Server
         -- request
         ::_skip_::
       catch err
-        -- TODO: propagate this up instead of exit(1)-ing
-        done = true
-        os.exit 1
+          -- TODO: propagate this up instead of exit(1)-ing
+          done = true
+          os.exit 1
     until done
-
 
   -- see: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#contentPart
   --[[

@@ -72,7 +72,15 @@ cond_impossible =
       return nil
 
     v = expos[1].item?.value?.v ?? expos[1].item.items[1].item.name.v
-    compv = node.nodes?[1].condition?.opValues?[1]?.pipeExprs?[1]?.expos?[1]?.item?.value?.v ?? ''
+    compv = node
+      .nodes?[1]
+      .condition?
+      .opValues?[1]?
+      .pipeExprs?[1]?
+      .expos?[1]?
+      .item?
+      .value?
+      .v ?? ''
 
     message = ''
     if v == 'true'
@@ -139,7 +147,7 @@ nil_comparisons =
     unless (lhs == 'nil' or rhs == 'nil') and #op > 0
       return
 
-    unless op in ['>', '>=', '<', '<=', '/', '*', '-', '+', '%', '//', '..', '&', '<<', '>>', '|', '~']
+    unless op in [ '>', '>=', '<', '<=', '/', '*', '-', '+', '%', '//', '..', '&', '<<', '>>', '|', '~' ]
       return
 
     {
@@ -239,7 +247,12 @@ basic_nilness =
     for stmt in *stmts
       -- now, we're at top-level of the body, and want to do our scan for ifs/appendix-ifs.
       if stmt.appendix and stmt.appendix.item\is types.IfLine
-        r = helpers._check_cond_expr stmt.appendix.item.type.v, stmt.appendix.item.condition.condition, args
+        r = helpers
+          ._check_cond_expr stmt
+            .appendix
+            .item
+            .type
+            .v, stmt.appendix.item.condition.condition, args
         if r
           -- override the position for the moment, if starts before
           r.line = stmt.appendix\g_src_line!
@@ -248,7 +261,14 @@ basic_nilness =
           r.end_col = stmt.appendix\g_end_col!
           results[] = r
 
-      target = stmt.content?.expList?.exprs?[1]?.pipeExprs?[1]?.expos?[1]?.item?.value
+      target = stmt
+        .content?
+        .expList?
+        .exprs?[1]?
+        .pipeExprs?[1]?
+        .expos?[1]?
+        .item?
+        .value
       if target and target\is types.If
         r = helpers._check_cond_expr target.type.v, target.nodes[1].condition, args
         if r

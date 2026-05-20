@@ -47,7 +47,7 @@ _check_cond_expr = (iftyp, n, args) ->
     return
 
   -- cool, we have a name now. what are we comparing it against?
-  unless cond.opValues[1].op.v in ['==', '!=', '~=']
+  unless cond.opValues[1].op.v in [ '==', '!=', '~=' ]
     -- other ops are suspicious but more easily detected.
     return
 
@@ -75,7 +75,8 @@ _check_cond_expr = (iftyp, n, args) ->
 
   {
     type: 'WARN'
-    message: "`#{ varn }` defaults to `#{ defv }`; " .. "cond #{ why } occurs `#{ iftyp } #{ varn } #{ op } #{ cv.item.value.v }`"
+    message: "`#{ varn }` defaults to `#{ defv }`; " ..
+       "cond #{ why } occurs `#{ iftyp } #{ varn } #{ op } #{ cv.item.value.v }`"
     line: n\g_src_line!
     col: n\g_src_col!
     end_line: n\g_end_line!
