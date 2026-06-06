@@ -15,7 +15,7 @@ import 'yuecheck.internal.sys'
 argp = argparse!
   name: 'yuefmt'
   description: 'tool for formatting yue code'
-  epilog: 'see https://github.com/chrsm/yuecheck'
+  epilog: 'see https://git.sr.ht/~chrsm/yuecheck'
 
 with argp
   dof = \argument 'dir_or_file'

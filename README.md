@@ -16,16 +16,9 @@ that. There may be things I will make configurable but ultimately it was a huge
 PITA to put together. If you have any suggestions, please feel free to file an
 issue.
 
+[SourceHut](https://git.sr.ht/~chrsm/yuecheck) is the main repository.
+[GitHub](https://github.com/chrsm/yuecheck) has a mirror.
 
-----
-
-Current TODOs:
-
-- [ ] General cleanup. Rules are ugly for implementation
-  * [x] categorized, but still more to do
-- [ ] More fleshed out LSP implementation. Unlikely this will be very advanced,
-  and less likely will it work with non-Yue code. Possibly could redirect to
-  luals.
 
 * [installation](#installation)
 * [yuecheck usage](#usage-of-yuecheck)
@@ -45,7 +38,7 @@ There is a rockspec, but yuecheck is not yet available on luarocks. It is the
 recommended way to install, however, to provide the `yuecheck` command.
 
 ```bash
-git clone git@github.com:chrsm/yuecheck.git
+git clone git@git.sr.ht:~chrsm/yuecheck
 cd yuecheck
 luarocks make
 # or luarocks --local make
@@ -123,7 +116,7 @@ Options:
                          pattern for paths to exclude
    -w, --write           write changes to disk
 
-see https://github.com/chrsm/yuecheck
+see https://git.sr.ht/~chrsm/yuecheck
 ```
 
 

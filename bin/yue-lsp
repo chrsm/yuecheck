@@ -11,7 +11,7 @@ os.exit 1
 argp = argparse!
   name: 'yue-lsp'
   description: 'lsp server for Yuescript, part of the yuecheck project'
-  epilog: 'see https://github.com/chrsm/yuecheck'
+  epilog: 'see https://git.sr.ht/~chrsm/yuecheck'
 
 with argp
   dbg = \option '-d --debug', 'enables logging, pass a file path to log to'

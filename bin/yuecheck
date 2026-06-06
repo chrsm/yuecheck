@@ -19,7 +19,7 @@ sys.chdir orig_dir
 argp = argparse!
   name: 'yuecheck'
   description: 'tool for analyzing and linting yue code'
-  epilog: 'see https://github.com/chrsm/yuecheck'
+  epilog: 'see https://git.sr.ht/~chrsm/yuecheck'
 
 with argp
   dof = \argument 'dir_or_file'

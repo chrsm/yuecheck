@@ -2,13 +2,13 @@ package = 'yuecheck'
 version = 'dev-1'
 
 source = {
-  url = 'git+ssh://git@github.com/chrsm/yuecheck.git'
+  url = 'git+ssh://git@git.sr.ht:~chrsm/yuecheck'
 }
 
 description = {
   summary = 'Yue utility lib and tooling',
   detailed = '',
-  homepage = 'https://github.com/chrsm/yuecheck',
+  homepage = 'https://git.sr.ht/~chrsm/yuecheck',
   license = 'MIT'
 }
 
