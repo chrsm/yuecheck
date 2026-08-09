@@ -12,7 +12,7 @@ import 'yuecheck.formatter' as fmt
 ]]
 find_yue_files = (path, ext) ->
   unless (lfs.attributes path, 'mode') == 'directory'
-    return nil, error "(#{ path }, #{ ext }) is not a directory"
+    error "(#{ path }, #{ ext }) is not a directory"
 
   if (path\sub #path, #path) == '/'
     path = path\sub 1, #path - 1

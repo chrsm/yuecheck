@@ -10,7 +10,7 @@ import 'yuecheck.rules'
 -- same helper as spec/formatter.yue; specs are standalone
 find_yue_files = (path, ext) ->
   unless (lfs.attributes path, 'mode') == 'directory'
-    return nil, error "(#{ path }, #{ ext }) is not a directory"
+    error "(#{ path }, #{ ext }) is not a directory"
 
   if (path\sub #path, #path) == '/'
     path = path\sub 1, #path - 1
@@ -28,6 +28,11 @@ find_yue_files = (path, ext) ->
     elseif p\match "%.#{ ext }$"
       files[] = p
   files
+
+-- ../spec/yuespec is gitignored
+optional_yue_files = (path, ext) ->
+  return {} unless (lfs.attributes path, 'mode') == 'directory'
+  find_yue_files path, ext
 
 all_rules = -> { k, true for k, _ in pairs rules }
 
@@ -48,8 +53,9 @@ describe 'corpus smoke', ->
     linter.enabled_rules = all_rules!
 
   corpus = {
-    ...(find_yue_files '../spec/yuespec', 'yue')
-    ...(find_yue_files '../spec/testdata/yue_repo', 'yue')
+    ...(optional_yue_files '../spec/yuespec', 'yue'),
+    ...(find_yue_files '../spec/testdata/yue_repo', 'yue'),
+    ...(find_yue_files '../spec/testdata/yue_inputs', 'yue')
   }
 
   for f in *corpus
