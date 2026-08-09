@@ -258,14 +258,13 @@ emit = (types) ->
             argassignfroms[] = "      if (not @#{a.name}) and _in v\\g_yue_name!, #{expr}"
             argassignfroms[] = "        @#{a.name} = v"
             argassignfroms[] = '        continue'
-            wext = a.required and '' or " if @#{a.name}"
-            argwalks[] = "    @#{a.name}\\walk visitor#{wext}"
+            -- NOTE(@chrsm): yue.to_ast omits even "required" fields for some syntax
+            argwalks[] = "    @#{a.name}\\walk visitor if @#{a.name}"
           else
             argassignfroms[] = "      if (not @#{a.name}) and v\\g_yue_name! == '#{a.type}'"
             argassignfroms[] = "        @#{a.name} = v"
             argassignfroms[] = '        continue'
-            wext = a.required and '' or " if @#{a.name}"
-            argwalks[] = "    @#{a.name}\\walk visitor#{wext}"
+            argwalks[] = "    @#{a.name}\\walk visitor if @#{a.name}"
 
       push "  new: (#{table.concat args, ', '}) =>"
       push table.concat argassigns, '\n'

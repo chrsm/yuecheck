@@ -124,12 +124,25 @@ linter.lint_string = (src) ->
   -- run a single rule against a node, collecting violations
   run_rule = (k, node) ->
     _rule = ruleset[k]
-    r = nil
-    if _rule.__class and
-       (_rule.__class == rule.Rule or _rule.__class.__parent == rule.Rule)
-      r = _rule\check node
-    else
-      r = _rule.check node
+    check = ->
+      if _rule.__class and
+         (_rule.__class == rule.Rule or _rule.__class.__parent == rule.Rule)
+        _rule\check node
+      else
+        _rule.check node
+    ok, r = pcall check
+    unless ok
+      -- disable the rule so it doesn't repeat endlessly
+      rules[k] = nil
+      violations[] = {
+        type: 'ERROR'
+        message: "internal error in rule '#{ k }': #{ r }"
+        line: node\g_src_line!
+        col: node\g_src_col!
+        end_line: node\g_end_line!
+        end_col: node\g_end_col!
+      }
+      return
     if r != nil and not ignored r.line
       if r[1] -- it's a table of violations
         violations[] = _r for _r in *r

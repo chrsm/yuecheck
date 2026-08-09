@@ -1,3 +1,4 @@
+import 'yuecheck.ast' as ast
 import 'yuecheck.internal.xstring'
 import 'yuecheck.types'
 
@@ -50,24 +51,18 @@ style_zero_index =
   on:
     * types.Value
   check: (node) ->
-    unless node.item\is types.ChainValue
+    unless ast.is.a node.item, types.ChainValue
       return nil
 
     cv = node.item.items
-    unless cv[1]?.item? and cv[1].item\is types.Variable
+    unless cv[1] and ast.ident cv[1]
       return nil
 
-    unless cv[2]?\is types.Exp
+    unless ast.is.a cv[2], types.Exp
       return nil
 
-    unless cv[2].pipeExprs?[1]?.expos?[1]?\is types.Value
-      return nil
-
-    v = cv[2].pipeExprs?[1]?.expos?[1]?.item.value
-    unless v and v\is types.Num
-      return nil
-
-    unless v.v == '0'
+    lit = ast.literal cv[2]
+    unless lit and lit.kind == 'number' and lit.v == '0'
       return nil
 
     {
@@ -196,20 +191,11 @@ style_conditionals =
 
     iftyp = node.type.v
 
-    name = ''
-    vnode = node
-      .nodes[1]?
-      .condition?
-      .pipeExprs?[1]
-      .expos?[1]?
-      .item?
-      .items?[1]?
-      .item?
-      .name
-    if vnode\is types.SelfName
-      name = vnode.name.v
-    else
-      name = vnode.v
+    -- the value under the `not` (`if not x.y`)
+    target = node.nodes[1].condition.pipeExprs[1]?.expos[1]
+    name = (ast.ident target) ?? (ast.call target)?.fqp
+    unless name
+      return
     name = xstring.stripq name
 
     message = switch iftyp
@@ -331,7 +317,7 @@ style_discourage_require =
   on:
     * types.Callable
   check: (node) ->
-    unless node.item?.name? and node.item.name.v == 'require'
+    unless (ast.ident node) == 'require'
       return
 
     {
@@ -358,37 +344,29 @@ style_discourage_unnecessary_sb =
     -- only contains a KeyName->Name.
     results = {}
     for v in *node.values
-      if v\is types.NormalPairDef
-        -- check all keys
-        if v.pair.key\is types.Exp
-          pe = v.pair.key.pipeExprs
-          continue if #v.pair.key.opValues > 0
-          -- check all; if we encounter non-strings, we're fineish
-          for vv in *pe
-            continue if vv.opValues
-            if vv.expos[1]\is types.Value
-              item = vv.expos[1].item
+      unless ast.is.a v, types.NormalPairDef
+        continue
 
-              -- TODO: see if this is an AST/parser change or not..
-              if (item\is types.ChainValue) and (item.items[1]\is types.String)
-                item = item.items[1]
+      -- only bracket keys arrive as an Exp
+      unless ast.is.a v.pair.key, types.Exp
+        continue
 
-              if item\is types.String
-                if item.str\is types.SingleString
-                  k = xstring.stripq item.str.v
+      lit = ast.literal v.pair.key
+      unless lit and ast.is.a lit.node, types.SingleString
+        continue
 
-                  -- if it's not simple, skip
-                  unless k\match '^[_%a][%a%d_]*$'
-                    continue
+      k = xstring.stripq lit.v
+      -- if it's not simple, skip
+      continue unless k\match '^[_%a][%a%d_]*$'
 
-                  results[] = {
-                    type: 'WARN'
-                    message: "use `#{ k }:` instead of `['#{ k }']`"
-                    line: item.str\g_src_line!
-                    col: item.str\g_src_col!
-                    end_line: item.str\g_end_line!
-                    end_col: item.str\g_end_col!
-                  }
+      results[] = {
+        type: 'WARN'
+        message: "use `#{ k }:` instead of `['#{ k }']`"
+        line: lit.node\g_src_line!
+        col: lit.node\g_src_col!
+        end_line: lit.node\g_end_line!
+        end_col: lit.node\g_end_col!
+      }
 
     #results > 0 and results or nil
 

@@ -18,17 +18,18 @@ cond_identical_exprs =
   on:
     * types.IfCond
   check: (node) ->
-    exp = node.condition
-    v1 = ast.extract.exp_value exp
-    v2 = ast.extract.exp_rhs_value exp
-    op = ast.extract.exp_operator exp
+    b = ast.binary node.condition
+    unless b and b.op
+      return
 
-    unless (v1 and v2 and op) and (v1 == v2)
+    v1 = ast.scalar b.x
+    v2 = ast.scalar b.y
+    unless v1 and (v1 == v2)
       return
 
     {
       type: 'WARN'
-      message: "identical expressions on lhs and rhs of '#{ op }' operator"
+      message: "identical expressions on lhs and rhs of '#{ b.op }' operator"
       line: node\g_src_line!
       col: node\g_src_col!
       end_line: node\g_end_line!
@@ -64,23 +65,8 @@ cond_impossible =
   check: (node) ->
     iftyp = node.type.v
 
-    expos = node.nodes?[1].condition?.pipeExprs?[1]?.expos or {}
-    unless #expos == 1
-      return nil
-
-    unless #(node.nodes?[1].condition?.opValues or {}) == 0
-      return nil
-
-    v = expos[1].item?.value?.v ?? expos[1].item.items[1].item.name.v
-    compv = node
-      .nodes?[1]
-      .condition?
-      .opValues?[1]?
-      .pipeExprs?[1]?
-      .expos?[1]?
-      .item?
-      .value?
-      .v ?? ''
+    v = ast.scalar node.nodes[1]?.condition
+    return nil unless v
 
     message = ''
     if v == 'true'
@@ -124,35 +110,24 @@ nil_comparisons =
   on:
     * types.Exp
   check: (node) ->
-    getv = (exp) ->
-      item = ast.extract.exp_first_value exp
-      return nil unless item
-
-      switch true
-        when not item
-          nil
-        when item\is types.ChainValue
-          ast.extract.chainvalue_base item
-        when item\is types.SimpleValue
-          item.value.v
-        else
-          nil
-
-    lhs = getv node
-    rhs = getv node\first 'opValues'
-    op = ast.extract.exp_operator node
-    unless lhs and rhs and op
+    b = ast.binary node
+    unless b and b.op
       return
 
-    unless (lhs == 'nil' or rhs == 'nil') and #op > 0
+    lhs = (ast.scalar b.x) ?? (ast.call b.x)?.fqp
+    rhs = (ast.scalar b.y) ?? (ast.call b.y)?.fqp
+    unless lhs and rhs
       return
 
-    unless op in [ '>', '>=', '<', '<=', '/', '*', '-', '+', '%', '//', '..', '&', '<<', '>>', '|', '~' ]
+    unless lhs == 'nil' or rhs == 'nil'
+      return
+
+    unless b.op in [ '>', '>=', '<', '<=', '/', '*', '-', '+', '%', '//', '..', '&', '<<', '>>', '|', '~' ]
       return
 
     {
       type: 'ERROR'
-      message: "syntax error: `#{ lhs } #{ op } #{ rhs }`"
+      message: "syntax error: `#{ lhs } #{ b.op } #{ rhs }`"
       line: node\g_src_line!
       col: node\g_src_col!
       end_line: node\g_end_line!
@@ -185,10 +160,17 @@ unreachable =
     unless node\is types.Repeat
       return nil
 
-    -- assume block
+    -- body may be a single Statement (`repeat print 1 until x`)
+    -- nothing can follow a break there
+    unless ast.is.a node.body, types.Block
+      return nil
+
     breakfound = false
     afterbreak = nil
     for i, v in ipairs node.body.statementOrComments
+      unless v.content?.is
+        continue
+
       if v.content\is types.BreakLoop
         breakfound = true
         continue
@@ -249,10 +231,10 @@ basic_nilness =
       if stmt.appendix and stmt.appendix.item\is types.IfLine
         r = helpers
           ._check_cond_expr stmt
-            .appendix
-            .item
-            .type
-            .v, stmt.appendix.item.condition.condition, args
+              .appendix
+              .item
+              .type
+              .v, stmt.appendix.item.condition.condition, args
         if r
           -- override the position for the moment, if starts before
           r.line = stmt.appendix\g_src_line!
@@ -261,14 +243,9 @@ basic_nilness =
           r.end_col = stmt.appendix\g_end_col!
           results[] = r
 
-      target = stmt
-        .content?
-        .expList?
-        .exprs?[1]?
-        .pipeExprs?[1]?
-        .expos?[1]?
-        .item?
-        .value
+      v = ast.unwrap stmt.content?.expList?.exprs?[1]
+      target = if ast.is.a v, types.SimpleValue
+        v.value
       if target and target\is types.If
         r = helpers._check_cond_expr target.type.v, target.nodes[1].condition, args
         if r

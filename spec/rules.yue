@@ -1,11 +1,14 @@
 -- yuecheck:ignore=stdlib_usage,style_comment_space
 import 'busted.runner' as busted
+import 'lfs'
 import 'yue'
 busted!
 
+import 'yuecheck.ast' as yast
 import 'yuecheck.comments' as cmt
 import 'yuecheck.linter'
 import 'yuecheck.rules'
+import 'yuecheck.types'
 
 fget = (path) ->
   fp, err = io.open path, 'r'
@@ -1469,7 +1472,124 @@ describe 'lpegrex grammar check', ->
         .truthy r[v.line][v.n], "expected r[#{ v.line }][#{ v.n }] to exist in results"
       assert.same v.comment, r[v.line][v.n].v
 
-  describe 'bugs', ->
-    it 'should handle classes with SelfItem args', ->
-      r = linter.lint_file '../spec/testdata/lint_class_bug.yue'
-      assert.same {}, r
+describe 'paren handling', ->
+  rhs_exp = (src) ->
+    node = yast.parse src
+    local found
+    node\walk (n) ->
+      found = n if n\is types.Exp
+    found
+
+  it 'unwrap hjandles nested parens', ->
+    core = yast.unwrap rhs_exp '_ = ((x))'
+    assert.truthy core\is types.ChainValue
+    assert.same 'x', yast.ident core
+
+  it 'ident names lone references only', ->
+    assert.same 'x', yast.ident rhs_exp '_ = (x)'
+    assert.same 'x', yast.ident rhs_exp '_ = @x'
+    assert.is_nil yast.ident rhs_exp '_ = a.b'
+    assert.is_nil yast.ident rhs_exp '_ = f!'
+
+  it 'binary requires a lone op and unparens both sides', ->
+    b = yast.binary rhs_exp '_ = (x) == (x)'
+    assert.same 'x', yast.ident b.x
+    assert.same '==', b.op
+    assert.same 'x', yast.ident b.y
+
+    -- flat opValues hide precedence so can't handle these for now
+    -- test here so that if/when that changes i can fix
+    assert.is_nil yast.binary rhs_exp '_ = x and #x > 1'
+    assert.is_nil yast.binary rhs_exp '_ = a |> f == b'
+
+  it 'literal classifies constants and keeps the node for positions', ->
+    l = yast.literal rhs_exp "_ = ('%d')"
+    assert.same 'string', l.kind
+    assert.same "'%d'", l.v
+    assert.truthy l.node\is types.SingleString
+    assert.truthy (l.node\g_src_line!) > 0
+
+    n = yast.literal rhs_exp '_ = (42)'
+    assert.same 'number', n.kind
+    assert.same '42', n.v
+    assert.same 'const', (yast.literal rhs_exp '_ = (nil)').kind
+
+  it 'call flattens chains and splices through parens', ->
+    c = yast.call rhs_exp '_ = (string.match) s'
+    assert.same 'string.match', c.fqp
+    assert.truthy c.invoke
+    assert.same 1, #c.args
+
+    -- a call result's members never extend the dotted path
+    c = yast.call rhs_exp '_ = (f x).y'
+    assert.same { 'f' }, c.path
+
+    -- no-invoke chains still give a dotted name
+    c = yast.call rhs_exp '_ = (_G).a'
+    assert.same '_G.a', c.fqp
+    assert.is_nil c.invoke
+
+    -- self items have no stable dotted path
+    -- test here so that if/when that changes i can fix
+    assert.is_nil yast.call rhs_exp '_ = @x.y!'
+
+  it 'nil_comparisons works', ->
+    linter.enabled_rules = nil_comparisons: true
+    r = linter.lint_string 'x = (nil) > 1'
+    assert.same 'ERROR', r[1]?.type
+    assert.same 'syntax error: `nil > 1`', r[1]?.message
+
+    r = linter.lint_string 'x = (1) > (nil)'
+    assert.same 'ERROR', r[1]?.type
+
+  it 'cond_identical_exprs works', ->
+    linter.enabled_rules = cond_identical_exprs: true
+    r = linter.lint_string 'if (x) == (x)\n  print 1'
+    assert.same "identical expressions on lhs and rhs of '==' operator",
+      r[1]?.message
+
+    -- plain vars too
+    r = linter.lint_string 'if x == x\n  print 1'
+    assert.same 1, #r
+
+    -- calls are not always identical (side effects)
+    r = linter.lint_string 'if f! == f!\n  print 1'
+    assert.same {}, r
+
+  it 'cond_impossible works', ->
+    linter.enabled_rules = cond_impossible: true
+    r = linter.lint_string 'if (true)\n  print 1'
+    assert.same '`if` expression literal `true` always executed', r[1]?.message
+
+    -- quiet for nonlits
+    assert.same {}, linter.lint_string 'if (dense a.body)\n  print 1'
+    assert.same {}, linter.lint_string "if 'str'\n  print 1"
+    assert.same {}, linter.lint_string 'if {a: 1}\n  print 1'
+
+  it 'global_writes  parens', ->
+    linter.enabled_rules = global_writes: true
+    r = linter.lint_string '(_G).a = 1'
+    assert.same 1, #r
+    assert.same 'WARN', r[1].type
+
+  it 'stdlib_match handle parens', ->
+    linter.enabled_rules = stdlib_match: true
+    r = linter.lint_string "a = string.match s, ('[0-9]')"
+    assert.same 'use `%d` instead of [0-9]', r[1]?.message
+
+    -- nonlit and parened-literal patterns don't crash
+    assert.same {}, linter.lint_string "a = string.match s, ('%d')"
+    assert.same {}, linter.lint_string 'a = string.match s, p'
+    assert.same {}, linter.lint_string '@a = string.match s, "%d"'
+
+  it 'style_conditionals handle parens', ->
+    linter.enabled_rules = style_conditionals: true
+    r = linter.lint_string 'if not (x)\n  print 1'
+    assert.same '`if not x` could be `unless x`', r[1]?.message
+
+  it 'stdlib_usage handle parens', ->
+    linter.enabled_rules = stdlib_usage: true
+    r = linter.lint_string "(string.rep) 'a'"
+    assert.same 'string.rep requires 2 arguments, optionally accepts 1 argument',
+      r[1]?.message
+

@@ -66,12 +66,13 @@ test:
 	eval $$($(LUAROCKS) path) && export PATH="`$(LUAROCKS) path --lr-bin`:$(PATH)" && export LUA_PATH='$(YCT_LPATH)' && cd src && \
 		yue -e ../spec/rules.yue -v -C . -o gtest --exclude-tags='ignore' && \
 		yue -e ../spec/lsp.yue -v -C . -o gtest --exclude-tags='ignore' && \
-		yue -e ../spec/formatter.yue -v -C . -o gtest --exclude-tags='ignore'
+		yue -e ../spec/formatter.yue -v -C . -o gtest --exclude-tags='ignore' && \
+		yue -e ../spec/smoke.yue -v -C . -o gtest --exclude-tags='ignore'
 
-# .PHONY: fmt
-# fmt:
-#	export LUA_PATH='$(YCT_LPATH)' && cd src && \
-#		yue -e yuecheck/formatter.yue
+.PHONY: fmt
+fmt:
+	export LUA_PATH='$(YCT_LPATH)' && cd src && \
+		../bin/yuefmt -w -d .
 
 .PHONY: lint
 ## run linter against itself

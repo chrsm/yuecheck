@@ -36,26 +36,6 @@ class _ast
       return true if @@ == args[i]
     false
 
-  -- get first element of a list property, or nil if empty/missing
-  -- ex: exp\first 'pipeExprs'
-  first: (prop) =>
-    list = @[prop]
-    (list and #list > 0) and list[1] or nil
-
-  -- get nested value via path of keys/indices, returns nil if any step fails
-  -- ex: exp\get 'pipeExprs', 1, 'expos', 1, 'item', 'value', 'v'
-  get: (...) =>
-    current = @
-    for step in *{ ... }
-      return nil unless current
-      current = if (type step) == 'number'
-        current[step]
-      elseif (type current) == 'table'
-        current[step]
-      else
-        nil
-    current
-
 --[[ special types ]]
 class _selector_t extends _ast
   @yue_type = 'sel_t'

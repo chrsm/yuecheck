@@ -1,0 +1,181 @@
+-- read-only views over parser ast
+import 'yuecheck.types'
+
+-- nil-safe, string-safe type test
+is_a = (node, ...) ->
+  ((type node) == 'table') and node.is and node\is_any ...
+
+-- unwrap _trivial_ wrappers around an expression
+-- recursively handles `((x))`
+--   Parens     == .expr core
+--   Exp        == single UnaryExp (1 pipeExpr, 0 opValues, no nilCoalesed)
+--   ExpOpValue == single UnaryExp (1 pipeExpr)
+--   UnaryExp   == single Value (0 ops, 1 expo, no inExp)
+--   Value      == .item
+--   Callable   == Parens inner, when `.item` is Parens
+--   ChainValue == Parens inner, when its only item is a Callable containing_ Parens
+-- complex nodes (`(a + b)`, `not x`, pipes, multi-item chains) returned as-is
+unwrap = (node) ->
+  return nil unless ((type node) == 'table') and node.is
+  switch true
+    when node\is types.Parens
+      unwrap node.expr
+    when node\is types.Exp
+      unless #node.pipeExprs == 1 and #node.opValues == 0 and not node.nilCoalesed
+        return node
+      unwrap node.pipeExprs[1]
+    when node\is types.ExpOpValue
+      unless #node.pipeExprs == 1
+        return node
+      unwrap node.pipeExprs[1]
+    when node\is types.UnaryExp
+      unless #node.ops == 0 and #node.expos == 1 and not node.inExp
+        return node
+      unwrap node.expos[1]
+    when node\is types.Value
+      unwrap node.item
+    when node\is types.Callable
+      unless is_a node.item, types.Parens
+        return node
+      unwrap node.item
+    when node\is types.ChainValue
+      first = node.items[1]
+      unless #node.items == 1 and (is_a first, types.Callable) and
+             is_a first.item, types.Parens
+        return node
+      unwrap first.item
+    else
+      node
+
+-- binary expression view: { x, op, y }
+-- _only when the Exp has exactly one op and one pipeExpr_
+-- anything else (pipelines, chained ops like `x and x > 1`) hides precedence
+binary = (exp) ->
+  return nil unless is_a exp, types.Exp
+  return nil unless #exp.opValues == 1 and #exp.pipeExprs == 1
+  ov = exp.opValues[1]
+  {
+    x: unwrap exp.pipeExprs[1]
+    op: ov.op?.v
+    y: unwrap ov
+  }
+
+-- identifier view: the name of a LONE reference, or nil
+--   `x`/`(x)`/`((x))` == 'x'
+--   Callable == its item's name
+--   `@x`/`@@x` == 'x'
+--   bare `@`/`@@` == '@'/'@@'.
+-- nil for anything complex - literals, macros, multi-item chains, blah blah
+-- for dotchain use `(call node)?.fqp`
+ident = (node) ->
+  node = unwrap node
+  return nil unless (type node) == 'table' and node.is
+  switch true
+    when node\is types.Variable
+      node.name?.v
+    when node\is types.Callable
+      ident node.item
+    when node\is types.SelfItem
+      n = node.name
+      switch true
+        when is_a n, types.SelfName, types.SelfClassName
+          n.name?.v
+        when is_a n, types.Self, types.SelfClass
+          n.v -- '@' / '@@'
+        else
+          nil
+    when node\is types.ChainValue
+      return nil unless #node.items == 1
+      ident node.items[1]
+    else
+      nil
+
+-- literal constant view: { kind, v, node } or nil
+--   kind: 'const' (nil/true/false), 'number', 'string'
+--   v:    raw source value.
+--         strings keep their quotes.
+--         nil for interpolated strings (not a constant)
+--   node: the underlying leaf node
+literal = (node) ->
+  node = unwrap node
+  return nil unless (type node) == 'table' and node.is
+  if node\is types.SimpleValue
+    val = node.value
+    switch true
+      when is_a val, types.ConstValue
+        return { kind: 'const', v: val.v, node: val }
+      when is_a val, types.Num
+        return { kind: 'number', v: val.v, node: val }
+    return nil
+
+  -- strings appear bare or as a ChainValue's item
+  strn = switch true
+    when node\is types.String
+      node
+    when (node\is types.ChainValue) and #node.items == 1 and
+       is_a node.items[1], types.String
+      node.items[1]
+    else
+      nil
+  return nil unless strn
+  { kind: 'string', v: strn.str?.v, node: strn.str ?? strn }
+
+-- scalar identity: a lit's value or the name of a lone reference
+--   ('nil', 'true', '1', ..)
+scalar = (node) ->
+  (literal node)?.v ?? ident node
+
+-- call/chain view: { path, fqp, args, invoke } or nil
+--   `string.match s, p`  -> { path: {'string','match'}, fqp: 'string.match',
+--                             invoke: InvokeArgs, args: {...} }
+--   `(string.match) s`   -> same (parens spliced through)
+--   `a.b` (no call)      -> { path: {'a','b'}, fqp: 'a.b', invoke: nil, args: {} }
+call = (node) ->
+  node = unwrap node
+  return nil unless is_a node, types.ChainValue
+  first = node.items[1]
+  return nil unless is_a first, types.Callable
+
+  path = nil
+  invoke = nil
+  switch true
+    when is_a first.item, types.Parens
+      inner = call unwrap first.item
+      return nil unless inner
+      return inner if inner.invoke
+      path = inner.path
+    when is_a first.item, types.Variable
+      name = first.item.name?.v
+      return nil unless name
+      path = { name }
+    else
+      return nil -- self items/macros
+
+  for i = 2, #node.items
+    ni = node.items[i]
+    break unless ni
+    switch ni.__class
+      when types.DotChainItem
+        path[] = ni.name?.v
+      when types.Invoke, types.InvokeArgs
+        invoke = ni
+        break
+      else
+        break
+
+  {
+    :path
+    fqp: table.concat path, '.'
+    :invoke
+    args: invoke?.args ?? {}
+  }
+
+export default {
+  :is_a
+  :unwrap
+  :binary
+  :ident
+  :literal
+  :scalar
+  :call
+}

@@ -1,0 +1,60 @@
+-- yuecheck:ignore=stdlib_usage,style_comment_space
+import 'busted.runner' as busted
+import 'lfs'
+import 'yue'
+busted!
+
+import 'yuecheck.linter'
+import 'yuecheck.rules'
+
+-- same helper as spec/formatter.yue; specs are standalone
+find_yue_files = (path, ext) ->
+  unless (lfs.attributes path, 'mode') == 'directory'
+    return nil, error "(#{ path }, #{ ext }) is not a directory"
+
+  if (path\sub #path, #path) == '/'
+    path = path\sub 1, #path - 1
+
+  files = {}
+  for ent in lfs.dir path
+    continue if ent in { '.', '..' }
+
+    p = "#{ path }/#{ ent }"
+    if (lfs.attributes p, 'mode') == 'directory'
+      -- skip common dirs
+      if p\match '%.git$'
+        continue
+      files = { ...files, ...(find_yue_files p, ext) }
+    elseif p\match "%.#{ ext }$"
+      files[] = p
+  files
+
+all_rules = -> { k, true for k, _ in pairs rules }
+
+describe 'sources of madness', ->
+  before_each ->
+    linter.enabled_rules = all_rules!
+
+  it 'should handle classes with SelfItem args', ->
+    r = linter.lint_file '../spec/testdata/lint_class_bug.yue'
+    assert.same {}, r
+
+  it 'should handle (parened) items properly', ->
+    r = linter.lint_file '../spec/testdata/parser_paren_bug.yue'
+    assert.same {}, r
+
+describe 'corpus smoke', ->
+  before_each ->
+    linter.enabled_rules = all_rules!
+
+  corpus = {
+    ...(find_yue_files '../spec/yuespec', 'yue')
+    ...(find_yue_files '../spec/testdata/yue_repo', 'yue')
+  }
+
+  for f in *corpus
+    it "should lint #{ f } without crashing", ->
+      r = linter.lint_file f
+      for v in *r
+        assert.is_nil ((tostring v.message)\match 'internal error'),
+          "#{ f }: #{ v.message }"

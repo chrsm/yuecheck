@@ -1,0 +1,2 @@
+if (dense a.body)
+  return true

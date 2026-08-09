@@ -1,3 +1,4 @@
+import 'yuecheck.ast' as ast
 import 'yuecheck.rule'
 import 'yuecheck.stdlib_defs'
 import 'yuecheck.types'
@@ -133,10 +134,13 @@ stdlib_match = rule.FuncRule
     -- argv
     --   * [1] is the string we're operating on
     --   * [2] is the pattern
-    strn = args[1].pipeExprs?[1]?.expos?[1]?.item?.items?[1]?.str
-    str = strn?.v
-    patn = args[2].pipeExprs?[1]?.expos?[1]?.item?.items?[1]?.str
-    pat = patn?.v
+    patl = ast.literal args[2]
+
+    -- can't validate complex or non-string pats
+    unless patl and patl.kind == 'string' and patl.v
+      return
+    pat = patl.v
+    patn = patl.node
 
     issues = {}
 

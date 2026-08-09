@@ -27,6 +27,8 @@ class Rule
   set_checker: (@checker) =>
     assert (type @checker) == 'function'
   report: (severity, message, node) =>
+    unless node
+      return { type: severity, :message, line: 0, col: 0, end_line: 0, end_col: 0 }
     {
       type: severity
       :message
@@ -79,7 +81,6 @@ class FuncRule extends Rule
   set_funcs: (@fns) =>
     assert (type @fns) == 'table'
   check: (node) =>
-    pkg = nil
     ianode = nil
     path = {}
     action = nil
@@ -95,43 +96,19 @@ class FuncRule extends Rule
         return
 
       for v in *list.exprs
-        cv = v.pipeExprs[1].expos[1].item
-        unless cv.items
-          continue
-        varnames[] = cv.items[1].item.name.v
+        name = (ast.ident v) ?? (ast.call v)?.fqp
+        varnames[] = name if name
     else
-      action = { node.items }
+      action = { node }
 
     for v in *action
-      -- this cv is the "package" or "function" name being executed;
-      -- further DotChainItems are more paths
+      -- the call view flattens the chain into its dotted path:
       -- eg `string.match`           = package(string) fn(match)
       --    `love.filesystem.append` = package(love.filesystem) fn(append)
-      cv = nil
-      if node\is types.ExpListAssign
-        unless v.pipeExprs and v.pipeExprs[1]?.expos?[1]?.item?.items?
-          continue
-        cv = v.pipeExprs[1].expos[1].item.items
-      else
-        cv = v
-
-      -- TODO: parens fkn this up; we need getters that will descend and do the
-      -- work for us because this is not fun.jpeg
-      pkg = cv[1].item?.name?.v
-      path[] = pkg
-      for i = 2, #cv
-        ni = cv[i]
-        unless ni
-          break
-
-        switch ni.__class
-          when types.DotChainItem
-            path[] = ni.name.v
-          when types.InvokeArgs, types.Invoke
-            ianode = ni
-            break
-          else
-            break
+      c = ast.call v
+      continue unless c
+      path[] = seg for seg in *c.path
+      ianode = c.invoke if c.invoke
 
     found = false
     fqp = "#{ table.concat path, '.' }"
