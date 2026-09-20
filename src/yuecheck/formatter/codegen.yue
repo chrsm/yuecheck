@@ -1028,14 +1028,7 @@ gen_chain_item = (item, ctx, gen) ->
       parts[] = ir.text '\\'
       parts[] = gen item.name, ctx
     when item\is types.Invoke
-      is_empty_call = false
-      if item.args and #item.args == 1
-        arg = item.args[1]
-        if (arg\is types.SingleString) and arg.v == '!'
-          is_empty_call = true
-      if is_empty_call
-        parts[] = ir.text '!'
-      elseif is_single_noparen_arg item
+      if is_single_noparen_arg item
         parts[] = gen item.args[1], ctx
       elseif item.args and #item.args > 0
         invoke_first_line = item.args[1]\g_src_line!
@@ -1165,12 +1158,6 @@ generators.Callable = (node, ctx, gen) ->
   gen node.item, ctx
 
 generators.Invoke = (node, ctx, gen) ->
-  -- invoke without parens (standalone)
-  if node.args and #node.args == 1
-    arg = node.args[1]
-    if (arg\is types.SingleString) and arg.v == '!'
-      return ir.text '!'
-
   if is_single_noparen_arg node
     return gen node.args[1], ctx
 

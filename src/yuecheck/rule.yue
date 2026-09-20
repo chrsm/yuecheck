@@ -121,16 +121,10 @@ class FuncRule extends Rule
       return
 
     -- they have an incomplete call, will be caught by stdlib_usage
-    unless ianode and ianode.args and #ianode.args > 0
+    unless ianode
       return
 
-    -- specific to string.match
-    argvs = {}
-    for i = 1, #ianode.args
-      argvs[] = ianode.args[i]
-    unless #argvs > 0
-      return
-
+    argvs = [ v for v in *ianode.args ]
     @checker path, argvs, varnames, node
 
 export default {

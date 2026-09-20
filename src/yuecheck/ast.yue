@@ -21,10 +21,6 @@ build = (ast, parent = nil) ->
             break
           arg[] = build v, { ntype, ast }
       --[[ handle various AST simplifications from yue.to_ast ]]
-      when ntype == 'Invoke'
-        n = types.SingleString child
-        n\set_source ln, col, end_ln, end_col
-        arg[] = n
       when ntype == 'ReversedIndex' and child == '[#]'
         n = types.ReversedIndex!
         n\set_source ln, col, end_ln, end_col
@@ -51,6 +47,8 @@ build = (ast, parent = nil) ->
           |> types.DoubleStringContent
           |> types.DoubleString
       --[[ nops ]]
+      when ntype == 'Invoke' and child == '!'
+        _ = nil -- nop; f! or f()
       when ntype == 'Return' and child == 'return'
         _ = nil -- explicit return keyword, no value
       when ntype == 'Block' and child == ''

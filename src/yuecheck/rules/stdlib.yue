@@ -47,12 +47,6 @@ stdlib_usage = rule.FuncRule
         end_col: node\g_end_col!
       }
 
-    oargs = args
-    args = {}
-    for v in *oargs
-      continue unless v
-      args[] = v unless (v\is types.SingleString) and (v.v == '!') -- invoke flattened
-
     defargs = pkg_v.args ?? {}
     optn, reqn = 0, 0
     variadic = false
