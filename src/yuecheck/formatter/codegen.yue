@@ -986,7 +986,19 @@ generators.PlainItem = (node, ctx, gen) ->
   if node.item then gen node.item, ctx else ir.EMPTY
 
 generators.UnaryValue = (node, ctx, gen) ->
-  if node.value then gen node.value, ctx else ir.EMPTY
+  print "UnaryValue: #{ json.encode node }"
+
+  parts = {}
+  if node.ops
+    for v in *node.ops
+      parts[] = gen v, ctx
+
+  if node.value
+    parts[] = gen node.value, ctx
+  else
+    return ir.EMPTY
+
+  ir.concat parts
 
 generators.StarExp = (node, ctx, gen) ->
   ir.cat ir.text('*'), gen(node.value, ctx)

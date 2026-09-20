@@ -121,6 +121,13 @@ describe 'formatter', ->
       assert.nil err
       assert.same expected, r
 
+    it 'should handle unary op', ->
+      input = 'f 4 ^ -123'
+      expected = 'f 4^-123'
+      r, err = fmt.format input
+      assert.nil err
+      assert.same expected, r
+
   describe 'string interpolation', ->
     it 'should add canonical spaces around bare interpolation', ->
       r = fmt.format 'x = "#{some_var}"'
