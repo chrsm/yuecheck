@@ -120,7 +120,7 @@ do
   item = get!
   list = { 1, 2, 3 }
   list = [ 1, 2, 3 ]
-  not_exist = item in list
+  not_exist = item not in list
   check item in list
   check item in { 1, 2, 3 }
   check item in [ 1, 2, 3 ]
@@ -128,10 +128,10 @@ do
 
 do
   check -> x in tb
-  check -> x in tb
+  check -> x not in tb
   local x, tb
   check -> return x in tb
-  check -> x in tb
+  check -> x not in tb
 
 do
   f1 = ->
@@ -143,7 +143,7 @@ do
       4
     ]
   f2 = ->
-    a in [
+    a not in [
       1,
       2,
       3,
@@ -169,7 +169,7 @@ do
       3, 4
     ]
   f6 = ->
-    b = a in {
+    b = a not in {
       1,
       2,
       x: 3

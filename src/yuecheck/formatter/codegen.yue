@@ -966,6 +966,8 @@ generators.UnaryExp = (node, ctx, gen) ->
     parts[] = gen val, ctx
 
   if node.inExp
+    if node.inExp.not_
+      parts[] = ir.text ' not'
     parts[] = ir.text ' in '
     parts[] = gen node.inExp.value, ctx
 

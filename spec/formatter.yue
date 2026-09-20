@@ -114,6 +114,13 @@ describe 'formatter', ->
       assert.nil err
       assert.same expected, r
 
+    it 'should handle not-in', ->
+      input = 'x = 1 not in [1,2,3]'
+      expected = 'x = 1 not in [ 1, 2, 3 ]'
+      r, err = fmt.format input
+      assert.nil err
+      assert.same expected, r
+
   describe 'string interpolation', ->
     it 'should add canonical spaces around bare interpolation', ->
       r = fmt.format 'x = "#{some_var}"'
