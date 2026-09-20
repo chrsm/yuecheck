@@ -1593,3 +1593,14 @@ describe 'paren handling', ->
     assert.same 'string.rep requires 2 arguments, optionally accepts 1 argument',
       r[1]?.message
 
+  it 'stdlib_usage ColonChainItem,', ->
+    linter.enabled_rules = stdlib_usage: true
+
+    r = linter.lint_string 'table\\insert x'
+    assert.same {}, r
+
+    r = linter.lint_string 'io\\write a, b'
+    assert.same {}, r
+
+    r = linter.lint_string 's\\match "("'
+    assert.same {}, r

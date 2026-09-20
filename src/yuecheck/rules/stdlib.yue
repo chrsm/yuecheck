@@ -14,7 +14,7 @@ stdlib_usage = rule.FuncRule
   fns: [
     '^os%.', '^math%.', '^table%.', '^string%.',
     '^package%.', '^io%.', '^debug%.', '^coroutine%.',
-    '.',
+    '^[%a_][%w_]*$',
   ]
   checker: (path, args, varnames, node) =>
     pkg = path[1]

@@ -126,10 +126,11 @@ scalar = (node) ->
   (literal node)?.v ?? ident node
 
 -- call/chain view: { path, fqp, args, invoke } or nil
---   `string.match s, p`  -> { path: {'string','match'}, fqp: 'string.match',
+--   `string.match s, p` -> { path: {'string','match'}, fqp: 'string.match',
 --                             invoke: InvokeArgs, args: {...} }
---   `(string.match) s`   -> same (parens spliced through)
---   `a.b` (no call)      -> { path: {'a','b'}, fqp: 'a.b', invoke: nil, args: {} }
+--   `s\match p`         -> { path: {'s'}, fqp: 's', method: 'match', invoke: InvokeArgs, args: {...} }
+--   `(string.match) s`  -> same (parens spliced through)
+--   `a.b` (no call)     -> { path: {'a','b'}, fqp: 'a.b', invoke: nil, args: {} }
 call = (node) ->
   node = unwrap node
   return nil unless is_a node, types.ChainValue
@@ -138,12 +139,14 @@ call = (node) ->
 
   path = nil
   invoke = nil
+  method = nil
   switch true
     when is_a first.item, types.Parens
       inner = call unwrap first.item
       return nil unless inner
       return inner if inner.invoke
       path = inner.path
+      method = inner.method
     when is_a first.item, types.Variable
       name = first.item.name?.v
       return nil unless name
@@ -157,6 +160,8 @@ call = (node) ->
     switch ni.__class
       when types.DotChainItem
         path[] = ni.name?.v
+      when types.ColonChainItem
+        method = ni.name?.v
       when types.Invoke, types.InvokeArgs
         invoke = ni
         break
@@ -166,6 +171,7 @@ call = (node) ->
   {
     :path
     fqp: table.concat path, '.'
+    :method
     :invoke
     args: invoke?.args ?? {}
   }

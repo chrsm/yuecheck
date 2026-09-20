@@ -107,6 +107,7 @@ class FuncRule extends Rule
       --    `love.filesystem.append` = package(love.filesystem) fn(append)
       c = ast.call v
       continue unless c
+      continue if c.method
       path[] = seg for seg in *c.path
       ianode = c.invoke if c.invoke
 
