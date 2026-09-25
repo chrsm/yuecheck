@@ -4,8 +4,6 @@ import 'yuecheck.formatter.ir'
 import 'yuecheck.internal.xstring'
 import 'yuecheck.types'
 
-import 'dkjson' as json
-
 -- reserved keywords, cannot be used as simple identifiers
 reserved_keywords = {
   -- lua keywords
@@ -986,8 +984,6 @@ generators.PlainItem = (node, ctx, gen) ->
   if node.item then gen node.item, ctx else ir.EMPTY
 
 generators.UnaryValue = (node, ctx, gen) ->
-  print "UnaryValue: #{ json.encode node }"
-
   parts = {}
   if node.ops
     for v in *node.ops
