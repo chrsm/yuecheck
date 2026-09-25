@@ -84,7 +84,7 @@ elseif args.dir_or_file
   else
     src = { args.dir_or_file }
 elseif args.file
-  src = { file }
+  src = { args.file }
 else
   error "unknown mode #{ json.encode args }"
 
