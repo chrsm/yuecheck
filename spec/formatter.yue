@@ -1,6 +1,7 @@
 -- yuecheck:ignore=stdlib_usage,style_comment_space
 import 'busted.runner' as busted
 import 'lfs'
+import 'yue'
 busted!
 
 import 'yuecheck.formatter' as fmt
@@ -837,3 +838,58 @@ describe 'formatter', ->
 
         r = fmt.format src
         assert.same expect, r
+
+  describe 'compiled lua equivalence', ->
+    lua_of = (code) ->
+      lua = yue.to_lua code, reserve_line_number: false
+      unless lua
+        return nil
+      lua = lua\gsub '"', "'"
+      (lua\gsub "%['([%a_][%w_]*)'%] =", '%1 =')
+
+    -- known formatter bugs; drop an entry once the bug is fixed and the file's
+    -- `expect` section is regenerated
+    known = {
+      'comments_keys.yue': 'single-line [[ ]] loses its padding'
+      'comments_nrc_wrc.yue': 'single-line [[ ]] loses its padding'
+      'globals.yue': 'single-line [[ ]] loses its padding'
+      'fmt_ll_args.yue': 'broken call arguments continue at column 0'
+      'yue_inputs/literals.yue': 'single-line [[ ]] loses its padding'
+      'yue_inputs/whitespace.yue': '`x = class -- c` becomes a call; comma added after eol comment'
+      'yue_inputs/with.yue': '`t[ [3] ]` becomes the long string `t[[3]]`'
+      'yue_repo/comprehension.yue': 'second comprehension `for` loses its keyword'
+      'yue_repo/cond.yue': 'inline `then` chains are joined or gain an `else`'
+      'yue_repo/export.yue': 'multi-line `#{ }` keeps its tabs'
+      'yue_repo/global.yue': '`global const` loses `const`'
+      'yue_repo/import.yue': '`import \\y` becomes `import :y`'
+      'yue_repo/lists.yue': 'second comprehension `for` loses its keyword'
+      'yue_repo/multiline_chain.yue': 'blank lines change on a second pass'
+      'yue_repo/string.yue': 'single-line [[ ]] loses its padding; tabs in `|` strings become spaces'
+      'yue_repo/syntax.yue': 'empty `--` lines added after a table block'
+      'yue_repo/tables.yue': 'blank lines and indent change on a second pass'
+      'yue_repo/try_catch.yue': '`try` inside parentheses is re-indented'
+    }
+
+    for f in *find_yue_files '../spec/testdata', 'yue'
+      rel = f\sub #'../spec/testdata/' + 1
+      if id := known[rel]
+        pending "#{ rel } (#{ id })"
+        continue
+
+      it "should compile #{ rel } to the same lua after formatting", ->
+        input, expect = fget_yr f
+        if input\find '%-%- input'
+          input, expect = parse_td input
+
+        out, err = fmt.format input
+        assert.is_nil err
+        assert.same out, (fmt.format out), 'second format pass changed the output'
+
+        lin = lua_of input
+        unless lin
+          return
+        if expect
+          assert
+            .same lin, (lua_of expect), 'expect section compiles differently from input'
+        assert
+          .same lin, (lua_of out), 'formatted output compiles differently from input'
