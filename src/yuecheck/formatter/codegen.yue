@@ -2221,11 +2221,9 @@ generators.CompFor = (node, ctx, gen) ->
   parts = {}
   for i, item in ipairs node.items
     switch true
-      when item\is types.CompForNum
-        parts[] = ir.text 'for ' if i == 1
-        parts[] = gen item, ctx
-      when item\is types.CompForEach
-        parts[] = ir.text 'for ' if i == 1
+      when (item\is types.CompForNum) or (item\is types.CompForEach)
+        parts[] = ir.text ' ' if i > 1
+        parts[] = ir.text 'for '
         parts[] = gen item, ctx
       when item\is types.Exp
         parts[] = ir.text ' when '

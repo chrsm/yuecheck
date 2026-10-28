@@ -129,6 +129,23 @@ describe 'formatter', ->
       assert.nil err
       assert.same expected, r
 
+    it 'should keep every for in a comprehension', ->
+      input = 'x = [ {x, y} for x = 1, 3 for y = 1, 2 ]'
+      expected = 'x = [ { x, y } for x = 1, 3 for y = 1, 2 ]'
+      r, err = fmt.format input
+      assert.nil err
+      assert.same expected, r
+
+      input = 'x = [ x for x in a when x > 2 for y in b when y ]'
+      r, err = fmt.format input
+      assert.nil err
+      assert.same input, r
+
+      input = 'x = { k, v for k in a for v in b }'
+      r, err = fmt.format input
+      assert.nil err
+      assert.same input, r
+
   describe 'string interpolation', ->
     it 'should add canonical spaces around bare interpolation', ->
       r = fmt.format 'x = "#{some_var}"'
@@ -857,12 +874,10 @@ describe 'formatter', ->
       'yue_inputs/literals.yue': 'single-line [[ ]] loses its padding'
       'yue_inputs/whitespace.yue': '`x = class -- c` becomes a call; comma added after eol comment'
       'yue_inputs/with.yue': '`t[ [3] ]` becomes the long string `t[[3]]`'
-      'yue_repo/comprehension.yue': 'second comprehension `for` loses its keyword'
       'yue_repo/cond.yue': 'inline `then` chains are joined or gain an `else`'
       'yue_repo/export.yue': 'multi-line `#{ }` keeps its tabs'
       'yue_repo/global.yue': '`global const` loses `const`'
       'yue_repo/import.yue': '`import \\y` becomes `import :y`'
-      'yue_repo/lists.yue': 'second comprehension `for` loses its keyword'
       'yue_repo/multiline_chain.yue': 'blank lines change on a second pass'
       'yue_repo/string.yue': 'single-line [[ ]] loses its padding; tabs in `|` strings become spaces'
       'yue_repo/syntax.yue': 'empty `--` lines added after a table block'
