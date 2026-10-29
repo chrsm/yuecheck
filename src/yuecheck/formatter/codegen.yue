@@ -31,8 +31,12 @@ is_valid_identifier = (str) ->
     return false
   true
 
-is_stupid_luastring = (item) ->
-  item.pipeExprs?[1]?.expos?[1]?.item?.items?[1]?.str?\is types.LuaString
+starts_with_bracket = (node, ctx) ->
+  line = ctx.source_lines?[node\g_src_line!]
+  unless line
+    return false
+  col = node\g_src_col!
+  (line\sub col, col) == '['
 
 -- check if source has trailing comma before closing bracket
 has_trailing_comma = (node, ctx, open_char = '[', close_char = ']') ->
@@ -1070,11 +1074,10 @@ gen_chain_item = (item, ctx, gen) ->
       bracket_ctx = { k, v for k, v in pairs ctx }
       bracket_ctx.inside_bracket_index = true
       parts[] = ir.text '['
-      if is_stupid_luastring item
-        parts[] = ir.SPACE
+      padded = starts_with_bracket item, ctx
+      parts[] = ir.SPACE if padded
       parts[] = gen item, bracket_ctx
-      if is_stupid_luastring item
-        parts[] = ir.SPACE
+      parts[] = ir.SPACE if padded
       parts[] = ir.text ']'
     when item\is types.String
       parts[] = gen item, ctx
@@ -1463,11 +1466,10 @@ generators.NormalPair = (node, ctx, gen) ->
 
     -- non-simplifiable key with brackets
     bracket_parts = { ir.text '[' }
-    if is_stupid_luastring key
-      bracket_parts[] = ir.SPACE
+    padded = starts_with_bracket key, ctx
+    bracket_parts[] = ir.SPACE if padded
     bracket_parts[] = gen key, ctx
-    if is_stupid_luastring key
-      bracket_parts[] = ir.SPACE
+    bracket_parts[] = ir.SPACE if padded
     bracket_parts[] = ir.text ']:'
     bracket_parts[] = eol_or_space
     bracket_parts[] = gen node.value, ctx
