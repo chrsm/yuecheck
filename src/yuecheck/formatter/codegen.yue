@@ -774,6 +774,11 @@ generators.LuaString = (node, ctx, gen) ->
         parts[] = ir.text src
     parts[] = gen node.close, ctx
     return ir.concat parts
+  elseif source_lines and open_line and open_line == close_line
+    src = source_lines[open_line]
+    -- yue.to_ast trims the content :| get it from the source
+    content = src\sub node.open\g_src_col! + #node.open.v, node.close\g_src_col! - 1
+    return ir.cat open_doc, (ir.text content), (gen node.close, ctx)
   elseif node.content
     unless open_line == node.content\g_src_line!
       return ir

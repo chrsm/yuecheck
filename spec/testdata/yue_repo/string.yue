@@ -161,13 +161,13 @@ you '"hmmm" I said'
 
 print aye, you
 
-another = [[hello world]]
+another = [[ hello world ]]
 
 hi_there = [[
 	hi there
 ]]
 
-well = [==["helo"]==]
+well = [==[ "helo" ]==]
 
 hola = [===[
 	eat noots]===]

@@ -161,6 +161,21 @@ describe 'formatter', ->
         assert.nil err
         assert.same expected, r
 
+    it 'should keep the content of single-line long strings', ->
+      cases = {
+        'x = [[ a b ]]'
+        'y = [=[ c ]=]'
+        'z = [[]]'
+        'w = [[   ]]'
+        'f [[ q ]], [==[ r]==]'
+        'print t[ [[a]] ]'
+        'k = { [ [[ key3 ]] ]: 3 }'
+      }
+      for input in *cases
+        r, err = fmt.format input
+        assert.nil err
+        assert.same input, r
+
   describe 'string interpolation', ->
     it 'should add canonical spaces around bare interpolation', ->
       r = fmt.format 'x = "#{some_var}"'
@@ -882,18 +897,14 @@ describe 'formatter', ->
     -- known formatter bugs; drop an entry once the bug is fixed and the file's
     -- `expect` section is regenerated
     known = {
-      'comments_keys.yue': 'single-line [[ ]] loses its padding'
-      'comments_nrc_wrc.yue': 'single-line [[ ]] loses its padding'
-      'globals.yue': 'single-line [[ ]] loses its padding'
       'fmt_ll_args.yue': 'broken call arguments continue at column 0'
-      'yue_inputs/literals.yue': 'single-line [[ ]] loses its padding'
       'yue_inputs/whitespace.yue': '`x = class -- c` becomes a call; comma added after eol comment'
       'yue_repo/cond.yue': 'inline `then` chains are joined or gain an `else`'
       'yue_repo/export.yue': 'multi-line `#{ }` keeps its tabs'
       'yue_repo/global.yue': '`global const` loses `const`'
       'yue_repo/import.yue': '`import \\y` becomes `import :y`'
       'yue_repo/multiline_chain.yue': 'blank lines change on a second pass'
-      'yue_repo/string.yue': 'single-line [[ ]] loses its padding; tabs in `|` strings become spaces'
+      'yue_repo/string.yue': 'tabs in `|` strings become spaces'
       'yue_repo/syntax.yue': 'empty `--` lines added after a table block'
       'yue_repo/tables.yue': 'blank lines and indent change on a second pass'
       'yue_repo/try_catch.yue': '`try` inside parentheses is re-indented'
