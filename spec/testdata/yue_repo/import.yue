@@ -158,16 +158,16 @@ do
 import hello from yeah
 import holla, world from table['cool']
 
-import x, :y, z from items
+import x, \y, z from items
 
-import master, :ghost from find 'mytable'
+import master, \ghost from find 'mytable'
 
 _obj_0 = 232
 
 import something from a table
 
 if indent
-  import okay, :well from tables[100]
+  import okay, \well from tables[100]
 
 do
   import a, b, c from z
@@ -189,11 +189,11 @@ do
 do
   import p from 'yue'
   import item from 'module.part'
-  import x1, y1, :z1 from 'mymodule'
+  import x1, y1, \z1 from 'mymodule'
 
 do
   from 'yue' import p
-  from 'mymodule' import x1, y1, :z1
+  from 'mymodule' import x1, y1, \z1
 
 do
   from z import a, b, c
@@ -261,11 +261,11 @@ do
   import 'm' as { g, { <close>: i } }
 
 do
-  import
-  import
-  import
-  import
+  import require
+  import string as stringlib
+  import string.format
+  import io.read as io_read
 
   type = ->
-  import
-  import
+  import type as tp
+  import 月 as yue

@@ -107,7 +107,7 @@ do
   else
     4343
 
-  global *
+  global ^
 
   another = 3434
   Another = 7890
@@ -164,13 +164,13 @@ do
 
 do
   global x = y
-  global *
+  global ^
   foobar = 'all lowercase'
   FooBar = 'pascal case'
   FOOBAR = 'all uppercase'
 
 do
-  global class A
-  global Flag = 1
-  global const, x, y = 'const', 1, 2
-  global math, table
+  global const class A
+  global const Flag = 1
+  global const const, x, y = 'const', 1, 2
+  global const math, table

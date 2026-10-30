@@ -669,7 +669,12 @@ generators.EmptyLine = (node, ctx) ->
   ir.HARDLINE
 
 generators.GlobalOp = (node, ctx) ->
-  if node.v then ir.text node.v else ir.EMPTY
+  -- yue.to_ast reports both `global *` and `global ^` as `*`, so read the source
+  line = ctx.source_lines?[node\g_src_line!]
+  unless line
+    return ir.text node.v
+  col = node\g_src_col!
+  ir.text line\sub col, col
 
 generators.LocalFlag = (node, ctx) ->
   if node.v then ir.text node.v else ir.EMPTY
@@ -2301,7 +2306,12 @@ generators.PipeBody = (node, ctx, gen) ->
   ir.nest 2, ir.concat(parts)
 
 generators.Global = (node, ctx, gen) ->
-  ir.cat ir.text('global '), gen(node.item, ctx)
+  parts = { ir.text 'global ' }
+  if node.constAttrib
+    parts[] = gen node.constAttrib, ctx
+    parts[] = ir.SPACE
+  parts[] = gen node.item, ctx
+  ir.concat parts
 
 generators.GlobalValues = (node, ctx, gen) ->
   parts = { gen(node.nameList, ctx) }
@@ -2385,13 +2395,16 @@ generators.FromImport = (node, ctx, gen) ->
   ir.concat parts
 
 generators.ColonImportName = (node, ctx, gen) ->
-  ir.cat (ir.text ':'), (gen node.name, ctx)
+  ir.cat (ir.text '\\'), (gen node.name, ctx)
 
 generators.ImportTabLit = (node, ctx, gen) ->
   parts = { ir.text '{ ' }
 
   items = node.items ?? {}
   for i, item in ipairs items
+    -- macro import form is `:$name`
+    if item\is types.MacroName
+      parts[] = ir.text ':'
     parts[] = gen item, ctx
     parts[] = ir.text ', ' if i < #items
 
@@ -2399,7 +2412,14 @@ generators.ImportTabLit = (node, ctx, gen) ->
   ir.concat parts
 
 generators.ImportGlobal = (node, ctx, gen) ->
-  if node.name then gen node.name, ctx else ir.EMPTY
+  parts = {}
+  for i, seg in ipairs node.segs
+    parts[] = ir.text '.' if i > 1
+    parts[] = gen seg, ctx
+  if node.target
+    parts[] = ir.text ' as '
+    parts[] = gen node.target, ctx
+  ir.concat parts
 
 --[[ macro generators ]]
 generators.Macro = (node, ctx, gen) ->

@@ -176,6 +176,26 @@ describe 'formatter', ->
         assert.nil err
         assert.same input, r
 
+    it 'should keep import and global declarations', ->
+      cases = {
+        "import 'm' as { $, :$todo }"
+        "import 'm' as { :$a, $b: $c }"
+        'import x, \\y, z from items'
+        "from 'm' import x1, \\z1"
+        'import require'
+        'import string.format'
+        'import io.read as io_read'
+        'global const class A'
+        'global const Flag = 1'
+        'global const math, table'
+        'global ^'
+        'global *'
+      }
+      for input in *cases
+        r, err = fmt.format input
+        assert.nil err
+        assert.same input, r
+
   describe 'string interpolation', ->
     it 'should add canonical spaces around bare interpolation', ->
       r = fmt.format 'x = "#{some_var}"'
@@ -901,8 +921,6 @@ describe 'formatter', ->
       'yue_inputs/whitespace.yue': '`x = class -- c` becomes a call; comma added after eol comment'
       'yue_repo/cond.yue': 'inline `then` chains are joined or gain an `else`'
       'yue_repo/export.yue': 'multi-line `#{ }` keeps its tabs'
-      'yue_repo/global.yue': '`global const` loses `const`'
-      'yue_repo/import.yue': '`import \\y` becomes `import :y`'
       'yue_repo/multiline_chain.yue': 'blank lines change on a second pass'
       'yue_repo/string.yue': 'tabs in `|` strings become spaces'
       'yue_repo/syntax.yue': 'empty `--` lines added after a table block'
