@@ -148,12 +148,12 @@ describe 'formatter', ->
 
     it 'should pad an index or key that starts with [', ->
       cases = {
-        { 'print t[ [3] ]', 'print t[ [3] ]' }
-        { 'print t[[3]]', 'print t([[3]])' }
-        { 'print t[ [x for x in *a] ]', 'print t[ [ x for x in *a ] ]' }
-        { 'print t[ [[a]] ]', 'print t[ [[a]] ]' }
-        { 'print t[ [==[a]==] ]', 'print t[ [==[a]==] ]' }
-        { 'x = { [ [3] ]: 1 }', 'x = { [ [3] ]: 1 }' }
+        { 'print t[ [3] ]', 'print t[ [3] ]' },
+        { 'print t[[3]]', 'print t([[3]])' },
+        { 'print t[ [x for x in *a] ]', 'print t[ [ x for x in *a ] ]' },
+        { 'print t[ [[a]] ]', 'print t[ [[a]] ]' },
+        { 'print t[ [==[a]==] ]', 'print t[ [==[a]==] ]' },
+        { 'x = { [ [3] ]: 1 }', 'x = { [ [3] ]: 1 }' },
         { 'x = { [ [[k]] ]: 1 }', 'x = { [ [[k]] ]: 1 }' }
       }
       for { input, expected } in *cases
@@ -163,12 +163,12 @@ describe 'formatter', ->
 
     it 'should keep the content of single-line long strings', ->
       cases = {
-        'x = [[ a b ]]'
-        'y = [=[ c ]=]'
-        'z = [[]]'
-        'w = [[   ]]'
-        'f [[ q ]], [==[ r]==]'
-        'print t[ [[a]] ]'
+        'x = [[ a b ]]',
+        'y = [=[ c ]=]',
+        'z = [[]]',
+        'w = [[   ]]',
+        'f [[ q ]], [==[ r]==]',
+        'print t[ [[a]] ]',
         'k = { [ [[ key3 ]] ]: 3 }'
       }
       for input in *cases
@@ -178,23 +178,48 @@ describe 'formatter', ->
 
     it 'should keep import and global declarations', ->
       cases = {
-        "import 'm' as { $, :$todo }"
-        "import 'm' as { :$a, $b: $c }"
-        'import x, \\y, z from items'
-        "from 'm' import x1, \\z1"
-        'import require'
-        'import string.format'
-        'import io.read as io_read'
-        'global const class A'
-        'global const Flag = 1'
-        'global const math, table'
-        'global ^'
+        "import 'm' as { $, :$todo }",
+        "import 'm' as { :$a, $b: $c }",
+        'import x, \\y, z from items',
+        "from 'm' import x1, \\z1",
+        'import require',
+        'import string.format',
+        'import io.read as io_read',
+        'global const class A',
+        'global const Flag = 1',
+        'global const math, table',
+        'global ^',
         'global *'
       }
       for input in *cases
         r, err = fmt.format input
         assert.nil err
         assert.same input, r
+
+    it 'should keep branches after an inline then', ->
+      cases = {
+        { 'if a then b\nelseif c\n  d', 'if a then b\nelseif c\n  d' },
+        { 'if a then b elseif c\n  d', 'if a then b elseif c\n  d' },
+        { 'if a then b\nelse\n  c', 'if a then b\nelse\n  c' },
+        { 'if a then b else\n  c', 'if a then b else\n  c' },
+        { 'if a then b\nelse c', 'if a then b\nelse\n  c' },
+        {
+          'if a then b elseif c\n  d\nelse\n  e',
+          'if a then b elseif c\n  d\nelse\n  e'
+        },
+        { 'if a then ->\n    x\nelse\n  y', 'if a then ->\n  x\nelse\n  y' },
+        {
+          'f = ->\n  if a then |\n    yaml\n  else\n    y',
+          'f = ->\n  if a then |\n    yaml\n  else\n    y'
+        },
+        {
+          'if a then b elseif c then d else e', 'if a then b elseif c then d else e'
+        }
+      }
+      for { input, expected } in *cases
+        r, err = fmt.format input
+        assert.nil err
+        assert.same expected, r
 
   describe 'string interpolation', ->
     it 'should add canonical spaces around bare interpolation', ->
@@ -914,12 +939,11 @@ describe 'formatter', ->
       lua = lua\gsub '"', "'"
       (lua\gsub "%['([%a_][%w_]*)'%] =", '%1 =')
 
-    -- known formatter bugs; drop an entry once the bug is fixed and the file's
-    -- `expect` section is regenerated
+    -- known formatter bugs + rewrites that behave the same but compile differently
     known = {
       'fmt_ll_args.yue': 'broken call arguments continue at column 0'
       'yue_inputs/whitespace.yue': '`x = class -- c` becomes a call; comma added after eol comment'
-      'yue_repo/cond.yue': 'inline `then` chains are joined or gain an `else`'
+      'yue_repo/cond.yue': '`else if` becomes `elseif`: same behavior, different lua text'
       'yue_repo/export.yue': 'multi-line `#{ }` keeps its tabs'
       'yue_repo/multiline_chain.yue': 'blank lines change on a second pass'
       'yue_repo/string.yue': 'tabs in `|` strings become spaces'

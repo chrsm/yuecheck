@@ -1677,6 +1677,14 @@ generators.WhileLine = (node, ctx, gen) ->
   cond_ctx.inside_condition = true
   ir.cat (ir.text node.type.v), ir.SPACE, (gen node.condition, cond_ctx)
 
+-- `if a then b else` with the else body after \n
+else_follows = (node, ctx) ->
+  line = ctx.source_lines?[node\g_end_line!]
+  unless line
+    return false
+  rest = line\sub node\g_end_col!
+  (rest\match '^%s*else%f[^%w_]') != nil
+
 generators.If = (node, ctx, gen) ->
   nodes = node.nodes or {}
   iftyp = node.type?.v or 'if'
@@ -1712,35 +1720,43 @@ generators.If = (node, ctx, gen) ->
          next_node\g_src_line! == cond_line
 
       if is_inline
-        -- inline ternary form
+        -- inline ternary form; an elseif/else that starts on a later source
+        -- line goes back to block form in the outer loop
         parts[] = ir.text ' then '
         i += 1
         parts[] = gen nodes[i], ctx
 
         while i + 1 <= #nodes
           next_item = nodes[i + 1]
-          if (next_item\is types.IfCond) and next_item\g_src_line! == cond_line
-            parts[] = ir.text ' elseif '
-            i += 1
-            parts[] = gen nodes[i], ctx
-            if i + 1 <= #nodes and (nodes[i + 1]\is types.Statement) and
-               nodes[i + 1]\g_src_line! == cond_line
-              parts[] = ir.text ' then '
+          same_line = next_item\g_src_line! == nodes[i]\g_end_line!
+          switch true
+            when (next_item\is types.IfCond) and same_line
+              parts[] = ir.text ' elseif '
               i += 1
               parts[] = gen nodes[i], ctx
-          elseif (next_item\is types.Statement) and
-                 next_item\g_src_line! == cond_line
-            parts[] = ir.text ' else '
-            i += 1
-            parts[] = gen nodes[i], ctx
-            break
-          elseif next_item\is types.Block
-            parts[] = ir.text ' else'
-            i += 1
-            parts[] = ir.indent_block gen(nodes[i], ctx)
-            break
-          else
-            break
+              elseif_line = nodes[i]\g_src_line!
+              after = nodes[i + 1]
+              if (after?\is types.Statement) and after\g_src_line! == elseif_line
+                parts[] = ir.text ' then '
+                i += 1
+                parts[] = gen nodes[i], ctx
+              elseif after?\is types.Block
+                -- body of this elseif
+                i += 1
+                parts[] = ir.indent_block gen(nodes[i], ctx)
+            when (next_item\is types.Statement) and same_line
+              parts[] = ir.text ' else '
+              i += 1
+              parts[] = gen nodes[i], ctx
+              break
+            when (next_item\is types.Block) and else_follows nodes[i], ctx
+              parts[] = ir.text ' else'
+              i += 1
+              parts[] = ir.indent_block gen(nodes[i], ctx)
+              break
+            else
+              parts[] = ir.HARDLINE
+              break
       else
         -- block form
         eol = get_eol_doc item\g_end_line!, ctx
