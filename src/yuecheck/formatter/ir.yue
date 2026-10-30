@@ -25,6 +25,9 @@ hardline = -> HARDLINE
 -- used for verbatim content (YAML multiline, Lua strings) where source indent matters
 literalline = -> { _doc_type: 'literalline' }
 
+-- text copied from inside a string literal
+literal_text = (s) -> { _doc_type: 'text', s: (tostring s), literal: true }
+
 -- sequential composition of a list of docs
 concat = (docs) -> { _doc_type: 'concat', docs: docs }
 
@@ -237,6 +240,7 @@ export default {
   :line
   :hardline
   :literalline
+  :literal_text
   :concat
   :cat
   :nest

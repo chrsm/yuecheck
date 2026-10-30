@@ -768,15 +768,15 @@ generators.LuaString = (node, ctx, gen) ->
         open_col = node.open\g_src_col!
         open_len = #node.open.v
         after_open = src\sub(open_col + open_len)
-        parts[] = ir.text after_open if #after_open > 0
+        parts[] = ir.literal_text after_open if #after_open > 0
       elseif ln == close_line
         close_col = node.close\g_src_col!
         before_close = src\sub(1, close_col - 1)
         parts[] = ir.literalline!
-        parts[] = ir.text before_close if #before_close > 0
+        parts[] = ir.literal_text before_close if #before_close > 0
       else
         parts[] = ir.literalline!
-        parts[] = ir.text src
+        parts[] = ir.literal_text src
     parts[] = gen node.close, ctx
     return ir.concat parts
   elseif source_lines and open_line and open_line == close_line
@@ -828,11 +828,8 @@ generators.DoubleString = (node, ctx) ->
               for ln in original_str\gmatch '[^\n]*'
                 lines[] = ln
               for i, ln in ipairs lines
-                if i == 1
-                  parts[] = ir.text ln
-                else
-                  parts[] = ir.literalline!
-                  parts[] = ir.text ln
+                parts[] = ir.literalline! if i > 1
+                parts[] = ir.literal_text ln
               return ir.concat parts
             return ir.text original_str
 
@@ -2526,7 +2523,6 @@ generators.YAMLMultiline = (node, ctx) ->
         if result\find '#{', 1, true
           result = xstring.normalize_interp_spacing result
         -- build as concat of lines with literallines (no indent added by layout)
-        -- normalize tab indentation to spaces
         parts = {}
         lines = {}
         for ln in result\gmatch '[^\n]*'
@@ -2538,10 +2534,11 @@ generators.YAMLMultiline = (node, ctx) ->
           parts[] = ir.literalline! if i > 1
           if i == 1
             parts[] = ir.text ln
-          else
-            -- normalize all tabs to spaces
-            normalized = ln\gsub '\t', '  '
-            parts[] = ir.text normalized
+            continue
+          -- tabs in the indentation become spaces
+          -- a tab _after_ the indentation is part of the string
+          ws = ln\match '^[ \t]*'
+          parts[] = ir.literal_text (ws\gsub '\t', '  ') .. (ln\sub #ws + 1)
         return ir.concat parts
 
   -- fallback

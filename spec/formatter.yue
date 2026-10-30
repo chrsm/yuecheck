@@ -221,6 +221,22 @@ describe 'formatter', ->
         assert.nil err
         assert.same expected, r
 
+    it 'should keep whitespace inside string literals', ->
+      cases = {
+        { 'x = [[\nfoo   \nbar]]', 'x = [[\nfoo   \nbar]]' }
+        { 'x = "\nfoo   \nbar"', 'x = "\nfoo   \nbar"' }
+        { 'x = |\n  foo   \n  bar  \ny = 1', 'x = |\n  foo   \n  bar  \ny = 1' }
+        { 'x = |\n  foo\tbar', 'x = |\n  foo\tbar' }
+        -- the file becomes space-indented, including the string's own indentation
+        { 'x = |\n\tconfig:\n\t\tenabled: true', 'x = |\n  config:\n    enabled: true' }
+        -- comments are not string content
+        { '--[[ a   \n  b ]]\nx = 1   ', '--[[ a\n  b ]]\nx = 1' }
+      }
+      for { input, expected } in *cases
+        r, err = fmt.format input
+        assert.nil err
+        assert.same expected, r
+
   describe 'string interpolation', ->
     it 'should add canonical spaces around bare interpolation', ->
       r = fmt.format 'x = "#{some_var}"'
@@ -946,7 +962,7 @@ describe 'formatter', ->
       'yue_repo/cond.yue': '`else if` becomes `elseif`: same behavior, different lua text'
       'yue_repo/export.yue': 'multi-line `#{ }` keeps its tabs'
       'yue_repo/multiline_chain.yue': 'blank lines change on a second pass'
-      'yue_repo/string.yue': 'tabs in `|` strings become spaces'
+      'yue_repo/string.yue': 'tab indentation inside `|` string content becomes spaces'
       'yue_repo/syntax.yue': 'empty `--` lines added after a table block'
       'yue_repo/tables.yue': 'blank lines and indent change on a second pass'
       'yue_repo/try_catch.yue': '`try` inside parentheses is re-indented'

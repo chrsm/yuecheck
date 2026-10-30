@@ -243,8 +243,8 @@ do
     path: "C:\\Program Files\\App"
     desc: 'single "quote" test'
   str = |
-    key: value
-    next: 123
+    key: value	 
+    next: 123	 
   str = |
     list:
       - "one"

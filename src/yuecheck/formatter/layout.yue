@@ -165,16 +165,18 @@ render_flat = (doc, output) ->
     else
       -- unknown: skip
 
--- strip trailing spaces from the last element in an output buffer
-strip_trailing_output = (output) ->
-  if #output > 0
-    last = output[#output]
-    output[#output] = last\gsub ' +$', ''
+-- strip trailing spaces from the last element in an output buffer _unless_ that
+-- element is string content
+strip_trailing_output = (output, literal_at) ->
+  if #output == 0 or #output == literal_at
+    return
+  output[#output] = output[#output]\gsub ' +$', ''
 
 -- render a doc to a string
 -- page_width: maximum line width (default 84)
 layout = (doc, page_width = 84) ->
   output = {}
+  literal_at = 0
   col = 0
   stack = { { indent: 0, mode: 'break', doc: doc } }
 
@@ -186,7 +188,12 @@ layout = (doc, page_width = 84) ->
       when 'empty'
         -- nothing
       when 'text'
-        output[] = d.s
+        if d.literal
+          output[] = d.s
+          literal_at = #output
+        else
+          -- text spanning lines (a --[[ ]] comment) loses trailing spaces
+          output[] = (d.s\gsub ' +\n', '\n')
         col += #d.s
       when 'line'
         if m == 'flat'
@@ -194,17 +201,17 @@ layout = (doc, page_width = 84) ->
           col += #d.alt
         else
           -- break mode: newline + indent
-          strip_trailing_output output
+          strip_trailing_output output, literal_at
           output[] = '\n'
           output[] = get_indent i
           col = i
       when 'hardline'
-        strip_trailing_output output
+        strip_trailing_output output, literal_at
         output[] = '\n'
         output[] = get_indent i
         col = i
       when 'literalline'
-        strip_trailing_output output
+        strip_trailing_output output, literal_at
         output[] = '\n'
         col = 0
       when 'concat'
@@ -249,7 +256,7 @@ layout = (doc, page_width = 84) ->
               col += item_w
             else
               -- doesn't fit: start new line
-              strip_trailing_output output
+              strip_trailing_output output, literal_at
               output[] = '\n'
               output[] = get_indent local_i
               col = local_i
@@ -298,11 +305,7 @@ layout = (doc, page_width = 84) ->
                 }
               break
 
-  result = table.concat output, ''
-  -- strip trailing whitespace per line
-  result = result\gsub '([^\n]*) +\n', '%1\n'
-  -- strip trailing whitespace at end
-  result = result\gsub ' +$', ''
-  result
+  strip_trailing_output output, literal_at
+  table.concat output, ''
 
 export default { :layout, :flat_width, :fits }
