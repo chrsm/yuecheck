@@ -111,6 +111,7 @@ determine_association = (comment, nodes_by_line) ->
       'FunLit': true
       'With': true
       'Do': true
+      'ClassBlock': true
     }
     has_more = false
     for entry in *same_line_nodes

@@ -788,7 +788,7 @@ generators.LuaString = (node, ctx, gen) ->
     unless open_line == node.content\g_src_line!
       return ir
         .cat open_doc, ir
-            .literalline!, ir.text(node.content.v), gen(node.close, ctx)
+          .literalline!, ir.text(node.content.v), gen(node.close, ctx)
     return ir.cat open_doc, ir.text(node.content.v), gen(node.close, ctx)
 
   ir.cat open_doc, gen(node.close, ctx)
@@ -1051,11 +1051,11 @@ gen_chain_item = (item, ctx, gen) ->
           for j, arg in ipairs item.args
             -- preceding inline comments (--[[x]] before arg on same line)
             pre_inline = get_preceding_doc_recursive arg
-            eol_d = get_eol_doc arg\g_src_line!, ctx
-            arg_doc = ir.cat pre_inline, gen(arg, ctx), eol_d
+            arg_doc = ir.cat pre_inline, gen(arg, ctx)
             if j < #item.args
               arg_doc = ir.cat arg_doc, ir.COMMA
-            arg_parts[] = arg_doc
+            -- after the comma
+            arg_parts[] = ir.cat arg_doc, get_eol_doc(arg\g_src_line!, ctx)
           inner = ir.join ir.HARDLINE, arg_parts
           if should_nest
             parts[] = ir.indent_block inner
@@ -1410,7 +1410,7 @@ generators.TableLit = (node, ctx, gen) ->
     .EMPTY
 
   items_doc = build_container_items_doc gen, node
-      .values, ctx, trailing_comma, is_source_multiline, forced
+    .values, ctx, trailing_comma, is_source_multiline, forced
   table_spacing = ctx?.table_spacing ?? true
 
   result = gen_container_with_doc '{', items_doc, '}', forced, table_spacing
@@ -1739,6 +1739,7 @@ generators.If = (node, ctx, gen) ->
                 parts[] = gen nodes[i], ctx
               elseif after?\is types.Block
                 -- body of this elseif
+                ir.append_if_nonempty parts, get_eol_doc nodes[i]\g_end_line!, ctx
                 i += 1
                 parts[] = ir.indent_block gen(nodes[i], ctx)
             when (next_item\is types.Statement) and same_line
@@ -1748,10 +1749,12 @@ generators.If = (node, ctx, gen) ->
               break
             when (next_item\is types.Block) and else_follows nodes[i], ctx
               parts[] = ir.text ' else'
+              ir.append_if_nonempty parts, get_eol_doc nodes[i]\g_end_line!, ctx
               i += 1
               parts[] = ir.indent_block gen(nodes[i], ctx)
               break
             else
+              ir.append_if_nonempty parts, get_eol_doc nodes[i]\g_end_line!, ctx
               parts[] = ir.HARDLINE
               break
       else
@@ -1852,6 +1855,8 @@ generators.Switch = (node, ctx, gen) ->
       ir.cat ir.text('else'), ir.indent_block(gen(node.lastBranch, ctx))
     branch_parts[] = else_doc
 
+  eol = get_eol_doc (node.assignment ?? node.target)\g_end_line!, ctx
+  ir.append_if_nonempty parts, eol
   parts[] = ir.indent_block ir.join(ir.HARDLINE, branch_parts)
   ir.concat parts
 
@@ -1899,6 +1904,8 @@ generators.ForNum = (node, ctx, gen) ->
     parts[] = ir.text ', '
     parts[] = gen node.stepValue.value, ctx
 
+  eol = get_eol_doc (node.stepValue ?? node.stopValue)\g_end_line!, ctx
+  ir.append_if_nonempty parts, eol
   parts[] = ir.indent_block gen(node.body, ctx)
   ir.concat parts
 
@@ -1910,6 +1917,7 @@ generators.ForEach = (node, ctx, gen) ->
     gen node.loopValue, ctx,
   }
 
+  ir.append_if_nonempty parts, get_eol_doc node.loopValue\g_end_line!, ctx
   parts[] = ir.indent_block gen(node.body, ctx)
   ir.concat parts
 
@@ -1960,6 +1968,7 @@ generators.Do = (node, ctx, gen) ->
 
   ir.cat(
     ir.text('do'),
+    get_eol_doc(do_line, ctx),
     ir.indent_block gen(node.body, ctx)
   )
 
@@ -1973,6 +1982,8 @@ generators.With = (node, ctx, gen) ->
     parts[] = ir.text ' :'
     parts[] = gen node.assign, ctx
 
+  eol = get_eol_doc (node.assign ?? node.valueList)\g_end_line!, ctx
+  ir.append_if_nonempty parts, eol
   parts[] = ir.indent_block gen(node.body, ctx)
   ir.concat parts
 
@@ -2006,20 +2017,23 @@ generators.CatchBlock = (node, ctx, gen) ->
 
 --[[ class generators ]]
 generators.ClassDecl = (node, ctx, gen) ->
-  parts = { ir.text 'class ' }
-  parts[] = gen node.name, ctx if node.name
-
-  if node.mixes
-    parts[] = ir.SPACE if node.name
-    parts[] = ir.text 'using '
-    parts[] = gen node.mixes, ctx
+  parts = { ir.text 'class' }
+  if node.name
+    parts[] = ir.SPACE
+    parts[] = gen node.name, ctx
 
   if node.extend
-    parts[] = ir.SPACE if node.name
-    parts[] = ir.text 'extends '
+    parts[] = ir.text ' extends '
     parts[] = gen node.extend, ctx
 
+  if node.mixes
+    parts[] = ir.text ' using '
+    parts[] = gen node.mixes, ctx
+
   if node.body
+    -- consume an eol comment on the header line (`x = class -- c`) before the body
+    eol = get_eol_doc node\g_src_line!, ctx
+    ir.append_if_nonempty parts, eol
     parts[] = ir.indent_block gen(node.body, ctx)
 
   ir.concat parts
@@ -2411,14 +2425,25 @@ generators.ColonImportName = (node, ctx, gen) ->
   ir.cat (ir.text '\\'), (gen node.name, ctx)
 
 generators.ImportTabLit = (node, ctx, gen) ->
-  parts = { ir.text '{ ' }
+  -- macro import form is `:$name`
+  gen_item = (item, c) ->
+    unless item\is types.MacroName
+      return gen item, c
+    ir.cat (ir.text ':'), (gen item, c)
 
   items = node.items ?? {}
+  if #items > 0 and node\g_end_line! > node\g_src_line!
+    -- keep a multi-line list multi-line so each item's comments have a line
+    trailing = has_trailing_comma node, ctx, '{', '}'
+    items_doc = build_container_items_doc gen_item, items, ctx, trailing, true, true
+    spacing = ctx?.table_spacing ?? true
+    container = gen_container_with_doc '', items_doc, '}', true, spacing
+    -- an eol comment after `{` stays on that line
+    return ir.cat (ir.text '{'), (get_eol_doc node\g_src_line!, ctx), container
+
+  parts = { ir.text '{ ' }
   for i, item in ipairs items
-    -- macro import form is `:$name`
-    if item\is types.MacroName
-      parts[] = ir.text ':'
-    parts[] = gen item, ctx
+    parts[] = gen_item item, ctx
     parts[] = ir.text ', ' if i < #items
 
   parts[] = ir.text ' }'

@@ -897,7 +897,7 @@ do
 do
   f = (a, b) -> a + b
   f(
-    a -- value a,
+    a, -- value a
     b -- value b
   )
   f!

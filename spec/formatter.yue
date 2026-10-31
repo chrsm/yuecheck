@@ -319,6 +319,77 @@ describe 'formatter', ->
       r = fmt.format input
       assert.same expect, r
 
+    it 'should keep an eol comment on a class header', ->
+      cases = {
+        { 'x = class -- c\n  a: 1', 'x = class -- c\n  a: 1' }
+        { 'x = class -- c', 'x = class -- c' }
+        { 'class A extends B -- c\n  new: =>\n    super!\n  m: => 1', 'class A extends B -- c\n  new: =>\n    super!\n  m: => 1' }
+        { 't =\n  k: class -- c\n    a: 1\n  j: 2', 't =\n  k: class -- c\n    a: 1\n  j: 2' }
+        { 'class A extends B using M\n  a: 1', 'class A extends B using M\n  a: 1' }
+      }
+      for { input, expected } in *cases
+        r, err = fmt.format input
+        assert.nil err
+        assert.same expected, r
+
+    it 'should put the comma before an argument comment', ->
+      cases = {
+        { 'f(\n  one -- one\n  two\n)', 'f(\n  one, -- one\n  two\n)' }
+        { 'f(\n  one, -- one\n  two, -- two\n  three -- three\n)', 'f(\n  one, -- one\n  two, -- two\n  three -- three\n)' }
+      }
+      for { input, expected } in *cases
+        r, err = fmt.format input
+        assert.nil err
+        assert.same expected, r
+
+    it 'should move comments with sorted imports', ->
+      cases = {
+        { "import 'y' -- why y\nimport 'x'", "import 'x'\nimport 'y' -- why y" }
+        { "import 'y' -- why y\nimport 'x' -- why x\nimport 'w'", "import 'w'\nimport 'x' -- why x\nimport 'y' -- why y" }
+        -- a comment above the group stays on top
+        { "-- the imports\nimport 'y'\nimport 'x'", "-- the imports\nimport 'x'\nimport 'y'" }
+      }
+      for { input, expected } in *cases
+        r, err = fmt.format input
+        assert.nil err
+        assert.same expected, r
+
+    it 'should keep comments in a multi-line import list', ->
+      cases = {
+        { "import 'm' as {\n  a, -- first\n  b: c, -- second\n}", "import 'm' as {\n  a, -- first\n  b: c, -- second\n}" }
+        { "import 'm' as {\n  $, -- all\n  :$todo -- one\n}", "import 'm' as {\n  $, -- all\n  :$todo -- one\n}" }
+        { "import 'm' as { -- on brace\n  a\n  b\n}", "import 'm' as { -- on brace\n  a,\n  b\n}" }
+        { "import 'm' as { a, b: c }", "import 'm' as { a, b: c }" }
+      }
+      for { input, expected } in *cases
+        r, err = fmt.format input
+        assert.nil err
+        assert.same expected, r
+
+    it 'should keep an eol comment after an inline then', ->
+      cases = {
+        'if a then b -- c\nelse\n  d'
+        'if a then b else -- c\n  d'
+        'if a then b elseif c -- k\n  d'
+      }
+      for input in *cases
+        r, err = fmt.format input
+        assert.nil err
+        assert.same input, r
+
+    it 'should keep eol comments on block headers', ->
+      cases = {
+        'with x -- c\n  .a = 1\n  .b = 2'
+        'do -- c\n  a = 1\n  b = 2'
+        'switch x -- c\n  when 1\n    a!\n  when 2\n    b!'
+        'for i = 1, 3 -- c\n  a i\n  b i'
+        'for v in *t -- c\n  a v\n  b v'
+      }
+      for input in *cases
+        r, err = fmt.format input
+        assert.nil err
+        assert.same input, r
+
   describe 'eof comments', ->
     it 'should keep comments that at eof', ->
       r = fmt.format 'x = 1\n-- eof comment'
@@ -958,7 +1029,6 @@ describe 'formatter', ->
     -- known formatter bugs + rewrites that behave the same but compile differently
     known = {
       'fmt_ll_args.yue': 'broken call arguments continue at column 0'
-      'yue_inputs/whitespace.yue': '`x = class -- c` becomes a call; comma added after eol comment'
       'yue_repo/cond.yue': '`else if` becomes `elseif`: same behavior, different lua text'
       'yue_repo/export.yue': 'multi-line `#{ }` keeps its tabs'
       'yue_repo/multiline_chain.yue': 'blank lines change on a second pass'

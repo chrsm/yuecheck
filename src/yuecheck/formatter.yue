@@ -108,6 +108,11 @@ sort_imports = (block) ->
         if entry.stmt.pos
           entry.stmt.pos.line = first_line + k - 1
 
+      first = group[1].stmt
+      if stmt._comments?.above and first != stmt
+        first._comments or= { above: {}, trailing: {}, eol: nil }
+        first._comments.above, stmt._comments.above = stmt._comments.above, {}
+
     i = j
 
 format = (src, opts = {}) ->
@@ -122,14 +127,12 @@ format = (src, opts = {}) ->
   unless parsed_ast
     return nil, err
 
+  comments = comment_parser.to_ast src
+  inject_result = comment_assoc.inject src, parsed_ast, comments
+
   -- OPINIONATED(@chrsm):
   -- sort top-level imports in ast before formatting
   sort_imports parsed_ast.block
-
-  -- inject comments as AST nodes (in node._comments; above/eol/trailing)
-  -- orphans are injected into Block.statementOrComments as YueComment nodes
-  comments = comment_parser.to_ast src
-  inject_result = comment_assoc.inject src, parsed_ast, comments
 
   -- track source lines for comments and interpolated strings
   source_lines = {}
