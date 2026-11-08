@@ -390,6 +390,40 @@ describe 'formatter', ->
         assert.nil err
         assert.same input, r
 
+    it 'should keep a comment on a closing bracket line', ->
+      cases = {
+        { 'x = {\n  a: 1\n} -- t\nprint 1', 'x = {\n  a: 1\n} -- t\nprint 1' }
+        { 'x = [\n  1\n  2\n] -- t\nprint 1', 'x = [\n  1,\n  2\n] -- t\nprint 1' }
+        { 'x = f(\n  a\n  b\n) -- f\nprint 1', 'x = f(\n  a,\n  b\n) -- f\nprint 1' }
+        { "import 'm' as {\n  a\n  b\n} -- after\nprint 1", "import 'm' as {\n  a,\n  b\n} -- after\nprint 1" }
+        { 'x = "\na\n" -- c\nprint 1', 'x = "\na\n" -- c\nprint 1' }
+        { 'f(\n  g(\n    a\n    b\n  ) -- g\n  c\n)', 'f(\n  g(\n    a,\n    b\n  ), -- g\n  c\n)' }
+        { 't =\n  k: {\n    a: 1\n  } -- c\n  j: 2', 't =\n  k: {\n    a: 1\n  } -- c\n  j: 2' }
+        { 'class A\n  k: {\n    a: 1\n  } -- c\n  m: => 1', 'class A\n  k: {\n    a: 1\n  } -- c\n  m: => 1' }
+        -- the next statement keeps its own comment
+        { 'x = {\n  a: 1\n}\ny = 1 -- y', 'x = {\n  a: 1\n}\ny = 1 -- y' }
+      }
+      for { input, expected } in *cases
+        r, err = fmt.format input
+        assert.nil err
+        assert.same expected, r
+
+    it 'should keep comments in call arguments', ->
+      cases = {
+        { 'f(\n  one --[[ i ]], -- one\n  two\n)', 'f(\n  one --[[ i ]], -- one\n  two\n)' }
+        { 'x = 1 --[[ a ]] -- b', 'x = 1 --[[ a ]] -- b' }
+        { 'x = f 1, -- c\n  2', 'x = f 1, -- c\n  2' }
+        { 'x = f 1,\n  2, -- c2\n  3', 'x = f 1,\n  2, -- c2\n  3' }
+        { 'x = f 1, -- c1\n  2, -- c2\n  3 -- c3', 'x = f 1, -- c1\n  2, -- c2\n  3 -- c3' }
+        { 'f {\n  a: 1\n}, 2 -- t\nprint 1', 'f {\n  a: 1\n}, 2 -- t\nprint 1' }
+        { 'f {\n  a: 1\n} -- t\nprint 1', 'f {\n  a: 1\n} -- t\nprint 1' }
+        { 'f {\n  a: 1\n}, -- t\n  2', 'f {\n  a: 1\n}, 2 -- t' }
+      }
+      for { input, expected } in *cases
+        r, err = fmt.format input
+        assert.nil err
+        assert.same expected, r
+
   describe 'eof comments', ->
     it 'should keep comments that at eof', ->
       r = fmt.format 'x = 1\n-- eof comment'

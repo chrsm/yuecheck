@@ -399,6 +399,21 @@ get_eol_doc = (line_num, ctx) ->
 
   ir.EMPTY
 
+-- is target the root node or one of its descendants?
+contains_node = (root, target) ->
+  found = false
+  root\walk (n) ->
+    found = true if n == target
+  found
+
+-- eol comment for a node that may span lines
+-- its last line (`} -- c`) first then its first line
+get_eol_doc_span = (node, ctx) ->
+  eol = get_eol_doc node\g_end_line!, ctx
+  unless eol._doc_type == 'empty'
+    return eol
+  get_eol_doc node\g_src_line!, ctx
+
 -- trailing comments for a node (inline block comments like --[[t]])
 -- reads from node._comments.trailing (injected during association)
 get_trailing_doc = (node, ctx) ->
@@ -1054,8 +1069,8 @@ gen_chain_item = (item, ctx, gen) ->
             arg_doc = ir.cat pre_inline, gen(arg, ctx)
             if j < #item.args
               arg_doc = ir.cat arg_doc, ir.COMMA
-            -- after the comma
-            arg_parts[] = ir.cat arg_doc, get_eol_doc(arg\g_src_line!, ctx)
+            -- after the comma a line_suffix
+            arg_parts[] = ir.cat arg_doc, (get_eol_doc_span arg, ctx)
           inner = ir.join ir.HARDLINE, arg_parts
           if should_nest
             parts[] = ir.indent_block inner
@@ -1205,35 +1220,30 @@ generators.InvokeArgs = (node, ctx, gen) ->
 
     should_nest = is_multiline and not first_is_multiline_table
     if should_nest
+      -- does arg i start its own source line?
+      -- (no comma before it on the line)
+      starts_line = (i) ->
+        arg_line = node.args[i]\g_src_line!
+        arg_col = node.args[i]\g_src_col!
+        line_content = arg_line and ctx.source_lines?[arg_line]
+        unless line_content and arg_col
+          return true
+        not (line_content\sub 1, arg_col - 1)\match ','
+
       arg_parts = {}
       for i, arg in ipairs node.args
-        arg_line = arg\g_src_line!
-        arg_col = arg\g_src_col!
-
         if i > 1
-          arg_parts[] = ir.COMMA
-
-          if is_multiline
-            should_newline = true
-            if ctx.source_lines and arg_line and arg_col
-              line_content = ctx.source_lines[arg_line]
-              if line_content
-                before_arg = line_content\sub 1, arg_col - 1
-                has_comma_on_line = before_arg\match ','
-                if has_comma_on_line
-                  should_newline = false
-
-            if should_newline
-              arg_parts[] = ir.HARDLINE
-            else
-              arg_parts[] = ir.SPACE
-          else
-            arg_parts[] = ir.SPACE
+          arg_parts[] = if starts_line i then ir.HARDLINE else ir.SPACE
 
         arg_parts[] = gen arg, ctx
 
-        if is_multiline and arg_line and arg_line != first_line
-          arg_parts[] = get_eol_doc arg_line, ctx
+        -- the comment goes after the comma _and only where a line break follows_
+        if i < #node.args
+          arg_parts[] = ir.COMMA
+          if starts_line i + 1
+            arg_parts[] = get_eol_doc arg\g_end_line!, ctx
+        elseif arg\g_src_line! != first_line
+          arg_parts[] = get_eol_doc arg\g_src_line!, ctx
 
       parts[] = ir.nest 2, ir.concat(arg_parts)
     else
@@ -1241,6 +1251,10 @@ generators.InvokeArgs = (node, ctx, gen) ->
         parts[] = ir.COMMA if i > 1
         parts[] = ir.SPACE if i > 1
         parts[] = gen arg, ctx
+      -- args are joined and comments from their lines go at its end
+      if is_multiline
+        for arg in *node.args
+          ir.append_if_nonempty parts, get_eol_doc arg\g_end_line!, ctx
 
   ir.concat parts
 
@@ -1539,8 +1553,7 @@ generators.TableBlock = (node, ctx, gen) ->
       parts[] = ir.text '* '
 
     parts[] = gen val, ctx
-    eol = get_eol_doc val\g_src_line!, ctx
-    ir.append_if_nonempty parts, eol
+    ir.append_if_nonempty parts, get_eol_doc_span val, ctx
 
     parts[] = ir.HARDLINE if i < #node.values
 
@@ -2071,8 +2084,7 @@ generators.ClassBlock = (node, ctx, gen) ->
     above_doc = get_above_doc item, ctx
     ir.append_if_nonempty parts, above_doc
     parts[] = gen item, ctx
-    eol = get_eol_doc item\g_src_line!, ctx
-    ir.append_if_nonempty parts, eol
+    ir.append_if_nonempty parts, get_eol_doc_span item, ctx
   ir.concat parts
 
 generators.ClassMemberList = (node, ctx, gen) ->
@@ -2141,6 +2153,16 @@ generators.Block = (node, ctx, gen) ->
     stmt_doc = gen stmt, ctx
     eol_doc = get_eol_doc_for_node stmt
     parts[] = ir.cat stmt_doc, eol_doc
+
+    -- a `} -- c` comment _inside the statement_ gets on its own line
+    for line = (stmt\g_src_line! or 0), (stmt\g_end_line! or -1)
+      comment = ctx.eol_comments_by_line?[line]
+      owner = comment?._closing_owner
+      unless owner and not comment._emitted and contains_node stmt, owner
+        continue
+      comment._emitted = true
+      parts[] = ir.HARDLINE
+      parts[] = ir.text (comment.v\gsub '%s+$', '')
 
     -- separator between statements (hardline)
     if i < #stmts

@@ -37,9 +37,14 @@ node_priority = {
 get_priority = (node) ->
   node_priority[node\g_yue_name!] or 50
 
+-- eol comments attach at stmt/expr level or below, NOT to File/Block
+MIN_EOL_PRIORITY = 10
+
 -- build nodes_by_line map from AST
+-- ++ multi-line nodes by the line they end on
 build_nodes_by_line = (ast) ->
   nodes_by_line = {}
+  nodes_by_end_line = {}
 
   collect_nodes = (node) ->
     unless node and node.is -- skip non-AST values
@@ -60,6 +65,11 @@ build_nodes_by_line = (ast) ->
       col: col
     }
 
+    end_line = node.end_pos?.line
+    if end_line and end_line > line
+      nodes_by_end_line[end_line] or= {}
+      nodes_by_end_line[end_line][] = { :node, :line, :col }
+
   -- walk AST to collect all nodes
   walk_ast = (node) ->
     unless node and (type node) == 'table'
@@ -69,7 +79,9 @@ build_nodes_by_line = (ast) ->
 
     -- walk children
     for k, v in pairs node
-      if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos', 'end_pos' ]
+      if k in [
+           'is', 'typ', '_src_line', '_src_col', '_comments', 'pos', 'end_pos'
+         ]
         continue
 
       if (type v) == 'table'
@@ -85,11 +97,37 @@ build_nodes_by_line = (ast) ->
   for line, nodes in pairs nodes_by_line
     table.sort nodes, (a, b) -> a.col < b.col
 
-  nodes_by_line
+  nodes_by_line, nodes_by_end_line
+
+-- `} -- c`, `) -- c` nodes don't start on the comment's line
+-- code before the comment closes a ml node there
+find_closing_line_owner = (comment, nodes_by_end_line, src_lines) ->
+  line = comment\g_src_line!
+  text = src_lines[line]
+
+  -- node spans also cover trailing comments so require code before it
+  unless text and (text\sub 1, comment\g_src_col! - 1)\match '%S'
+    return nil
+
+  best = nil
+  for entry in *(nodes_by_end_line[line] or {})
+    priority = get_priority entry.node
+    continue if priority < MIN_EOL_PRIORITY
+    unless best
+      best = entry
+      continue
+    earlier = entry.line < best.line or
+       (entry.line == best.line and entry.col < best.col)
+    same_start = entry.line == best.line and entry.col == best.col
+    if earlier or (same_start and priority < get_priority best.node)
+      best = entry
+  best?.node
 
 -- determine association type for a comment
 -- returns { node: best_node|nil, type: assoc_type|'orphan' }
-determine_association = (comment, nodes_by_line) ->
+-- lookup: { :nodes_by_line, :nodes_by_end_line, :src_lines } (built by inject)
+determine_association = (comment, lookup, followed_by_comment = false) ->
+  { :nodes_by_line, :nodes_by_end_line, :src_lines } = lookup
   comment_col = comment\g_src_col!
   comment_line = comment\g_src_line!
 
@@ -120,14 +158,14 @@ determine_association = (comment, nodes_by_line) ->
         unless multiline_containers[node_type]
           has_more = true
           break
-    is_end_of_line = not has_more
+
+    -- `x --[[ a ]] -- b` _only the last comment_ on a line can be EOL
+    is_end_of_line = not (has_more or followed_by_comment)
 
     if is_end_of_line
       -- for eol comments, attach to the statement/expression level (priority >= 10)
       -- not the broad File/Block containers, and not deep leaves like SingleString
       -- pick the lowest priority that qualifies, otherwise fall back to highest
-      MIN_EOL_PRIORITY = 10
-
       -- first pass: find lowest priority >= MIN_EOL_PRIORITY
       for entry in *same_line_nodes
         if entry.col < comment_col
@@ -208,6 +246,13 @@ determine_association = (comment, nodes_by_line) ->
       unless found_next
         best_node = nil
         best_type = 'orphan'
+
+  unless best_node or same_line_nodes
+    if owner := find_closing_line_owner comment, nodes_by_end_line, src_lines
+      best_node = owner
+      best_type = 'end_of_line'
+      -- codegen's Block keeps if no generator places it
+      comment._closing_owner = owner
 
   -- _if_ there isn't a same-line node, check if this is an above comment
   unless best_node
@@ -327,7 +372,9 @@ find_containing_block = (ast, comment_line, comment_col) ->
     -- for non-Block nodes, recursively check all children for nested Blocks
     for k, v in pairs node
       -- ugh, cleanup TODO kthx
-      continue if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', 'pos', 'end_pos' ]
+      continue if k in [
+        'is', 'typ', '_src_line', '_src_col', '_comments', 'pos', 'end_pos'
+      ]
 
       if (type v) == 'table'
         if v.is
@@ -381,7 +428,10 @@ collect_multiline_tablelits = (ast) ->
         }
 
     for k, v in pairs node
-      continue if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', '_inner_comments', '_raw_content', 'pos', 'end_pos' ]
+      continue if k in [
+        'is', 'typ', '_src_line', '_src_col', '_comments', '_inner_comments',
+        '_raw_content', 'pos', 'end_pos'
+      ]
       if (type v) == 'table'
         if v.is and (type v.is) == 'function'
           walk v
@@ -423,7 +473,10 @@ collect_tableblocks = (ast) ->
         }
 
     for k, v in pairs node
-      continue if k in [ 'is', 'typ', '_src_line', '_src_col', '_comments', '_inner_comments', '_raw_content', 'pos', 'end_pos' ]
+      continue if k in [
+        'is', 'typ', '_src_line', '_src_col', '_comments', '_inner_comments',
+        '_raw_content', 'pos', 'end_pos'
+      ]
       if (type v) == 'table'
         if v.is and (type v.is) == 'function'
           walk v
@@ -471,7 +524,12 @@ inject = (src, ast, comments) ->
   unless comments?.indices? and #comments.indices > 0
     return { orphans: {}, eol_comments_by_line: {} }
 
-  nodes_by_line = build_nodes_by_line ast
+  nodes_by_line, nodes_by_end_line = build_nodes_by_line ast
+  lookup = {
+    :nodes_by_line
+    :nodes_by_end_line
+    src_lines: [ line for line in src\gmatch '[^\n]*' ]
+  }
   orphans = {}
   eol_comments_by_line = {}
 
@@ -486,8 +544,9 @@ inject = (src, ast, comments) ->
     line_comments = comments[line_idx]
     continue unless line_comments
 
-    for comment in *line_comments
-      assoc = determine_association comment, nodes_by_line
+    for ci, comment in ipairs line_comments
+      followed = ci < #line_comments
+      assoc = determine_association comment, lookup, followed
 
       if assoc.node
         inject_comment assoc.node, comment, assoc.type
